@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Anatomy 3D Viewer</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <div id="app">
+    <!-- Header -->
+    <header id="header">
+      <h1>Anatomy Lab 3D Viewer</h1>
+      <p class="subtitle">University of Waterloo</p>
+    </header>
+
+    <!-- Region selector -->
+    <nav id="region-selector">
+      <button class="region-btn active" data-region="shoulder">
+        <span class="region-icon">🦴</span>
+        <span class="region-label">Shoulder</span>
+      </button>
+      <button class="region-btn" data-region="pelvis">
+        <span class="region-icon">🦴</span>
+        <span class="region-label">Pelvis</span>
+      </button>
+    </nav>
+
+    <!-- Viewer area -->
+    <main id="viewer-container">
+      <!-- Loading overlay -->
+      <div id="loading-overlay">
+        <div id="loading-box">
+          <div id="loading-spinner"></div>
+          <p id="loading-text">Loading model…</p>
+          <div id="progress-bar-track">
+            <div id="progress-bar-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Three.js canvas goes here -->
+      <canvas id="viewer-canvas"></canvas>
+
+      <!-- Controls hint -->
+      <div id="controls-hint">
+        <span>Drag to rotate</span>
+        <span class="divider">·</span>
+        <span>Scroll to zoom</span>
+        <span class="divider">·</span>
+        <span>Right-drag to pan</span>
+      </div>
+
+      <!-- Reset button -->
+      <button id="reset-btn" title="Reset view">&#8635; Reset View</button>
+    </main>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./js/three.module.min.js",
+        "three/addons/": "./js/"
+      }
+    }
+  </script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
