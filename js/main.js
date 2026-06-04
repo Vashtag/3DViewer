@@ -333,7 +333,7 @@ function fitCameraToModel(object) {
   const fov = camera.fov * (Math.PI / 180);
   let distance = radius / Math.sin(fov / 2);
   if (camera.aspect < 1) distance /= camera.aspect; // portrait viewports
-  distance *= 1.15; // small breathing room
+  distance *= 1.0; // sphere fills the view; the mesh (inscribed) keeps a margin
 
   camera.up.set(0, 1, 0);
   camera.position.set(0, 0, distance);
