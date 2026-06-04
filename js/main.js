@@ -13,10 +13,11 @@ const progressFill    = document.getElementById('progress-bar-fill');
 const viewerToolbar   = document.getElementById('viewer-toolbar');
 const resetBtn        = document.getElementById('reset-btn');
 const gizmoCanvas     = document.getElementById('gizmo-canvas');
+const bottomBar       = document.getElementById('bottom-bar');
 const controlsHint    = document.getElementById('controls-hint');
 const emptyState      = document.getElementById('empty-state');
 const displayControls = document.getElementById('display-controls');
-const regionBtns      = document.querySelectorAll('.region-btn');
+const regionSelector  = document.getElementById('region-selector');
 const bgSwatches      = document.querySelectorAll('.bg-swatch');
 const viewBtns        = document.querySelectorAll('.view-btn');
 const lightAzimuth    = document.getElementById('light-azimuth');
@@ -24,11 +25,14 @@ const lightElevation  = document.getElementById('light-elevation');
 const lightReset      = document.getElementById('light-reset');
 const navBtns         = document.querySelectorAll('.nav-btn');
 
-// Draco-compressed GLB per region (texture + materials embedded).
-const REGION_FILES = {
-  shoulder: 'models/shoulder/shoulder.glb',
-  pelvis:   'models/pelvis/pelvis.glb',
-};
+// ── Model catalogue ───────────────────────────────────────
+// To add a model: convert your OBJ to a Draco GLB (see tools/README.md),
+// drop it in models/<id>/<id>.glb, then add one entry here.
+const MODELS = [
+  { id: 'shoulder', label: 'Shoulder', file: 'models/shoulder/shoulder.glb' },
+  { id: 'pelvis',   label: 'Pelvis',   file: 'models/pelvis/pelvis.glb'     },
+];
+const MODEL_BY_ID = Object.fromEntries(MODELS.map(m => [m.id, m]));
 
 // ── Main renderer ─────────────────────────────────────────
 // alpha: true makes the canvas transparent so the CSS background (lab photo
@@ -125,7 +129,7 @@ resize();
 // ── Orientation gizmo ─────────────────────────────────────
 // A small secondary Three.js scene showing a labelled cube + axis vectors.
 // The gizmo camera mirrors the main camera's viewing direction so the cube
-// always reflects the current orientation. Click a face to snap the view.
+// always reflects the current orientation. Passive (not interactive).
 
 const GIZMO_PX = 90; // CSS size — renderer uses devicePixelRatio internally
 
@@ -142,14 +146,15 @@ const gizmoCamera = new THREE.OrthographicCamera(-1.8, 1.8, 1.8, -1.8, 0.1, 10);
 
 // Cube faces: BoxGeometry material order is +X, -X, +Y, -Y, +Z, -Z.
 // The gizmo is a passive orientation indicator (not clickable).
-// Labels use anatomical terms: S = superior (top), I = inferior (bottom).
+// Labels use anatomical terms: A = anterior (front), P = posterior (back),
+// S = superior (top), I = inferior (bottom), L/R = left/right.
 const GIZMO_FACES = [
-  { label: 'R',  bg: '#b83030' }, // +X
-  { label: 'L',  bg: '#7a1f1f' }, // -X
-  { label: 'S',  bg: '#2e8b2e' }, // +Y  (superior)
-  { label: 'I',  bg: '#1a5c1a' }, // -Y  (inferior)
-  { label: 'F',  bg: '#2255bb' }, // +Z  (front / anterior)
-  { label: 'Bk', bg: '#163a80' }, // -Z  (back / posterior)
+  { label: 'R', bg: '#b83030' }, // +X
+  { label: 'L', bg: '#7a1f1f' }, // -X
+  { label: 'S', bg: '#2e8b2e' }, // +Y  (superior)
+  { label: 'I', bg: '#1a5c1a' }, // -Y  (inferior)
+  { label: 'A', bg: '#2255bb' }, // +Z  (anterior / front)
+  { label: 'P', bg: '#163a80' }, // -Z  (posterior / back)
 ];
 
 function makeFaceTex(label, bgColor) {
@@ -275,7 +280,7 @@ function hideLoading() { loadingOverlay.classList.add('hidden'); }
 
 function showViewerUI() {
   emptyState.classList.add('hidden');
-  controlsHint.classList.remove('hidden');
+  bottomBar.classList.remove('hidden');
   viewerToolbar.classList.remove('hidden');
   displayControls.classList.remove('hidden');
   setNavMode('orbit'); // always start a freshly-loaded model in orbit mode
@@ -370,7 +375,9 @@ const gltfLoader = new GLTFLoader();
 gltfLoader.setDRACOLoader(dracoLoader);
 
 function loadRegion(region) {
-  showLoading('Loading ' + region + ' model…');
+  const model = MODEL_BY_ID[region];
+  if (!model) { console.error('Unknown model:', region); return; }
+  showLoading('Loading ' + model.label + ' model…');
 
   if (currentModel) {
     scene.remove(currentModel);
@@ -386,7 +393,7 @@ function loadRegion(region) {
   }
 
   gltfLoader.load(
-    REGION_FILES[region],
+    model.file,
     (gltf) => {
       const object = gltf.scene;
       setProgress(100);
@@ -404,13 +411,18 @@ function loadRegion(region) {
   );
 }
 
-// ── Region buttons ────────────────────────────────────────
-regionBtns.forEach(btn => {
+// ── Region buttons (generated from MODELS) ───────────────
+MODELS.forEach(model => {
+  const btn = document.createElement('button');
+  btn.className = 'region-btn';
+  btn.dataset.region = model.id;
+  btn.innerHTML = `<span class="region-label">${model.label}</span>`;
   btn.addEventListener('click', () => {
-    regionBtns.forEach(b => b.classList.remove('active'));
+    regionSelector.querySelectorAll('.region-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    loadRegion(btn.dataset.region);
+    loadRegion(model.id);
   });
+  regionSelector.appendChild(btn);
 });
 
 // ── Reset view ────────────────────────────────────────────

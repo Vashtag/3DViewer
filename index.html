@@ -20,23 +20,11 @@
       <!-- Left sidebar: model list -->
       <aside id="sidebar">
         <p class="sidebar-label">Regions</p>
-        <nav id="region-selector">
-          <button class="region-btn" data-region="shoulder">
-            <span class="region-label">Shoulder</span>
-          </button>
-          <button class="region-btn" data-region="pelvis">
-            <span class="region-label">Pelvis</span>
-          </button>
-        </nav>
+        <!-- Region buttons are generated from the MODELS list in js/main.js -->
+        <nav id="region-selector"></nav>
 
         <!-- Display controls (shown once a model is loaded) -->
         <div id="display-controls" class="hidden">
-          <p class="sidebar-label">Navigation</p>
-          <div id="nav-modes">
-            <button class="nav-btn active" data-mode="orbit">Orbit</button>
-            <button class="nav-btn" data-mode="fly">Fly (WASD)</button>
-          </div>
-
           <p class="sidebar-label">Background</p>
           <div id="bg-swatches">
             <button class="bg-swatch active" data-bg="dark"  title="Black"></button>
@@ -96,13 +84,19 @@
           </div>
         </div>
 
-        <!-- Controls hint -->
-        <div id="controls-hint" class="hidden">
-          <span>Drag to rotate</span>
-          <span class="divider">·</span>
-          <span>Scroll to zoom</span>
-          <span class="divider">·</span>
-          <span>Right-drag to pan</span>
+        <!-- Bottom bar: navigation mode toggle + controls hint -->
+        <div id="bottom-bar" class="hidden">
+          <div id="nav-modes">
+            <button class="nav-btn active" data-mode="orbit">Orbit</button>
+            <button class="nav-btn" data-mode="fly">Fly (WASD)</button>
+          </div>
+          <div id="controls-hint">
+            <span>Drag to rotate</span>
+            <span class="divider">·</span>
+            <span>Scroll to zoom</span>
+            <span class="divider">·</span>
+            <span>Right-drag to pan</span>
+          </div>
         </div>
       </main>
     </div>
