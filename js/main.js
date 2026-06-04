@@ -568,10 +568,11 @@ function addLabel(name, localPos, record = true) {
   const el = document.createElement('div');
   el.className = 'anno-label';
   const dot = document.createElement('span'); dot.className = 'anno-dot';
+  const leader = document.createElement('span'); leader.className = 'anno-leader';
   const content = document.createElement('span'); content.className = 'anno-content';
   const txt = document.createElement('span'); txt.className = 'anno-text'; txt.textContent = name;
   content.append(txt);
-  el.append(dot, content);
+  el.append(dot, leader, content);
 
   const obj = new CSS2DObject(el);
   obj.position.copy(localPos);
@@ -780,9 +781,11 @@ function captureScreenshot() {
   // The 3D model
   ctx.drawImage(src, 0, 0, W, H);
 
-  // Visible labels: project each anchor to screen and draw a dot + text
+  // Visible labels: project each anchor and draw a dot + leader line + text,
+  // matching the on-screen leader-line callout style.
   if (labelsVisible && labelLayer && labelLayer.children.length) {
     const v = new THREE.Vector3();
+    const LX = 32 * scale, LY = 32 * scale; // leader offset (up-right)
     ctx.textBaseline = 'middle';
     ctx.font = `600 ${13 * scale}px system-ui, sans-serif`;
     labelLayer.children.forEach(o => {
@@ -790,16 +793,25 @@ function captureScreenshot() {
       if (v.z > 1) return; // behind camera
       const x = (v.x * 0.5 + 0.5) * W;
       const y = (-v.y * 0.5 + 0.5) * H;
+      const ex = x + LX, ey = y - LY; // leader end / text anchor
       const name = o.element?.querySelector('.anno-text')?.textContent || '';
-      const padX = 7 * scale, txtX = x + 11 * scale;
+
+      // Leader line
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ex, ey);
+      ctx.lineWidth = 1.5 * scale; ctx.strokeStyle = 'rgba(255,255,255,0.65)'; ctx.stroke();
+
+      // Text pill at the leader end
+      const padX = 7 * scale, txtX = ex + padX;
       const tw = ctx.measureText(name).width;
       ctx.fillStyle = 'rgba(15,17,23,0.78)';
-      ctx.fillRect(txtX - padX, y - 9 * scale, tw + padX * 2, 18 * scale);
+      ctx.fillRect(ex, ey - 9 * scale, tw + padX * 2, 18 * scale);
       ctx.fillStyle = '#fff';
-      ctx.fillText(name, txtX, y + scale);
-      ctx.beginPath(); ctx.arc(x, y, 5 * scale, 0, Math.PI * 2);
+      ctx.fillText(name, txtX, ey + scale);
+
+      // Anchor dot
+      ctx.beginPath(); ctx.arc(x, y, 3.5 * scale, 0, Math.PI * 2);
       ctx.fillStyle = '#4f7cff'; ctx.fill();
-      ctx.lineWidth = 2 * scale; ctx.strokeStyle = '#fff'; ctx.stroke();
+      ctx.lineWidth = 1.5 * scale; ctx.strokeStyle = '#fff'; ctx.stroke();
     });
   }
 

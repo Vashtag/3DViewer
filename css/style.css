@@ -260,11 +260,11 @@ body {
   left: 0;
   top: 0;
   transform: translate(-50%, -50%);
-  width: 11px;
-  height: 11px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--accent);
-  border: 2px solid #fff;
+  border: 1.5px solid #fff;
   box-shadow: 0 0 0 1px #0008, 0 1px 3px #0009;
 }
 
@@ -272,16 +272,29 @@ body {
 .anno-dot.draggable {
   pointer-events: auto;
   cursor: grab;
-  width: 13px;
-  height: 13px;
+  width: 11px;
+  height: 11px;
 }
 .anno-dot.draggable:active { cursor: grabbing; }
 
-/* Text + buttons sit just to the right of the dot, vertically centred on it */
+/* Leader line from the dot up-and-to-the-right to the text. ~45px at -45°
+   reaches about (32, -32) from the anchor. */
+.anno-leader {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 45px;
+  height: 0;
+  border-top: 1.5px solid rgba(255, 255, 255, 0.65);
+  transform-origin: 0 0;
+  transform: rotate(-45deg);
+}
+
+/* Text + buttons sit at the far end of the leader, away from the model */
 .anno-content {
   position: absolute;
-  left: 10px;
-  top: 0;
+  left: 32px;
+  top: -32px;
   transform: translateY(-50%);
   display: flex;
   align-items: center;
