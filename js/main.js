@@ -281,6 +281,20 @@ addAxis(1.4, 0, 0, 0xff4444); // X – red
 addAxis(0, 1.4, 0, 0x44cc44); // Y – green
 addAxis(0, 0, 1.4, 0x4488ff); // Z – blue
 
+// ── Label state ───────────────────────────────────────────
+// Declared before the render loop because animate() (kicked off below) calls
+// updateLabelLeaders(), which reads these. Saved labels live in
+// models/<id>/<id>_labels.json as [{ name, position: [x,y,z] }] with position
+// in the model's local space, so they track rotation, centring and zoom.
+const EDIT_MODE = new URLSearchParams(location.search).has('edit');
+let labelLayer = null;     // THREE.Group (child of currentModel) holding labels
+let labelData = [];        // current label records
+let labelsVisible = false;
+let activeModelId = null;
+let dragging = null; // { entry, obj } while a label is being dragged in edit mode
+const _ray = new THREE.Raycaster();
+const _ndc = new THREE.Vector2();
+
 // ── Render loop ───────────────────────────────────────────
 let fitRadius = 0; // bounding-sphere radius of current model
 
@@ -547,17 +561,6 @@ function buildViewButtons(model) {
 
 // ── Annotations / labels ─────────────────────────────────
 // Author tools appear only when the URL contains ?edit (hidden from students).
-// Saved labels live in models/<id>/labels.json as
-//   [{ name, position: [x, y, z] }]  with position in the model's local space,
-// so they track the model through rotation, centring and zoom.
-const EDIT_MODE = new URLSearchParams(location.search).has('edit');
-let labelLayer = null;     // THREE.Group (child of currentModel) holding labels
-let labelData = [];        // current label records
-let labelsVisible = false;
-let activeModelId = null;
-let dragging = null; // { entry, obj } while a label is being dragged in edit mode
-const _ray = new THREE.Raycaster();
-const _ndc = new THREE.Vector2();
 
 function addLabel(name, localPos, record = true) {
   if (!labelLayer) return;
