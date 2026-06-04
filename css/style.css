@@ -129,14 +129,14 @@ body {
   box-shadow: 0 0 0 2px rgba(79, 124, 255, 0.3);
 }
 
+.bg-swatch[data-bg="dark"]  { background: #0f1117; }
+.bg-swatch[data-bg="light"] { background: #e8eaf0; }
 .bg-swatch[data-bg="lab"] {
   background-image: url('../assets/lab-background.jpg');
   background-size: cover;
   background-position: center;
   background-color: #555; /* fallback before image loads */
 }
-.bg-swatch[data-bg="gray"]  { background: #6b7280; }
-.bg-swatch[data-bg="light"] { background: #e8eaf0; }
 
 /* ── Lighting controls ── */
 #light-controls {
@@ -213,10 +213,9 @@ body {
   position: relative;
   overflow: hidden;
   min-width: 0;
-  /* Lab photo is the default background; dark color is the fallback while
-     the image loads or when the user switches to a solid swatch. */
+  /* Black is the default background; JS swaps in white or the lab photo. */
   background-color: #0f1117;
-  background-image: url('../assets/lab-background.jpg');
+  background-image: none;
   background-size: cover;
   background-position: center;
 }

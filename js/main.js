@@ -225,9 +225,9 @@ function showViewerUI() {
   controlsHint.classList.remove('hidden');
   viewerToolbar.classList.remove('hidden');
   displayControls.classList.remove('hidden');
-  // Default to the lab photo background on first load
+  // Default to a black background on first load
   if (!container.dataset.bgSet) {
-    setBackground('lab');
+    setBackground('dark');
     container.dataset.bgSet = '1';
   }
 }
@@ -421,15 +421,15 @@ viewBtns.forEach(btn => {
 // The renderer is transparent; backgrounds are set via CSS on the container
 // so the lab photo or a solid colour shows through the canvas.
 const BG_STYLES = {
-  lab:   { image: 'url(assets/lab-background.jpg)', color: '#0f1117' },
-  gray:  { image: 'none', color: '#6b7280' },
+  dark:  { image: 'none', color: '#0f1117' },
   light: { image: 'none', color: '#e8eaf0' },
+  lab:   { image: 'url(assets/lab-background.jpg)', color: '#0f1117' },
 };
 
 function setBackground(bg) {
   bgSwatches.forEach(s => s.classList.remove('active'));
   document.querySelector(`.bg-swatch[data-bg="${bg}"]`)?.classList.add('active');
-  const s = BG_STYLES[bg] || BG_STYLES.lab;
+  const s = BG_STYLES[bg] || BG_STYLES.dark;
   container.style.backgroundImage = s.image;
   container.style.backgroundColor = s.color;
 }
