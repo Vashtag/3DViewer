@@ -11,6 +11,12 @@ const progressFill = document.getElementById('progress-bar-fill');
 const resetBtn = document.getElementById('reset-btn');
 const regionBtns = document.querySelectorAll('.region-btn');
 
+// Actual filenames on disk (case-sensitive on web servers)
+const REGION_FILES = {
+  shoulder: { obj: 'shoulder.obj', mtl: 'shoulder.mtl' },
+  pelvis:   { obj: 'Pelvis.obj',   mtl: 'Pelvis.mtl'   },
+};
+
 // ── Renderer ──────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -120,8 +126,7 @@ function loadRegion(region) {
   }
 
   const base = `models/${region}/`;
-  const mtlFile = `${region}.mtl`;
-  const objFile = `${region}.obj`;
+  const { obj: objFile, mtl: mtlFile } = REGION_FILES[region];
 
   const mtlLoader = new MTLLoader();
   mtlLoader.setPath(base);
