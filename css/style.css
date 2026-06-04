@@ -277,8 +277,10 @@ body {
 }
 .anno-dot.draggable:active { cursor: grabbing; }
 
-/* Leader line from the dot up-and-to-the-right to the text. ~45px at -45°
-   reaches about (32, -32) from the anchor. */
+/* Leader line from the dot out to the text. Its rotation, and the content's
+   position, are set per-frame in JS (see updateLabelLeaders) so each label
+   points radially away from the model centre instead of bunching to one side.
+   The values here are just sane defaults before the first frame. */
 .anno-leader {
   position: absolute;
   left: 0;
