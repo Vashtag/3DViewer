@@ -53,6 +53,7 @@ const MODELS = [
   },
   {
     id: 'pelvis', label: 'Pelvis', file: 'models/pelvis/pelvis.glb',
+    rotation: [0, 0, 4], // level out the roll so the anterior view sits straight
     // Left/Right are swapped so each button shows the opposite anatomical side.
     views: [
       { label: 'Anterior',  dir: 'front' },
@@ -107,6 +108,8 @@ controls.dampingFactor = 0.07;
 const flyControls = new PointerLockControls(camera, renderer.domElement);
 let navMode = 'orbit';
 const keys = { w: false, a: false, s: false, d: false, up: false, down: false };
+// Q/E roll the camera in orbit mode (rotate the view around its own axis).
+const rollKeys = { ccw: false, cw: false };
 let prevTime = performance.now();
 
 function flySpeedPerSec() {
@@ -114,6 +117,13 @@ function flySpeedPerSec() {
 }
 
 document.addEventListener('keydown', e => {
+  // Q/E roll works in orbit mode.
+  if (navMode === 'orbit') {
+    if (e.code === 'KeyQ') rollKeys.ccw = true;
+    if (e.code === 'KeyE') rollKeys.cw = true;
+    return;
+  }
+  // WASD / Space / Shift fly when pointer is locked.
   if (navMode !== 'fly' || !flyControls.isLocked) return;
   switch (e.code) {
     case 'KeyW': keys.w = true; break;
@@ -132,6 +142,8 @@ document.addEventListener('keyup', e => {
     case 'KeyD': keys.d = false; break;
     case 'Space': keys.up = false; break;
     case 'ShiftLeft': case 'ShiftRight': keys.down = false; break;
+    case 'KeyQ': rollKeys.ccw = false; break;
+    case 'KeyE': rollKeys.cw = false; break;
   }
 });
 
@@ -279,6 +291,13 @@ function animate() {
       if (keys.down) camera.position.y -= step;
     }
   } else {
+    // Q/E roll: rotate the camera's up vector around the view axis, which
+    // tilts the OrbitControls horizon.
+    if (rollKeys.ccw || rollKeys.cw) {
+      const rollAng = ((rollKeys.ccw ? 1 : 0) - (rollKeys.cw ? 1 : 0)) * 1.4 * dt;
+      camera.getWorldDirection(_flyFwd);
+      camera.up.applyAxisAngle(_flyFwd, rollAng);
+    }
     controls.update();
   }
 
@@ -509,7 +528,7 @@ function updateHint(locked = flyControls.isLocked) {
       ? 'WASD to move <span class="divider">·</span> Space / Shift to rise · descend <span class="divider">·</span> mouse to look <span class="divider">·</span> <strong>Press Esc to leave fly mode</strong>'
       : 'Click the model to start flying <span class="divider">·</span> then press Esc to leave';
   } else {
-    controlsHint.innerHTML = 'Drag to rotate <span class="divider">·</span> Scroll to zoom <span class="divider">·</span> Right-drag to pan';
+    controlsHint.innerHTML = 'Drag to rotate <span class="divider">·</span> Scroll to zoom <span class="divider">·</span> Right-drag to pan <span class="divider">·</span> Q / E to roll';
   }
 }
 
