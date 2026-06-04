@@ -263,6 +263,15 @@ body {
   flex-shrink: 0;
 }
 
+/* In edit mode the dot is grabbable to move the pin */
+.anno-dot.draggable {
+  pointer-events: auto;
+  cursor: grab;
+  width: 13px;
+  height: 13px;
+}
+.anno-dot.draggable:active { cursor: grabbing; }
+
 .anno-text {
   color: #fff;
   font-size: 0.78rem;

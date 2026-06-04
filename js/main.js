@@ -554,29 +554,41 @@ let labelLayer = null;     // THREE.Group (child of currentModel) holding labels
 let labelData = [];        // current label records
 let labelsVisible = false;
 let activeModelId = null;
+let dragging = null; // { entry, obj } while a label is being dragged in edit mode
 const _ray = new THREE.Raycaster();
 const _ndc = new THREE.Vector2();
 
-function makeLabelElement(name, onDelete) {
+function addLabel(name, localPos, record = true) {
+  if (!labelLayer) return;
+  const entry = { name, position: [localPos.x, localPos.y, localPos.z] };
+
   const el = document.createElement('div');
   el.className = 'anno-label';
   const dot = document.createElement('span'); dot.className = 'anno-dot';
   const txt = document.createElement('span'); txt.className = 'anno-text'; txt.textContent = name;
   el.append(dot, txt);
+
+  const obj = new CSS2DObject(el);
+  obj.position.copy(localPos);
+
   if (EDIT_MODE) {
+    // Delete button
     const del = document.createElement('span');
     del.className = 'anno-del'; del.textContent = '×'; del.title = 'Remove';
-    del.addEventListener('click', e => { e.stopPropagation(); onDelete(); });
+    del.addEventListener('pointerdown', e => e.stopPropagation());
+    del.addEventListener('click', e => { e.stopPropagation(); removeLabel(entry, obj); });
     el.appendChild(del);
-  }
-  return el;
-}
 
-function addLabel(name, localPos, record = true) {
-  if (!labelLayer) return;
-  const entry = { name, position: [localPos.x, localPos.y, localPos.z] };
-  const obj = new CSS2DObject(makeLabelElement(name, () => removeLabel(entry, obj)));
-  obj.position.copy(localPos);
+    // Drag the dot to move the pin (re-raycasts onto the surface).
+    dot.classList.add('draggable');
+    dot.addEventListener('pointerdown', e => {
+      e.stopPropagation();
+      e.preventDefault();
+      dragging = { entry, obj };
+      controls.enabled = false;
+    });
+  }
+
   labelLayer.add(obj);
   if (record) labelData.push(entry);
 }
@@ -611,7 +623,7 @@ async function loadLabels(model) {
 
   let data = [];
   try {
-    const res = await fetch(`models/${model.id}/labels.json`, { cache: 'no-store' });
+    const res = await fetch(`models/${model.id}/${model.id}_labels.json`, { cache: 'no-store' });
     if (res.ok) data = await res.json();
   } catch (e) { /* no labels file — fine */ }
   data.forEach(d => addLabel(d.name, new THREE.Vector3(d.position[0], d.position[1], d.position[2])));
@@ -638,11 +650,31 @@ renderer.domElement.addEventListener('click', e => {
   addLabel(name, currentModel.worldToLocal(hits[0].point.clone()));
 });
 
+// Edit mode: drag a pin's dot to re-place it on the surface (a spot chosen in
+// one view often needs nudging in another).
+window.addEventListener('pointermove', e => {
+  if (!dragging || !currentModel) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  _ndc.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
+  _ndc.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
+  _ray.setFromCamera(_ndc, camera);
+  const hits = _ray.intersectObject(currentModel, true);
+  if (!hits.length) return; // keep last valid spot if dragged off the model
+  const local = currentModel.worldToLocal(hits[0].point.clone());
+  dragging.obj.position.copy(local);
+  dragging.entry.position = [local.x, local.y, local.z];
+});
+window.addEventListener('pointerup', () => {
+  if (!dragging) return;
+  dragging = null;
+  if (navMode === 'orbit') controls.enabled = true;
+});
+
 editDownload.addEventListener('click', () => {
   const blob = new Blob([JSON.stringify(labelData, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `${activeModelId || 'model'}-labels.json`;
+  a.download = `${activeModelId || 'model'}_labels.json`;
   a.click();
   URL.revokeObjectURL(a.href);
 });
