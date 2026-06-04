@@ -28,9 +28,11 @@ const navBtns         = document.querySelectorAll('.nav-btn');
 // ── Model catalogue ───────────────────────────────────────
 // To add a model: convert your OBJ to a Draco GLB (see tools/README.md),
 // drop it in models/<id>/<id>.glb, then add one entry here.
+// `rotation` (degrees, [x,y,z]) orients the scan so its anatomical anterior
+// faces +Z — i.e. so the default "Anterior" view looks correct.
 const MODELS = [
-  { id: 'shoulder', label: 'Shoulder', file: 'models/shoulder/shoulder.glb' },
-  { id: 'pelvis',   label: 'Pelvis',   file: 'models/pelvis/pelvis.glb'     },
+  { id: 'shoulder', label: 'Shoulder', file: 'models/shoulder/shoulder.glb', rotation: [0, 90, 0] },
+  { id: 'pelvis',   label: 'Pelvis',   file: 'models/pelvis/pelvis.glb' },
 ];
 const MODEL_BY_ID = Object.fromEntries(MODELS.map(m => [m.id, m]));
 
@@ -222,6 +224,8 @@ addAxis(0, 0, 1.4, 0x4488ff); // Z – blue
 let fitRadius = 0; // bounding-sphere radius of current model
 
 const _gizmoDir = new THREE.Vector3();
+const _flyFwd   = new THREE.Vector3();
+const _flyRight = new THREE.Vector3();
 
 function animate() {
   requestAnimationFrame(animate);
@@ -233,10 +237,14 @@ function animate() {
   if (navMode === 'fly') {
     if (flyControls.isLocked) {
       const step = flySpeedPerSec() * dt;
-      if (keys.w) flyControls.moveForward(step);
-      if (keys.s) flyControls.moveForward(-step);
-      if (keys.d) flyControls.moveRight(step);
-      if (keys.a) flyControls.moveRight(-step);
+      // Free flight: W/S follow the actual look direction (so looking up and
+      // pressing W climbs), A/D strafe, Space/Shift move along world up.
+      camera.getWorldDirection(_flyFwd);
+      _flyRight.crossVectors(_flyFwd, camera.up).normalize();
+      if (keys.w) camera.position.addScaledVector(_flyFwd, step);
+      if (keys.s) camera.position.addScaledVector(_flyFwd, -step);
+      if (keys.d) camera.position.addScaledVector(_flyRight, step);
+      if (keys.a) camera.position.addScaledVector(_flyRight, -step);
       if (keys.up)   camera.position.y += step;
       if (keys.down) camera.position.y -= step;
     }
@@ -398,6 +406,14 @@ function loadRegion(region) {
       const object = gltf.scene;
       setProgress(100);
       softenMaterials(object);
+      if (model.rotation) {
+        object.rotation.set(
+          THREE.MathUtils.degToRad(model.rotation[0]),
+          THREE.MathUtils.degToRad(model.rotation[1]),
+          THREE.MathUtils.degToRad(model.rotation[2])
+        );
+        object.updateMatrixWorld(true);
+      }
       scene.add(object);
       currentModel = object;
       fitCameraToModel(object);
@@ -451,7 +467,7 @@ viewBtns.forEach(btn => {
 function updateHint() {
   if (navMode === 'fly') {
     controlsHint.innerHTML = flyControls.isLocked
-      ? 'WASD move <span class="divider">·</span> Space / Shift up·down <span class="divider">·</span> mouse to look <span class="divider">·</span> Esc to release'
+      ? 'WASD to move <span class="divider">·</span> Space / Shift to rise · descend <span class="divider">·</span> mouse to look <span class="divider">·</span> <strong>Press Esc to leave fly mode</strong>'
       : 'Click the model to start flying';
   } else {
     controlsHint.innerHTML = 'Drag to rotate <span class="divider">·</span> Scroll to zoom <span class="divider">·</span> Right-drag to pan';
@@ -475,6 +491,14 @@ function setNavMode(mode) {
 }
 
 navBtns.forEach(b => b.addEventListener('click', () => setNavMode(b.dataset.mode)));
+
+// Fly mode needs pointer lock + a keyboard, so it's not usable on touch
+// devices — hide the toggle there and stay in orbit mode.
+const isTouchPrimary = window.matchMedia('(pointer: coarse)').matches;
+if (isTouchPrimary) {
+  const navModes = document.getElementById('nav-modes');
+  if (navModes) navModes.style.display = 'none';
+}
 
 // ── Background swatches ───────────────────────────────────
 // The renderer is transparent; backgrounds are set via CSS on the container
