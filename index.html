@@ -28,6 +28,26 @@
             <span class="region-label">Pelvis</span>
           </button>
         </nav>
+
+        <!-- Display controls (shown once a model is loaded) -->
+        <div id="display-controls" class="hidden">
+          <p class="sidebar-label">View</p>
+          <div id="view-presets">
+            <button class="view-btn" data-view="front">Front</button>
+            <button class="view-btn" data-view="back">Back</button>
+            <button class="view-btn" data-view="left">Left</button>
+            <button class="view-btn" data-view="right">Right</button>
+            <button class="view-btn" data-view="top">Top</button>
+            <button class="view-btn" data-view="bottom">Bottom</button>
+          </div>
+
+          <p class="sidebar-label">Background</p>
+          <div id="bg-swatches">
+            <button class="bg-swatch active" data-bg="dark" title="Dark"></button>
+            <button class="bg-swatch" data-bg="gray" title="Gray"></button>
+            <button class="bg-swatch" data-bg="light" title="Light"></button>
+          </div>
+        </div>
       </aside>
 
       <!-- Viewer area -->
