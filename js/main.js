@@ -17,6 +17,10 @@ const emptyState      = document.getElementById('empty-state');
 const displayControls = document.getElementById('display-controls');
 const regionBtns      = document.querySelectorAll('.region-btn');
 const bgSwatches      = document.querySelectorAll('.bg-swatch');
+const viewBtns        = document.querySelectorAll('.view-btn');
+const lightAzimuth    = document.getElementById('light-azimuth');
+const lightElevation  = document.getElementById('light-elevation');
+const lightReset      = document.getElementById('light-reset');
 
 // Actual filenames on disk (case-sensitive on web servers)
 const REGION_FILES = {
@@ -398,6 +402,11 @@ resetBtn.addEventListener('click', () => {
   controls.update();
 });
 
+// ── View shortcut buttons (Anterior / Posterior / Left / Right) ──
+viewBtns.forEach(btn => {
+  btn.addEventListener('click', () => setView(btn.dataset.view));
+});
+
 // ── Background swatches ───────────────────────────────────
 const BACKGROUNDS = { dark: 0x0f1117, gray: 0x6b7280, light: 0xe8eaf0 };
 
@@ -408,3 +417,31 @@ bgSwatches.forEach(swatch => {
     renderer.setClearColor(BACKGROUNDS[swatch.dataset.bg]);
   });
 });
+
+// ── Lighting direction ────────────────────────────────────
+// The two sliders orbit the key light around the model. Azimuth spins it
+// horizontally; elevation raises/lowers it. The fill lights stay fixed so
+// there's always some ambient shape, but the dominant light follows the user.
+const LIGHT_DEFAULT = { azimuth: 45, elevation: 47 };
+
+function updateKeyLight() {
+  const az = THREE.MathUtils.degToRad(Number(lightAzimuth.value));
+  const el = THREE.MathUtils.degToRad(Number(lightElevation.value));
+  const r = 5;
+  keyLight.position.set(
+    r * Math.cos(el) * Math.sin(az),
+    r * Math.sin(el),
+    r * Math.cos(el) * Math.cos(az)
+  );
+}
+
+lightAzimuth.addEventListener('input', updateKeyLight);
+lightElevation.addEventListener('input', updateKeyLight);
+
+lightReset.addEventListener('click', () => {
+  lightAzimuth.value = LIGHT_DEFAULT.azimuth;
+  lightElevation.value = LIGHT_DEFAULT.elevation;
+  updateKeyLight();
+});
+
+updateKeyLight(); // sync key light to the slider defaults on startup

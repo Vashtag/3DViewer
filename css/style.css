@@ -133,6 +133,75 @@ body {
 .bg-swatch[data-bg="gray"]  { background: #6b7280; }
 .bg-swatch[data-bg="light"] { background: #e8eaf0; }
 
+/* ── Lighting controls ── */
+#light-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.slider-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.slider-row span {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  padding-left: 2px;
+}
+
+.slider-row input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  cursor: pointer;
+  outline: none;
+}
+
+.slider-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  cursor: pointer;
+}
+
+.slider-row input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  cursor: pointer;
+}
+
+#light-reset {
+  margin-top: 2px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+#light-reset:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  background: #1e2540;
+}
+
 /* ── Viewer ── */
 #viewer-container {
   flex: 1;
@@ -236,18 +305,51 @@ body {
   transition: width 0.15s ease;
 }
 
-/* ── Viewer toolbar (reset + gizmo) ── */
+/* ── Viewer toolbar (reset + gizmo + view shortcuts) ── */
 #viewer-toolbar {
   position: absolute;
   top: 14px;
   right: 14px;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 10px;
   z-index: 5;
 }
 
 #viewer-toolbar.hidden { display: none; }
+
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Semi-transparent anatomical view shortcuts, under the gizmo */
+#view-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  width: 184px; /* aligns under the reset + gizmo row */
+}
+
+.view-btn {
+  padding: 7px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(26, 29, 39, 0.45);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.view-btn:hover {
+  border-color: var(--accent);
+  background: rgba(30, 37, 64, 0.75);
+}
 
 #reset-btn {
   padding: 8px 14px;
