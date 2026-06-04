@@ -19,7 +19,7 @@ const emptyState      = document.getElementById('empty-state');
 const displayControls = document.getElementById('display-controls');
 const regionSelector  = document.getElementById('region-selector');
 const bgSwatches      = document.querySelectorAll('.bg-swatch');
-const viewBtns        = document.querySelectorAll('.view-btn');
+const viewButtons     = document.getElementById('view-buttons');
 const lightAzimuth    = document.getElementById('light-azimuth');
 const lightElevation  = document.getElementById('light-elevation');
 const lightReset      = document.getElementById('light-reset');
@@ -28,11 +28,39 @@ const navBtns         = document.querySelectorAll('.nav-btn');
 // ── Model catalogue ───────────────────────────────────────
 // To add a model: convert your OBJ to a Draco GLB (see tools/README.md),
 // drop it in models/<id>/<id>.glb, then add one entry here.
-// `rotation` (degrees, [x,y,z]) orients the scan so its anatomical anterior
-// faces +Z — i.e. so the default "Anterior" view looks correct.
+//   rotation: (degrees, [x,y,z]) orients the scan so its anatomical anterior
+//             faces +Z — i.e. so the default "Anterior" view looks correct.
+//   views:    the shortcut buttons under the gizmo — { label, dir } where dir
+//             is the camera direction (front/back/left/right/top/bottom).
+//             Omit to use DEFAULT_VIEWS.
+const DEFAULT_VIEWS = [
+  { label: 'Anterior',  dir: 'front' },
+  { label: 'Posterior', dir: 'back'  },
+  { label: 'Left',      dir: 'left'  },
+  { label: 'Right',     dir: 'right' },
+];
+
 const MODELS = [
-  { id: 'shoulder', label: 'Shoulder', file: 'models/shoulder/shoulder.glb', rotation: [0, 90, 0] },
-  { id: 'pelvis',   label: 'Pelvis',   file: 'models/pelvis/pelvis.glb' },
+  {
+    id: 'shoulder', label: 'Shoulder', file: 'models/shoulder/shoulder.glb',
+    rotation: [0, 90, 0],
+    views: [
+      { label: 'Anterior',  dir: 'front' },
+      { label: 'Posterior', dir: 'back'  },
+      { label: 'Lateral',   dir: 'left'  },
+      { label: 'Medial',    dir: 'right' },
+    ],
+  },
+  {
+    id: 'pelvis', label: 'Pelvis', file: 'models/pelvis/pelvis.glb',
+    // Left/Right are swapped so each button shows the opposite anatomical side.
+    views: [
+      { label: 'Anterior',  dir: 'front' },
+      { label: 'Posterior', dir: 'back'  },
+      { label: 'Left',      dir: 'right' },
+      { label: 'Right',     dir: 'left'  },
+    ],
+  },
 ];
 const MODEL_BY_ID = Object.fromEntries(MODELS.map(m => [m.id, m]));
 
@@ -388,6 +416,7 @@ function loadRegion(region) {
   const model = MODEL_BY_ID[region];
   if (!model) { console.error('Unknown model:', region); return; }
   showLoading('Loading ' + model.label + ' model…');
+  buildViewButtons(model);
 
   if (currentModel) {
     scene.remove(currentModel);
@@ -457,13 +486,21 @@ resetBtn.addEventListener('click', () => {
   controls.update();
 });
 
-// ── View shortcut buttons (Anterior / Posterior / Left / Right) ──
-viewBtns.forEach(btn => {
-  btn.addEventListener('click', () => {
-    if (navMode === 'fly') setNavMode('orbit');
-    setView(btn.dataset.view);
+// ── View shortcut buttons (built per-model) ──────────────
+function buildViewButtons(model) {
+  viewButtons.innerHTML = '';
+  const views = model.views || DEFAULT_VIEWS;
+  views.forEach(v => {
+    const btn = document.createElement('button');
+    btn.className = 'view-btn';
+    btn.textContent = v.label;
+    btn.addEventListener('click', () => {
+      if (navMode === 'fly') setNavMode('orbit');
+      setView(v.dir);
+    });
+    viewButtons.appendChild(btn);
   });
-});
+}
 
 // ── Navigation mode (orbit vs fly) ────────────────────────
 function updateHint(locked = flyControls.isLocked) {
