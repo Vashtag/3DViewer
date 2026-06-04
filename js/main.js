@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { OBJLoader } from './OBJLoader.js';
-import { MTLLoader } from './MTLLoader.js';
+import { GLTFLoader } from './GLTFLoader.js';
+import { DRACOLoader } from './DRACOLoader.js';
 import { OrbitControls } from './OrbitControls.js';
+import { PointerLockControls } from './PointerLockControls.js';
 
 // ── DOM refs ──────────────────────────────────────────────
 const canvas          = document.getElementById('viewer-canvas');
@@ -21,11 +22,12 @@ const viewBtns        = document.querySelectorAll('.view-btn');
 const lightAzimuth    = document.getElementById('light-azimuth');
 const lightElevation  = document.getElementById('light-elevation');
 const lightReset      = document.getElementById('light-reset');
+const navBtns         = document.querySelectorAll('.nav-btn');
 
-// Actual filenames on disk (case-sensitive on web servers)
+// Draco-compressed GLB per region (texture + materials embedded).
 const REGION_FILES = {
-  shoulder: { obj: 'shoulder.obj', mtl: 'shoulder.mtl' },
-  pelvis:   { obj: 'Pelvis.obj',   mtl: 'Pelvis.mtl'   },
+  shoulder: 'models/shoulder/shoulder.glb',
+  pelvis:   'models/pelvis/pelvis.glb',
 };
 
 // ── Main renderer ─────────────────────────────────────────
@@ -65,6 +67,50 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.07;
 // min/max distance are set per-model in fitCameraToModel.
 
+// ── Fly mode (first-person WASD navigation) ──────────────
+// PointerLockControls: click the viewer to capture the mouse for looking,
+// WASD to walk, Space/Shift to rise/descend, Esc to release the pointer.
+const flyControls = new PointerLockControls(camera, renderer.domElement);
+let navMode = 'orbit';
+const keys = { w: false, a: false, s: false, d: false, up: false, down: false };
+let prevTime = performance.now();
+
+function flySpeedPerSec() {
+  return Math.max(fitRadius * 0.9, 1); // scale movement to model size
+}
+
+document.addEventListener('keydown', e => {
+  if (navMode !== 'fly' || !flyControls.isLocked) return;
+  switch (e.code) {
+    case 'KeyW': keys.w = true; break;
+    case 'KeyS': keys.s = true; break;
+    case 'KeyA': keys.a = true; break;
+    case 'KeyD': keys.d = true; break;
+    case 'Space': keys.up = true; e.preventDefault(); break;
+    case 'ShiftLeft': case 'ShiftRight': keys.down = true; break;
+  }
+});
+document.addEventListener('keyup', e => {
+  switch (e.code) {
+    case 'KeyW': keys.w = false; break;
+    case 'KeyS': keys.s = false; break;
+    case 'KeyA': keys.a = false; break;
+    case 'KeyD': keys.d = false; break;
+    case 'Space': keys.up = false; break;
+    case 'ShiftLeft': case 'ShiftRight': keys.down = false; break;
+  }
+});
+
+// Click the viewer to lock the pointer when in fly mode.
+renderer.domElement.addEventListener('click', () => {
+  if (navMode === 'fly' && !flyControls.isLocked) flyControls.lock();
+});
+flyControls.addEventListener('lock', updateHint);
+flyControls.addEventListener('unlock', () => {
+  for (const k in keys) keys[k] = false; // stop drifting when released
+  updateHint();
+});
+
 // ── Resize ────────────────────────────────────────────────
 function resize() {
   const w = container.clientWidth;
@@ -94,15 +140,16 @@ gizmoRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 const gizmoScene  = new THREE.Scene();
 const gizmoCamera = new THREE.OrthographicCamera(-1.8, 1.8, 1.8, -1.8, 0.1, 10);
 
-// Cube faces: BoxGeometry material order is +X, -X, +Y, -Y, +Z, -Z
-// Camera starts at +Z, so the +Z face is "Front" in our coordinate system.
+// Cube faces: BoxGeometry material order is +X, -X, +Y, -Y, +Z, -Z.
+// The gizmo is a passive orientation indicator (not clickable).
+// Labels use anatomical terms: S = superior (top), I = inferior (bottom).
 const GIZMO_FACES = [
-  { label: 'R',  view: 'right',  bg: '#b83030' }, // +X
-  { label: 'L',  view: 'left',   bg: '#7a1f1f' }, // -X
-  { label: 'T',  view: 'top',    bg: '#2e8b2e' }, // +Y
-  { label: 'Bo', view: 'bottom', bg: '#1a5c1a' }, // -Y
-  { label: 'F',  view: 'front',  bg: '#2255bb' }, // +Z
-  { label: 'Bk', view: 'back',   bg: '#163a80' }, // -Z
+  { label: 'R',  bg: '#b83030' }, // +X
+  { label: 'L',  bg: '#7a1f1f' }, // -X
+  { label: 'S',  bg: '#2e8b2e' }, // +Y  (superior)
+  { label: 'I',  bg: '#1a5c1a' }, // -Y  (inferior)
+  { label: 'F',  bg: '#2255bb' }, // +Z  (front / anterior)
+  { label: 'Bk', bg: '#163a80' }, // -Z  (back / posterior)
 ];
 
 function makeFaceTex(label, bgColor) {
@@ -166,31 +213,36 @@ addAxis(1.4, 0, 0, 0xff4444); // X – red
 addAxis(0, 1.4, 0, 0x44cc44); // Y – green
 addAxis(0, 0, 1.4, 0x4488ff); // Z – blue
 
-// Click a cube face → snap main camera to that view
-const gizmoRaycaster = new THREE.Raycaster();
-gizmoCanvas.addEventListener('click', e => {
-  const rect = gizmoCanvas.getBoundingClientRect();
-  const x =  ((e.clientX - rect.left)  / rect.width)  * 2 - 1;
-  const y = -((e.clientY - rect.top)   / rect.height) * 2 + 1;
-  gizmoRaycaster.setFromCamera({ x, y }, gizmoCamera);
-  const hits = gizmoRaycaster.intersectObject(gizmoCube);
-  if (hits.length) {
-    const faceIdx = Math.floor(hits[0].faceIndex / 2);
-    setView(GIZMO_FACES[faceIdx].view);
-  }
-});
-
 // ── Render loop ───────────────────────────────────────────
 let fitRadius = 0; // bounding-sphere radius of current model
 
+const _gizmoDir = new THREE.Vector3();
+
 function animate() {
   requestAnimationFrame(animate);
-  controls.update();
 
-  // Dynamically shrink near plane as user zooms in so the model never clips
-  // prematurely. Far plane also scales so depth precision stays reasonable.
+  const now = performance.now();
+  const dt = Math.min((now - prevTime) / 1000, 0.1);
+  prevTime = now;
+
+  if (navMode === 'fly') {
+    if (flyControls.isLocked) {
+      const step = flySpeedPerSec() * dt;
+      if (keys.w) flyControls.moveForward(step);
+      if (keys.s) flyControls.moveForward(-step);
+      if (keys.d) flyControls.moveRight(step);
+      if (keys.a) flyControls.moveRight(-step);
+      if (keys.up)   camera.position.y += step;
+      if (keys.down) camera.position.y -= step;
+    }
+  } else {
+    controls.update();
+  }
+
+  // Dynamically shrink near plane as user zooms/flies in so the model never
+  // clips prematurely. Far plane also scales so depth precision stays sane.
   if (fitRadius > 0) {
-    const dist = camera.position.length();
+    const dist = Math.max(camera.position.length(), fitRadius * 0.01);
     camera.near = Math.max(dist * 0.002, 0.001);
     camera.far  = dist * 200 + fitRadius * 4;
     camera.updateProjectionMatrix();
@@ -198,9 +250,10 @@ function animate() {
 
   renderer.render(scene, camera);
 
-  // Sync gizmo: orbit the gizmo camera around the cube in the same direction
-  // as the main camera orbits the model, so the cube reflects current orientation.
-  gizmoCamera.position.copy(camera.position).normalize().multiplyScalar(5);
+  // Sync gizmo to the main camera's actual view direction, so it reflects
+  // orientation correctly in both orbit and fly modes.
+  camera.getWorldDirection(_gizmoDir);
+  gizmoCamera.position.copy(_gizmoDir).multiplyScalar(-5);
   gizmoCamera.up.copy(camera.up);
   gizmoCamera.lookAt(0, 0, 0);
   gizmoRenderer.render(gizmoScene, gizmoCamera);
@@ -225,6 +278,7 @@ function showViewerUI() {
   controlsHint.classList.remove('hidden');
   viewerToolbar.classList.remove('hidden');
   displayControls.classList.remove('hidden');
+  setNavMode('orbit'); // always start a freshly-loaded model in orbit mode
   // Default to a black background on first load
   if (!container.dataset.bgSet) {
     setBackground('dark');
@@ -309,7 +363,12 @@ function setView(name) {
   controls.update();
 }
 
-// ── Model loading ─────────────────────────────────────────
+// ── Model loading (Draco-compressed GLB) ─────────────────
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('js/draco/');
+const gltfLoader = new GLTFLoader();
+gltfLoader.setDRACOLoader(dracoLoader);
+
 function loadRegion(region) {
   showLoading('Loading ' + region + ' model…');
 
@@ -326,68 +385,22 @@ function loadRegion(region) {
     fitRadius = 0;
   }
 
-  const base = `models/${region}/`;
-  const { obj: objFile, mtl: mtlFile } = REGION_FILES[region];
-
-  const mtlLoader = new MTLLoader();
-  mtlLoader.setPath(base);
-
-  mtlLoader.load(
-    mtlFile,
-    (materials) => {
-      materials.preload();
-      setProgress(30);
-
-      const objLoader = new OBJLoader();
-      objLoader.setMaterials(materials);
-      objLoader.setPath(base);
-
-      objLoader.load(
-        objFile,
-        (object) => {
-          setProgress(100);
-          softenMaterials(object);
-          scene.add(object);
-          currentModel = object;
-          fitCameraToModel(object);
-          showViewerUI();
-          setTimeout(hideLoading, 300);
-        },
-        (xhr) => {
-          if (xhr.lengthComputable) setProgress(30 + Math.round((xhr.loaded / xhr.total) * 70));
-        },
-        (err) => { loadingText.textContent = 'Error loading model.'; console.error(err); }
-      );
+  gltfLoader.load(
+    REGION_FILES[region],
+    (gltf) => {
+      const object = gltf.scene;
+      setProgress(100);
+      softenMaterials(object);
+      scene.add(object);
+      currentModel = object;
+      fitCameraToModel(object);
+      showViewerUI();
+      setTimeout(hideLoading, 300);
     },
-    undefined,
-    (err) => {
-      // MTL failed — load OBJ with a plain matte material
-      console.warn('MTL load failed, loading OBJ without materials.', err);
-      setProgress(30);
-
-      const objLoader = new OBJLoader();
-      objLoader.setPath(base);
-
-      objLoader.load(
-        objFile,
-        (object) => {
-          object.traverse(child => {
-            if (child.isMesh)
-              child.material = new THREE.MeshStandardMaterial({ color: 0xd4b896, roughness: 0.9 });
-          });
-          setProgress(100);
-          scene.add(object);
-          currentModel = object;
-          fitCameraToModel(object);
-          showViewerUI();
-          setTimeout(hideLoading, 300);
-        },
-        (xhr) => {
-          if (xhr.lengthComputable) setProgress(30 + Math.round((xhr.loaded / xhr.total) * 70));
-        },
-        (err2) => { loadingText.textContent = 'Error loading model.'; console.error(err2); }
-      );
-    }
+    (xhr) => {
+      if (xhr.lengthComputable) setProgress(Math.round((xhr.loaded / xhr.total) * 100));
+    },
+    (err) => { loadingText.textContent = 'Error loading model.'; console.error(err); }
   );
 }
 
@@ -401,8 +414,10 @@ regionBtns.forEach(btn => {
 });
 
 // ── Reset view ────────────────────────────────────────────
+// Returns to the default orbit framing (and out of fly mode if active).
 resetBtn.addEventListener('click', () => {
   if (!camera._defaultPos) return;
+  if (navMode === 'fly') setNavMode('orbit');
   camera.up.set(0, 1, 0);
   camera.position.copy(camera._defaultPos);
   camera.near = camera._defaultNear;
@@ -414,8 +429,40 @@ resetBtn.addEventListener('click', () => {
 
 // ── View shortcut buttons (Anterior / Posterior / Left / Right) ──
 viewBtns.forEach(btn => {
-  btn.addEventListener('click', () => setView(btn.dataset.view));
+  btn.addEventListener('click', () => {
+    if (navMode === 'fly') setNavMode('orbit');
+    setView(btn.dataset.view);
+  });
 });
+
+// ── Navigation mode (orbit vs fly) ────────────────────────
+function updateHint() {
+  if (navMode === 'fly') {
+    controlsHint.innerHTML = flyControls.isLocked
+      ? 'WASD move <span class="divider">·</span> Space / Shift up·down <span class="divider">·</span> mouse to look <span class="divider">·</span> Esc to release'
+      : 'Click the model to start flying';
+  } else {
+    controlsHint.innerHTML = 'Drag to rotate <span class="divider">·</span> Scroll to zoom <span class="divider">·</span> Right-drag to pan';
+  }
+}
+
+function setNavMode(mode) {
+  navMode = mode;
+  navBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  if (mode === 'fly') {
+    controls.enabled = false;
+    camera.up.set(0, 1, 0);
+  } else {
+    if (flyControls.isLocked) flyControls.unlock();
+    camera.up.set(0, 1, 0);
+    controls.enabled = true;
+    controls.target.set(0, 0, 0);
+    controls.update();
+  }
+  updateHint();
+}
+
+navBtns.forEach(b => b.addEventListener('click', () => setNavMode(b.dataset.mode)));
 
 // ── Background swatches ───────────────────────────────────
 // The renderer is transparent; backgrounds are set via CSS on the container

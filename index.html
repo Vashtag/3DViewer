@@ -31,6 +31,12 @@
 
         <!-- Display controls (shown once a model is loaded) -->
         <div id="display-controls" class="hidden">
+          <p class="sidebar-label">Navigation</p>
+          <div id="nav-modes">
+            <button class="nav-btn active" data-mode="orbit">Orbit</button>
+            <button class="nav-btn" data-mode="fly">Fly (WASD)</button>
+          </div>
+
           <p class="sidebar-label">Background</p>
           <div id="bg-swatches">
             <button class="bg-swatch active" data-bg="dark"  title="Black"></button>
@@ -80,7 +86,7 @@
         <div id="viewer-toolbar" class="hidden">
           <div class="toolbar-row">
             <button id="reset-btn" title="Reset view">&#8635; Reset View</button>
-            <canvas id="gizmo-canvas" title="Click a face to snap to that view"></canvas>
+            <canvas id="gizmo-canvas" title="Orientation indicator"></canvas>
           </div>
           <div id="view-buttons">
             <button class="view-btn" data-view="front">Anterior</button>
