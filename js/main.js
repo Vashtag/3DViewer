@@ -9,6 +9,8 @@ const loadingOverlay = document.getElementById('loading-overlay');
 const loadingText = document.getElementById('loading-text');
 const progressFill = document.getElementById('progress-bar-fill');
 const resetBtn = document.getElementById('reset-btn');
+const controlsHint = document.getElementById('controls-hint');
+const emptyState = document.getElementById('empty-state');
 const regionBtns = document.querySelectorAll('.region-btn');
 
 // Actual filenames on disk (case-sensitive on web servers)
@@ -45,8 +47,7 @@ scene.add(fillLight);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.07;
-controls.minDistance = 0.5;
-controls.maxDistance = 20;
+// min/max distance are set per-model in fitCameraToModel (scans vary in scale).
 
 // ── Resize ────────────────────────────────────────────────
 function resize() {
@@ -84,24 +85,47 @@ function hideLoading() {
   loadingOverlay.classList.add('hidden');
 }
 
+// Reveal the viewer UI once a model is on screen.
+function showViewerUI() {
+  emptyState.classList.add('hidden');
+  controlsHint.classList.remove('hidden');
+  resetBtn.classList.remove('hidden');
+}
+
 function fitCameraToModel(object) {
   const box = new THREE.Box3().setFromObject(object);
   const center = box.getCenter(new THREE.Vector3());
-  const size = box.getSize(new THREE.Vector3());
-  const maxDim = Math.max(size.x, size.y, size.z);
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  const radius = sphere.radius;
 
-  // Centre the model at the origin
+  // Centre the model at the origin.
   object.position.sub(center);
 
+  // Distance at which the bounding sphere just fits the vertical FOV.
+  // Using the sphere (not max dimension) means the model stays framed
+  // no matter how the student rotates it. Scans vary wildly in scale,
+  // so everything below is derived from the model's own radius.
   const fov = camera.fov * (Math.PI / 180);
-  const distance = (maxDim / 2) / Math.tan(fov / 2) * 1.6;
+  let distance = radius / Math.sin(fov / 2);
+
+  // Narrow (portrait) viewports have a smaller horizontal FOV — pull back
+  // so the model still fits widthwise.
+  if (camera.aspect < 1) {
+    distance /= camera.aspect;
+  }
+
+  distance *= 1.15; // a little breathing room around the edges
 
   camera.position.set(0, 0, distance);
-  camera.near = distance / 100;
-  camera.far = distance * 100;
+  camera.near = Math.max(distance - radius * 2, 0.01);
+  camera.far = distance + radius * 2;
   camera.updateProjectionMatrix();
 
   controls.target.set(0, 0, 0);
+  // Clamp zoom relative to model size (the model is ~hundreds of units,
+  // so fixed limits would jam the camera inside it).
+  controls.minDistance = radius * 0.4;
+  controls.maxDistance = radius * 12;
   controls.update();
 
   // Store default for reset
@@ -148,6 +172,7 @@ function loadRegion(region) {
           scene.add(object);
           currentModel = object;
           fitCameraToModel(object);
+          showViewerUI();
           setTimeout(hideLoading, 300);
         },
         (xhr) => {
@@ -184,6 +209,7 @@ function loadRegion(region) {
           scene.add(object);
           currentModel = object;
           fitCameraToModel(object);
+          showViewerUI();
           setTimeout(hideLoading, 300);
         },
         (xhr) => {
@@ -221,5 +247,5 @@ resetBtn.addEventListener('click', () => {
   controls.update();
 });
 
-// ── Initial load ──────────────────────────────────────────
-loadRegion('shoulder');
+// ── Initial state ─────────────────────────────────────────
+// Start with no model loaded — the empty state prompts the user to pick one.
