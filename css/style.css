@@ -53,7 +53,7 @@ body {
 
 /* ── Sidebar ── */
 #sidebar {
-  width: 200px;
+  width: 180px;
   flex-shrink: 0;
   background: var(--surface);
   border-right: 1px solid var(--border);
@@ -105,32 +105,7 @@ body {
 
 /* ── Display controls ── */
 #display-controls.hidden { display: none; }
-
 #display-controls .sidebar-label { margin-top: 22px; }
-
-#view-presets {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-}
-
-.view-btn {
-  padding: 8px 6px;
-  border-radius: 8px;
-  border: 1.5px solid var(--border);
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 0.82rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
-}
-
-.view-btn:hover {
-  border-color: var(--accent);
-  color: var(--text);
-  background: #1e2540;
-}
 
 #bg-swatches {
   display: flex;
@@ -261,6 +236,52 @@ body {
   transition: width 0.15s ease;
 }
 
+/* ── Viewer toolbar (reset + gizmo) ── */
+#viewer-toolbar {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 5;
+}
+
+#viewer-toolbar.hidden { display: none; }
+
+#reset-btn {
+  padding: 8px 14px;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  background: rgba(26, 29, 39, 0.85);
+  color: var(--text);
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+  backdrop-filter: blur(6px);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+#reset-btn:hover {
+  border-color: var(--accent);
+  background: rgba(30, 37, 64, 0.95);
+}
+
+/* The gizmo canvas is sized by JS (90 × 90 CSS px). */
+#gizmo-canvas {
+  display: block;
+  width: 90px;
+  height: 90px;
+  border-radius: 10px;
+  cursor: pointer;
+  background: rgba(15, 17, 23, 0.45);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+#gizmo-canvas:hover {
+  border-color: rgba(79, 124, 255, 0.4);
+}
+
 /* ── Controls hint ── */
 #controls-hint {
   position: absolute;
@@ -280,28 +301,6 @@ body {
 
 .divider { margin: 0 6px; opacity: 0.4; }
 
-/* ── Reset button ── */
-#reset-btn {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  padding: 8px 14px;
-  border-radius: var(--radius);
-  border: 1.5px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  font-size: 0.82rem;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-}
-
-#reset-btn:hover {
-  border-color: var(--accent);
-  background: #1e2540;
-}
-
-#reset-btn.hidden { display: none; }
-
 /* ── Mobile ── */
 @media (max-width: 600px) {
   #header { padding: 10px 14px 8px; }
@@ -319,6 +318,8 @@ body {
   #region-selector { flex-direction: row; gap: 8px; }
   .region-btn { padding: 7px 14px; font-size: 0.85rem; }
 
-  #reset-btn { top: 10px; right: 10px; padding: 7px 11px; }
+  #viewer-toolbar { top: 10px; right: 10px; gap: 8px; }
+  #reset-btn { padding: 7px 11px; }
+  #gizmo-canvas { width: 70px; height: 70px; }
   #controls-hint { font-size: 0.7rem; }
 }
