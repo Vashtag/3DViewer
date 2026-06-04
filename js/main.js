@@ -12,6 +12,9 @@ const resetBtn = document.getElementById('reset-btn');
 const controlsHint = document.getElementById('controls-hint');
 const emptyState = document.getElementById('empty-state');
 const regionBtns = document.querySelectorAll('.region-btn');
+const displayControls = document.getElementById('display-controls');
+const viewBtns = document.querySelectorAll('.view-btn');
+const bgSwatches = document.querySelectorAll('.bg-swatch');
 
 // Actual filenames on disk (case-sensitive on web servers)
 const REGION_FILES = {
@@ -29,19 +32,26 @@ renderer.setClearColor(0x0f1117);
 const scene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000);
-const DEFAULT_CAMERA_POS = new THREE.Vector3(0, 0, 3);
 
 // ── Lighting ──────────────────────────────────────────────
-const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+// Soft, fairly even lighting. Combined with the de-shined materials this
+// keeps surface detail readable from every angle instead of washing out
+// into a hotspot.
+const ambient = new THREE.AmbientLight(0xffffff, 0.75);
 scene.add(ambient);
 
-const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
+const keyLight = new THREE.DirectionalLight(0xffffff, 0.8);
 keyLight.position.set(2, 3, 2);
 scene.add(keyLight);
 
-const fillLight = new THREE.DirectionalLight(0xc8d8ff, 0.4);
+const fillLight = new THREE.DirectionalLight(0xc8d8ff, 0.35);
 fillLight.position.set(-2, 1, -1);
 scene.add(fillLight);
+
+// A second fill from below/behind lifts shadowed undersides of the bone.
+const backFill = new THREE.DirectionalLight(0xffffff, 0.25);
+backFill.position.set(0, -2, -2);
+scene.add(backFill);
 
 // ── Controls ──────────────────────────────────────────────
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -70,6 +80,7 @@ animate();
 
 // ── Model loading ─────────────────────────────────────────
 let currentModel = null;
+let fitDistance = 0; // camera distance that frames the current model
 
 function setProgress(pct) {
   progressFill.style.width = pct + '%';
@@ -90,6 +101,25 @@ function showViewerUI() {
   emptyState.classList.add('hidden');
   controlsHint.classList.remove('hidden');
   resetBtn.classList.remove('hidden');
+  displayControls.classList.remove('hidden');
+}
+
+// The scan's MTL declares a near-mirror specular (Ks 1 1 1, Ns 1000), so
+// MTLLoader builds glossy MeshPhongMaterials that blow out into highlights
+// and hide surface features at certain angles. Flatten the specular so the
+// diffuse texture (the actual anatomy) reads cleanly from any direction.
+function softenMaterials(object) {
+  object.traverse(child => {
+    if (!child.isMesh) return;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    mats.forEach(m => {
+      if ('shininess' in m) m.shininess = 6;       // MeshPhongMaterial
+      if (m.specular) m.specular.setScalar(0.03);
+      if ('roughness' in m) m.roughness = 0.9;      // MeshStandardMaterial
+      if ('metalness' in m) m.metalness = 0.0;
+      m.needsUpdate = true;
+    });
+  });
 }
 
 function fitCameraToModel(object) {
@@ -115,7 +145,9 @@ function fitCameraToModel(object) {
   }
 
   distance *= 1.15; // a little breathing room around the edges
+  fitDistance = distance;
 
+  camera.up.set(0, 1, 0);
   camera.position.set(0, 0, distance);
   camera.near = Math.max(distance - radius * 2, 0.01);
   camera.far = distance + radius * 2;
@@ -169,6 +201,7 @@ function loadRegion(region) {
         objFile,
         (object) => {
           setProgress(100);
+          softenMaterials(object);
           scene.add(object);
           currentModel = object;
           fitCameraToModel(object);
@@ -202,10 +235,11 @@ function loadRegion(region) {
           // Apply a default material so the mesh is visible
           object.traverse(child => {
             if (child.isMesh) {
-              child.material = new THREE.MeshStandardMaterial({ color: 0xd4b896, roughness: 0.7 });
+              child.material = new THREE.MeshStandardMaterial({ color: 0xd4b896, roughness: 0.9 });
             }
           });
           setProgress(100);
+          softenMaterials(object);
           scene.add(object);
           currentModel = object;
           fitCameraToModel(object);
@@ -236,9 +270,56 @@ regionBtns.forEach(btn => {
   });
 });
 
+// ── View presets ──────────────────────────────────────────
+// Unit directions the camera sits along, looking back at the centred model.
+const VIEW_DIRS = {
+  front:  [0, 0, 1],
+  back:   [0, 0, -1],
+  left:   [-1, 0, 0],
+  right:  [1, 0, 0],
+  top:    [0, 1, 0],
+  bottom: [0, -1, 0],
+};
+
+function setView(name) {
+  if (!currentModel || !fitDistance) return;
+  const d = VIEW_DIRS[name];
+  if (!d) return;
+
+  // Looking straight down/up makes the default up-vector (0,1,0) parallel to
+  // the view direction, which gimbal-locks. Re-orient up for those cases.
+  if (name === 'top') camera.up.set(0, 0, -1);
+  else if (name === 'bottom') camera.up.set(0, 0, 1);
+  else camera.up.set(0, 1, 0);
+
+  camera.position.set(d[0] * fitDistance, d[1] * fitDistance, d[2] * fitDistance);
+  controls.target.set(0, 0, 0);
+  controls.update();
+}
+
+viewBtns.forEach(btn => {
+  btn.addEventListener('click', () => setView(btn.dataset.view));
+});
+
+// ── Background ────────────────────────────────────────────
+const BACKGROUNDS = {
+  dark:  0x0f1117,
+  gray:  0x6b7280,
+  light: 0xe8eaf0,
+};
+
+bgSwatches.forEach(swatch => {
+  swatch.addEventListener('click', () => {
+    bgSwatches.forEach(s => s.classList.remove('active'));
+    swatch.classList.add('active');
+    renderer.setClearColor(BACKGROUNDS[swatch.dataset.bg]);
+  });
+});
+
 // ── Reset view ────────────────────────────────────────────
 resetBtn.addEventListener('click', () => {
   if (!camera._defaultPos) return;
+  camera.up.set(0, 1, 0);
   camera.position.copy(camera._defaultPos);
   camera.near = camera._defaultNear;
   camera.far = camera._defaultFar;
