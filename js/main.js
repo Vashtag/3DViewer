@@ -562,11 +562,16 @@ function addLabel(name, localPos, record = true) {
   if (!labelLayer) return;
   const entry = { name, position: [localPos.x, localPos.y, localPos.z] };
 
+  // The label is a zero-size anchor so CSS2DRenderer pins the DOT exactly on
+  // the 3D point. The text/buttons float to the side without shifting it,
+  // so the dot stays accurate at any zoom level.
   const el = document.createElement('div');
   el.className = 'anno-label';
   const dot = document.createElement('span'); dot.className = 'anno-dot';
+  const content = document.createElement('span'); content.className = 'anno-content';
   const txt = document.createElement('span'); txt.className = 'anno-text'; txt.textContent = name;
-  el.append(dot, txt);
+  content.append(txt);
+  el.append(dot, content);
 
   const obj = new CSS2DObject(el);
   obj.position.copy(localPos);
@@ -577,7 +582,7 @@ function addLabel(name, localPos, record = true) {
     del.className = 'anno-del'; del.textContent = '×'; del.title = 'Remove';
     del.addEventListener('pointerdown', e => e.stopPropagation());
     del.addEventListener('click', e => { e.stopPropagation(); removeLabel(entry, obj); });
-    el.appendChild(del);
+    content.appendChild(del);
 
     // Drag the dot to move the pin (re-raycasts onto the surface).
     dot.classList.add('draggable');
