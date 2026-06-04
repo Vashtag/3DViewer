@@ -53,7 +53,7 @@ const MODELS = [
   },
   {
     id: 'pelvis', label: 'Pelvis', file: 'models/pelvis/pelvis.glb',
-    rotation: [0, 0, 4], // level out the roll so the anterior view sits straight
+    rotation: [0, 0, 6], // level out the roll so the anterior view sits straight
     // Left/Right are swapped so each button shows the opposite anatomical side.
     views: [
       { label: 'Anterior',  dir: 'front' },
