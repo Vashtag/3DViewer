@@ -15,46 +15,57 @@
       <p class="subtitle">University of Waterloo</p>
     </header>
 
-    <!-- Region selector -->
-    <nav id="region-selector">
-      <button class="region-btn active" data-region="shoulder">
-        <span class="region-icon">🦴</span>
-        <span class="region-label">Shoulder</span>
-      </button>
-      <button class="region-btn" data-region="pelvis">
-        <span class="region-icon">🦴</span>
-        <span class="region-label">Pelvis</span>
-      </button>
-    </nav>
+    <!-- Body: sidebar + viewer -->
+    <div id="body">
+      <!-- Left sidebar: model list -->
+      <aside id="sidebar">
+        <p class="sidebar-label">Regions</p>
+        <nav id="region-selector">
+          <button class="region-btn" data-region="shoulder">
+            <span class="region-label">Shoulder</span>
+          </button>
+          <button class="region-btn" data-region="pelvis">
+            <span class="region-label">Pelvis</span>
+          </button>
+        </nav>
+      </aside>
 
-    <!-- Viewer area -->
-    <main id="viewer-container">
-      <!-- Loading overlay -->
-      <div id="loading-overlay">
-        <div id="loading-box">
-          <div id="loading-spinner"></div>
-          <p id="loading-text">Loading model…</p>
-          <div id="progress-bar-track">
-            <div id="progress-bar-fill"></div>
+      <!-- Viewer area -->
+      <main id="viewer-container">
+        <!-- Empty state (no model loaded) -->
+        <div id="empty-state">
+          <div id="empty-icon">⊹</div>
+          <p id="empty-title">Select a region to begin</p>
+          <p id="empty-sub">Choose a model from the list on the left.</p>
+        </div>
+
+        <!-- Loading overlay -->
+        <div id="loading-overlay" class="hidden">
+          <div id="loading-box">
+            <div id="loading-spinner"></div>
+            <p id="loading-text">Loading model…</p>
+            <div id="progress-bar-track">
+              <div id="progress-bar-fill"></div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Three.js canvas goes here -->
-      <canvas id="viewer-canvas"></canvas>
+        <!-- Three.js canvas goes here -->
+        <canvas id="viewer-canvas"></canvas>
 
-      <!-- Controls hint -->
-      <div id="controls-hint">
-        <span>Drag to rotate</span>
-        <span class="divider">·</span>
-        <span>Scroll to zoom</span>
-        <span class="divider">·</span>
-        <span>Right-drag to pan</span>
-      </div>
+        <!-- Controls hint -->
+        <div id="controls-hint" class="hidden">
+          <span>Drag to rotate</span>
+          <span class="divider">·</span>
+          <span>Scroll to zoom</span>
+          <span class="divider">·</span>
+          <span>Right-drag to pan</span>
+        </div>
 
-      <!-- Reset button -->
-      <button id="reset-btn" title="Reset view">&#8635; Reset View</button>
-    </main>
+        <!-- Reset button -->
+        <button id="reset-btn" class="hidden" title="Reset view">&#8635; Reset View</button>
+      </main>
+    </div>
   </div>
 
   <script type="importmap">

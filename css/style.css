@@ -16,9 +16,13 @@ body {
   color: var(--text);
   font-family: system-ui, -apple-system, sans-serif;
   height: 100dvh;
+  overflow: hidden;
+}
+
+#app {
+  height: 100dvh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
 /* ── Header ── */
@@ -40,32 +44,56 @@ body {
   margin-top: 2px;
 }
 
-/* ── Region selector ── */
+/* ── Body layout (sidebar + viewer) ── */
+#body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+/* ── Sidebar ── */
+#sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 16px 14px;
+  overflow-y: auto;
+}
+
+.sidebar-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  padding-left: 4px;
+}
+
 #region-selector {
   display: flex;
-  gap: 10px;
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .region-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 18px;
+  width: 100%;
+  padding: 10px 14px;
   border-radius: var(--radius);
-  border: 1.5px solid var(--border);
-  background: var(--surface);
+  border: 1.5px solid transparent;
+  background: transparent;
   color: var(--text-muted);
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
+  text-align: left;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 
 .region-btn:hover {
-  border-color: var(--accent);
+  background: #232739;
   color: var(--text);
 }
 
@@ -75,13 +103,44 @@ body {
   color: var(--text);
 }
 
-.region-icon { font-size: 1rem; }
-
 /* ── Viewer ── */
 #viewer-container {
   flex: 1;
   position: relative;
   overflow: hidden;
+  min-width: 0;
+}
+
+/* ── Empty state ── */
+#empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  z-index: 5;
+  pointer-events: none;
+}
+
+#empty-state.hidden { display: none; }
+
+#empty-icon {
+  font-size: 3rem;
+  color: var(--border);
+  line-height: 1;
+}
+
+#empty-title {
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+#empty-sub {
+  font-size: 0.85rem;
+  color: var(--text-muted);
 }
 
 #viewer-canvas {
@@ -162,6 +221,8 @@ body {
   white-space: nowrap;
 }
 
+#controls-hint.hidden { display: none; }
+
 .divider { margin: 0 6px; opacity: 0.4; }
 
 /* ── Reset button ── */
@@ -184,12 +245,25 @@ body {
   background: #1e2540;
 }
 
+#reset-btn.hidden { display: none; }
+
 /* ── Mobile ── */
-@media (max-width: 480px) {
+@media (max-width: 600px) {
   #header { padding: 10px 14px 8px; }
   #header h1 { font-size: 1rem; }
-  #region-selector { padding: 10px 14px; gap: 8px; }
+
+  /* Sidebar becomes a horizontal bar above the viewer */
+  #body { flex-direction: column; }
+  #sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 10px 14px;
+  }
+  .sidebar-label { display: none; }
+  #region-selector { flex-direction: row; gap: 8px; }
   .region-btn { padding: 7px 14px; font-size: 0.85rem; }
+
   #reset-btn { top: 10px; right: 10px; padding: 7px 11px; }
   #controls-hint { font-size: 0.7rem; }
 }
