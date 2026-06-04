@@ -208,6 +208,86 @@ body {
   background: #1e2540;
 }
 
+/* ── Labels / edit sidebar controls ── */
+#labels-section.hidden, #edit-section.hidden { display: none; }
+
+#labels-toggle, #edit-download {
+  width: 100%;
+  padding: 8px 8px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+#labels-toggle:hover, #edit-download:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  background: #1e2540;
+}
+
+#labels-toggle.active {
+  border-color: var(--accent);
+  background: #1e2540;
+  color: var(--text);
+}
+
+#edit-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+/* ── Annotation labels (CSS2D overlay) ── */
+.anno-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  user-select: none;
+}
+
+.anno-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #0008, 0 1px 3px #0009;
+  flex-shrink: 0;
+}
+
+.anno-text {
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 500;
+  background: rgba(15, 17, 23, 0.78);
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px #0007;
+}
+
+.anno-del {
+  pointer-events: auto;
+  cursor: pointer;
+  color: #fff;
+  background: #c0392b;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
 /* ── Viewer ── */
 #viewer-container {
   flex: 1;
@@ -362,7 +442,7 @@ body {
   background: rgba(30, 37, 64, 0.75);
 }
 
-#reset-btn {
+#reset-btn, #screenshot-btn {
   padding: 8px 14px;
   border-radius: var(--radius);
   border: 1.5px solid var(--border);
@@ -375,7 +455,9 @@ body {
   transition: border-color 0.15s, background 0.15s;
 }
 
-#reset-btn:hover {
+#screenshot-btn { padding: 8px 11px; font-size: 0.95rem; line-height: 1; }
+
+#reset-btn:hover, #screenshot-btn:hover {
   border-color: var(--accent);
   background: rgba(30, 37, 64, 0.95);
 }

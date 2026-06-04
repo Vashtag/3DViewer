@@ -3,6 +3,7 @@ import { GLTFLoader } from './GLTFLoader.js';
 import { DRACOLoader } from './DRACOLoader.js';
 import { OrbitControls } from './OrbitControls.js';
 import { PointerLockControls } from './PointerLockControls.js';
+import { CSS2DRenderer, CSS2DObject } from './CSS2DRenderer.js';
 
 // ── DOM refs ──────────────────────────────────────────────
 const canvas          = document.getElementById('viewer-canvas');
@@ -12,6 +13,7 @@ const loadingText     = document.getElementById('loading-text');
 const progressFill    = document.getElementById('progress-bar-fill');
 const viewerToolbar   = document.getElementById('viewer-toolbar');
 const resetBtn        = document.getElementById('reset-btn');
+const screenshotBtn   = document.getElementById('screenshot-btn');
 const gizmoCanvas     = document.getElementById('gizmo-canvas');
 const bottomBar       = document.getElementById('bottom-bar');
 const controlsHint    = document.getElementById('controls-hint');
@@ -24,6 +26,10 @@ const lightAzimuth    = document.getElementById('light-azimuth');
 const lightElevation  = document.getElementById('light-elevation');
 const lightReset      = document.getElementById('light-reset');
 const navBtns         = document.querySelectorAll('.nav-btn');
+const labelsSection   = document.getElementById('labels-section');
+const labelsToggle    = document.getElementById('labels-toggle');
+const editSection     = document.getElementById('edit-section');
+const editDownload    = document.getElementById('edit-download');
 
 // ── Model catalogue ───────────────────────────────────────
 // To add a model: convert your OBJ to a Draco GLB (see tools/README.md),
@@ -68,7 +74,7 @@ const MODEL_BY_ID = Object.fromEntries(MODELS.map(m => [m.id, m]));
 // ── Main renderer ─────────────────────────────────────────
 // alpha: true makes the canvas transparent so the CSS background (lab photo
 // or solid colour) shows through behind the 3D model.
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setClearColor(0x000000, 0); // fully transparent
@@ -159,11 +165,23 @@ flyControls.addEventListener('unlock', () => {
   updateHint(false);
 });
 
+// ── Label renderer (CSS2D) ────────────────────────────────
+// HTML labels that track 3D anchor points — crisp at any zoom, always facing
+// the camera. The overlay ignores pointer events so orbit/fly still work;
+// only interactive bits (the edit-mode delete buttons) re-enable them.
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.domElement.style.position = 'absolute';
+labelRenderer.domElement.style.top = '0';
+labelRenderer.domElement.style.left = '0';
+labelRenderer.domElement.style.pointerEvents = 'none';
+container.appendChild(labelRenderer.domElement);
+
 // ── Resize ────────────────────────────────────────────────
 function resize() {
   const w = container.clientWidth;
   const h = container.clientHeight;
   renderer.setSize(w, h, false);
+  labelRenderer.setSize(w, h);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
 }
@@ -189,17 +207,36 @@ const gizmoScene  = new THREE.Scene();
 const gizmoCamera = new THREE.OrthographicCamera(-1.8, 1.8, 1.8, -1.8, 0.1, 10);
 
 // Cube faces: BoxGeometry material order is +X, -X, +Y, -Y, +Z, -Z.
-// The gizmo is a passive orientation indicator (not clickable).
-// Labels use anatomical terms: A = anterior (front), P = posterior (back),
-// S = superior (top), I = inferior (bottom), L/R = left/right.
+// The gizmo is a passive orientation indicator (not clickable). Each face maps
+// to a camera direction; its letter is derived per-model from the view buttons
+// (so e.g. the pelvis's swapped L/R, or the shoulder's Medial/Lateral, match).
 const GIZMO_FACES = [
-  { label: 'R', bg: '#b83030' }, // +X
-  { label: 'L', bg: '#7a1f1f' }, // -X
-  { label: 'S', bg: '#2e8b2e' }, // +Y  (superior)
-  { label: 'I', bg: '#1a5c1a' }, // -Y  (inferior)
-  { label: 'A', bg: '#2255bb' }, // +Z  (anterior / front)
-  { label: 'P', bg: '#163a80' }, // -Z  (posterior / back)
+  { dir: 'right',  bg: '#b83030' }, // +X
+  { dir: 'left',   bg: '#7a1f1f' }, // -X
+  { dir: 'top',    bg: '#2e8b2e' }, // +Y
+  { dir: 'bottom', bg: '#1a5c1a' }, // -Y
+  { dir: 'front',  bg: '#2255bb' }, // +Z
+  { dir: 'back',   bg: '#163a80' }, // -Z
 ];
+
+// Default single-letter labels per direction; overridden by a model's views.
+const DEFAULT_DIR_LETTERS = { front: 'A', back: 'P', left: 'L', right: 'R', top: 'S', bottom: 'I' };
+
+function dirLetters(model) {
+  const letters = { ...DEFAULT_DIR_LETTERS };
+  (model?.views || []).forEach(v => { letters[v.dir] = v.label.charAt(0).toUpperCase(); });
+  return letters;
+}
+
+function updateGizmoLabels(model) {
+  const letters = dirLetters(model);
+  GIZMO_FACES.forEach((f, i) => {
+    const mat = gizmoCube.material[i];
+    mat.map?.dispose();
+    mat.map = makeFaceTex(letters[f.dir], f.bg);
+    mat.needsUpdate = true;
+  });
+}
 
 function makeFaceTex(label, bgColor) {
   const s = 128;
@@ -224,11 +261,13 @@ function makeFaceTex(label, bgColor) {
 
 const gizmoCube = new THREE.Mesh(
   new THREE.BoxGeometry(1, 1, 1),
-  GIZMO_FACES.map(f => new THREE.MeshBasicMaterial({ map: makeFaceTex(f.label, f.bg) }))
+  GIZMO_FACES.map(f => new THREE.MeshBasicMaterial({ map: makeFaceTex(DEFAULT_DIR_LETTERS[f.dir], f.bg) }))
 );
 gizmoScene.add(gizmoCube);
 
-// Axis arrows: X = red, Y = green, Z = blue
+// Short colored axis cues sticking out of the cube (X=red, Y=green, Z=blue).
+// No labelled dots — the cube faces are already lettered, and dots would sit
+// on top of a face letter whenever that axis points at the camera.
 function addAxis(x, y, z, color) {
   const pts = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(x, y, z)];
   const line = new THREE.Line(
@@ -236,26 +275,6 @@ function addAxis(x, y, z, color) {
     new THREE.LineBasicMaterial({ color })
   );
   gizmoScene.add(line);
-
-  // Small labelled dot at the tip
-  const label = x ? 'X' : y ? 'Y' : 'Z';
-  const ts = 64;
-  const tc = document.createElement('canvas');
-  tc.width = tc.height = ts;
-  const ctx = tc.getContext('2d');
-  ctx.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
-  ctx.beginPath();
-  ctx.arc(ts / 2, ts / 2, ts / 2 - 2, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 28px system-ui';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(label, ts / 2, ts / 2);
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(tc) }));
-  sprite.scale.set(0.38, 0.38, 0.38);
-  sprite.position.set(x * 1.05, y * 1.05, z * 1.05);
-  gizmoScene.add(sprite);
 }
 
 addAxis(1.4, 0, 0, 0xff4444); // X – red
@@ -311,6 +330,7 @@ function animate() {
   }
 
   renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
 
   // Sync gizmo to the main camera's actual view direction, so it reflects
   // orientation correctly in both orbit and fly modes.
@@ -436,8 +456,10 @@ function loadRegion(region) {
   if (!model) { console.error('Unknown model:', region); return; }
   showLoading('Loading ' + model.label + ' model…');
   buildViewButtons(model);
+  updateGizmoLabels(model);
 
   if (currentModel) {
+    clearLabels();
     scene.remove(currentModel);
     currentModel.traverse(child => {
       if (child.isMesh) {
@@ -468,6 +490,7 @@ function loadRegion(region) {
       currentModel = object;
       fitCameraToModel(object);
       showViewerUI();
+      loadLabels(model);
       setTimeout(hideLoading, 300);
     },
     (xhr) => {
@@ -521,6 +544,109 @@ function buildViewButtons(model) {
   });
 }
 
+// ── Annotations / labels ─────────────────────────────────
+// Author tools appear only when the URL contains ?edit (hidden from students).
+// Saved labels live in models/<id>/labels.json as
+//   [{ name, position: [x, y, z] }]  with position in the model's local space,
+// so they track the model through rotation, centring and zoom.
+const EDIT_MODE = new URLSearchParams(location.search).has('edit');
+let labelLayer = null;     // THREE.Group (child of currentModel) holding labels
+let labelData = [];        // current label records
+let labelsVisible = false;
+let activeModelId = null;
+const _ray = new THREE.Raycaster();
+const _ndc = new THREE.Vector2();
+
+function makeLabelElement(name, onDelete) {
+  const el = document.createElement('div');
+  el.className = 'anno-label';
+  const dot = document.createElement('span'); dot.className = 'anno-dot';
+  const txt = document.createElement('span'); txt.className = 'anno-text'; txt.textContent = name;
+  el.append(dot, txt);
+  if (EDIT_MODE) {
+    const del = document.createElement('span');
+    del.className = 'anno-del'; del.textContent = '×'; del.title = 'Remove';
+    del.addEventListener('click', e => { e.stopPropagation(); onDelete(); });
+    el.appendChild(del);
+  }
+  return el;
+}
+
+function addLabel(name, localPos, record = true) {
+  if (!labelLayer) return;
+  const entry = { name, position: [localPos.x, localPos.y, localPos.z] };
+  const obj = new CSS2DObject(makeLabelElement(name, () => removeLabel(entry, obj)));
+  obj.position.copy(localPos);
+  labelLayer.add(obj);
+  if (record) labelData.push(entry);
+}
+
+function removeLabel(entry, obj) {
+  labelLayer.remove(obj); // fires CSS2DObject 'removed' → cleans up the DOM node
+  const i = labelData.indexOf(entry);
+  if (i >= 0) labelData.splice(i, 1);
+}
+
+function clearLabels() {
+  if (labelLayer) {
+    [...labelLayer.children].forEach(o => labelLayer.remove(o));
+    labelLayer.parent?.remove(labelLayer);
+  }
+  labelLayer = null;
+  labelData = [];
+}
+
+function setLabelsVisible(v) {
+  labelsVisible = v;
+  if (labelLayer) labelLayer.visible = v;
+  labelsToggle.textContent = v ? 'Hide labels' : 'Show labels';
+  labelsToggle.classList.toggle('active', v);
+}
+
+async function loadLabels(model) {
+  clearLabels();
+  activeModelId = model.id;
+  labelLayer = new THREE.Group();
+  currentModel.add(labelLayer);
+
+  let data = [];
+  try {
+    const res = await fetch(`models/${model.id}/labels.json`, { cache: 'no-store' });
+    if (res.ok) data = await res.json();
+  } catch (e) { /* no labels file — fine */ }
+  data.forEach(d => addLabel(d.name, new THREE.Vector3(d.position[0], d.position[1], d.position[2])));
+
+  labelsSection.classList.toggle('hidden', !(labelData.length || EDIT_MODE));
+  editSection.classList.toggle('hidden', !EDIT_MODE);
+  setLabelsVisible(EDIT_MODE); // labels start visible while authoring, hidden otherwise
+}
+
+labelsToggle.addEventListener('click', () => setLabelsVisible(!labelsVisible));
+
+// Edit mode: click the model surface to drop a labelled pin.
+renderer.domElement.addEventListener('click', e => {
+  if (!EDIT_MODE || navMode !== 'orbit' || !currentModel) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  _ndc.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
+  _ndc.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
+  _ray.setFromCamera(_ndc, camera);
+  const hits = _ray.intersectObject(currentModel, true);
+  if (!hits.length) return;
+  const name = prompt('Label name:');
+  if (!name) return;
+  if (!labelsVisible) setLabelsVisible(true);
+  addLabel(name, currentModel.worldToLocal(hits[0].point.clone()));
+});
+
+editDownload.addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(labelData, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${activeModelId || 'model'}-labels.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
 // ── Navigation mode (orbit vs fly) ────────────────────────
 function updateHint(locked = flyControls.isLocked) {
   if (navMode === 'fly') {
@@ -566,8 +692,10 @@ const BG_STYLES = {
   light: { image: 'none', color: '#e8eaf0' },
   lab:   { image: 'url(assets/lab-background.jpg)', color: '#0f1117' },
 };
+let currentBg = 'dark';
 
 function setBackground(bg) {
+  currentBg = bg;
   bgSwatches.forEach(s => s.classList.remove('active'));
   document.querySelector(`.bg-swatch[data-bg="${bg}"]`)?.classList.add('active');
   const s = BG_STYLES[bg] || BG_STYLES.dark;
@@ -578,6 +706,76 @@ function setBackground(bg) {
 bgSwatches.forEach(swatch => {
   swatch.addEventListener('click', () => setBackground(swatch.dataset.bg));
 });
+
+// ── Screenshot ────────────────────────────────────────────
+// Composite the CSS background + the (transparent) WebGL canvas + any visible
+// labels into one image and download it. The WebGL canvas alone is transparent,
+// so we paint the background first.
+let labImg = null;
+function getLabImage() {
+  if (!labImg) { labImg = new Image(); labImg.src = 'assets/lab-background.jpg'; }
+  return labImg;
+}
+
+function drawCover(ctx, img, W, H) {
+  const ir = img.width / img.height, r = W / H;
+  let dw, dh;
+  if (ir > r) { dh = H; dw = H * ir; } else { dw = W; dh = W / ir; }
+  ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+}
+
+function captureScreenshot() {
+  const src = renderer.domElement;
+  const W = src.width, H = src.height;              // device pixels
+  const scale = W / container.clientWidth;          // device px per CSS px
+  const out = document.createElement('canvas');
+  out.width = W; out.height = H;
+  const ctx = out.getContext('2d');
+
+  // Background
+  ctx.fillStyle = (BG_STYLES[currentBg] || BG_STYLES.dark).color;
+  ctx.fillRect(0, 0, W, H);
+  if (currentBg === 'lab') {
+    const img = getLabImage();
+    if (img.complete && img.naturalWidth) drawCover(ctx, img, W, H);
+  }
+
+  // The 3D model
+  ctx.drawImage(src, 0, 0, W, H);
+
+  // Visible labels: project each anchor to screen and draw a dot + text
+  if (labelsVisible && labelLayer && labelLayer.children.length) {
+    const v = new THREE.Vector3();
+    ctx.textBaseline = 'middle';
+    ctx.font = `600 ${13 * scale}px system-ui, sans-serif`;
+    labelLayer.children.forEach(o => {
+      o.getWorldPosition(v).project(camera);
+      if (v.z > 1) return; // behind camera
+      const x = (v.x * 0.5 + 0.5) * W;
+      const y = (-v.y * 0.5 + 0.5) * H;
+      const name = o.element?.querySelector('.anno-text')?.textContent || '';
+      const padX = 7 * scale, txtX = x + 11 * scale;
+      const tw = ctx.measureText(name).width;
+      ctx.fillStyle = 'rgba(15,17,23,0.78)';
+      ctx.fillRect(txtX - padX, y - 9 * scale, tw + padX * 2, 18 * scale);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(name, txtX, y + scale);
+      ctx.beginPath(); ctx.arc(x, y, 5 * scale, 0, Math.PI * 2);
+      ctx.fillStyle = '#4f7cff'; ctx.fill();
+      ctx.lineWidth = 2 * scale; ctx.strokeStyle = '#fff'; ctx.stroke();
+    });
+  }
+
+  out.toBlob(blob => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${activeModelId || 'model'}-${Date.now()}.png`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }, 'image/png');
+}
+
+screenshotBtn.addEventListener('click', captureScreenshot);
 
 // ── Lighting direction ────────────────────────────────────
 // The two sliders orbit the key light around the model. Azimuth spins it
