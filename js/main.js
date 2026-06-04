@@ -111,10 +111,12 @@ document.addEventListener('keyup', e => {
 renderer.domElement.addEventListener('click', () => {
   if (navMode === 'fly' && !flyControls.isLocked) flyControls.lock();
 });
-flyControls.addEventListener('lock', updateHint);
+// Note: PointerLockControls dispatches lock/unlock BEFORE updating isLocked,
+// so pass the state explicitly rather than reading flyControls.isLocked here.
+flyControls.addEventListener('lock', () => updateHint(true));
 flyControls.addEventListener('unlock', () => {
   for (const k in keys) keys[k] = false; // stop drifting when released
-  updateHint();
+  updateHint(false);
 });
 
 // ── Resize ────────────────────────────────────────────────
@@ -464,11 +466,11 @@ viewBtns.forEach(btn => {
 });
 
 // ── Navigation mode (orbit vs fly) ────────────────────────
-function updateHint() {
+function updateHint(locked = flyControls.isLocked) {
   if (navMode === 'fly') {
-    controlsHint.innerHTML = flyControls.isLocked
+    controlsHint.innerHTML = locked
       ? 'WASD to move <span class="divider">·</span> Space / Shift to rise · descend <span class="divider">·</span> mouse to look <span class="divider">·</span> <strong>Press Esc to leave fly mode</strong>'
-      : 'Click the model to start flying';
+      : 'Click the model to start flying <span class="divider">·</span> then press Esc to leave';
   } else {
     controlsHint.innerHTML = 'Drag to rotate <span class="divider">·</span> Scroll to zoom <span class="divider">·</span> Right-drag to pan';
   }
