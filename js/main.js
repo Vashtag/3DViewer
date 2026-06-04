@@ -29,29 +29,34 @@ const REGION_FILES = {
 };
 
 // ── Main renderer ─────────────────────────────────────────
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+// alpha: true makes the canvas transparent so the CSS background (lab photo
+// or solid colour) shows through behind the 3D model.
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.setClearColor(0x0f1117);
+renderer.setClearColor(0x000000, 0); // fully transparent
 
 // ── Scene & Camera ────────────────────────────────────────
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000);
 
 // ── Lighting ──────────────────────────────────────────────
-const ambient = new THREE.AmbientLight(0xffffff, 0.75);
+// Matched to overhead fluorescent lab lighting: bright cool-white from
+// above, high ambient to simulate the bounced light of a white-walled room,
+// and a soft low fill so undersides are still visible.
+const ambient = new THREE.AmbientLight(0xf0f4ff, 0.95); // cool, bright room
 scene.add(ambient);
 
-const keyLight = new THREE.DirectionalLight(0xffffff, 0.8);
-keyLight.position.set(2, 3, 2);
+const keyLight = new THREE.DirectionalLight(0xffffff, 0.85); // overhead key
+keyLight.position.set(1, 5, 1); // roughly overhead — fine-tuned by sliders
 scene.add(keyLight);
 
-const fillLight = new THREE.DirectionalLight(0xc8d8ff, 0.35);
-fillLight.position.set(-2, 1, -1);
+const fillLight = new THREE.DirectionalLight(0xddeeff, 0.25); // soft side fill
+fillLight.position.set(-3, 1, -1);
 scene.add(fillLight);
 
-const backFill = new THREE.DirectionalLight(0xffffff, 0.25);
-backFill.position.set(0, -2, -2);
+const backFill = new THREE.DirectionalLight(0xffffff, 0.15); // subtle under fill
+backFill.position.set(0, -2, -1);
 scene.add(backFill);
 
 // ── OrbitControls ─────────────────────────────────────────
@@ -220,6 +225,11 @@ function showViewerUI() {
   controlsHint.classList.remove('hidden');
   viewerToolbar.classList.remove('hidden');
   displayControls.classList.remove('hidden');
+  // Default to the lab photo background on first load
+  if (!container.dataset.bgSet) {
+    setBackground('lab');
+    container.dataset.bgSet = '1';
+  }
 }
 
 // ── Material softening ────────────────────────────────────
@@ -408,21 +418,31 @@ viewBtns.forEach(btn => {
 });
 
 // ── Background swatches ───────────────────────────────────
-const BACKGROUNDS = { dark: 0x0f1117, gray: 0x6b7280, light: 0xe8eaf0 };
+// The renderer is transparent; backgrounds are set via CSS on the container
+// so the lab photo or a solid colour shows through the canvas.
+const BG_STYLES = {
+  lab:   { image: 'url(assets/lab-background.jpg)', color: '#0f1117' },
+  gray:  { image: 'none', color: '#6b7280' },
+  light: { image: 'none', color: '#e8eaf0' },
+};
+
+function setBackground(bg) {
+  bgSwatches.forEach(s => s.classList.remove('active'));
+  document.querySelector(`.bg-swatch[data-bg="${bg}"]`)?.classList.add('active');
+  const s = BG_STYLES[bg] || BG_STYLES.lab;
+  container.style.backgroundImage = s.image;
+  container.style.backgroundColor = s.color;
+}
 
 bgSwatches.forEach(swatch => {
-  swatch.addEventListener('click', () => {
-    bgSwatches.forEach(s => s.classList.remove('active'));
-    swatch.classList.add('active');
-    renderer.setClearColor(BACKGROUNDS[swatch.dataset.bg]);
-  });
+  swatch.addEventListener('click', () => setBackground(swatch.dataset.bg));
 });
 
 // ── Lighting direction ────────────────────────────────────
 // The two sliders orbit the key light around the model. Azimuth spins it
 // horizontally; elevation raises/lowers it. The fill lights stay fixed so
 // there's always some ambient shape, but the dominant light follows the user.
-const LIGHT_DEFAULT = { azimuth: 45, elevation: 47 };
+const LIGHT_DEFAULT = { azimuth: 20, elevation: 72 };
 
 function updateKeyLight() {
   const az = THREE.MathUtils.degToRad(Number(lightAzimuth.value));
