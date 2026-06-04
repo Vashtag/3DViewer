@@ -331,6 +331,7 @@ function animate() {
 
   renderer.render(scene, camera);
   labelRenderer.render(scene, camera);
+  updateLabelLeaders();
 
   // Sync gizmo to the main camera's actual view direction, so it reflects
   // orientation correctly in both orbit and fly modes.
@@ -576,6 +577,8 @@ function addLabel(name, localPos, record = true) {
 
   const obj = new CSS2DObject(el);
   obj.position.copy(localPos);
+  obj.userData.leader = leader;
+  obj.userData.content = content;
 
   if (EDIT_MODE) {
     // Delete button
@@ -640,6 +643,44 @@ async function loadLabels(model) {
 }
 
 labelsToggle.addEventListener('click', () => setLabelsVisible(!labelsVisible));
+
+// Orient each label's leader line radially outward from the model centre
+// (which sits at world origin and is the orbit target), so callouts fan out
+// away from the mesh instead of all pointing the same way and covering it.
+const _lblWorld = new THREE.Vector3();
+const LEADER_LEN = 45; // keep in sync with .anno-leader width
+function updateLabelLeaders() {
+  if (!labelLayer || !labelsVisible || !labelLayer.children.length) return;
+  const w = renderer.domElement.clientWidth;
+  const h = renderer.domElement.clientHeight;
+  // Model centre (origin) in screen space.
+  _lblWorld.set(0, 0, 0).project(camera);
+  const cx = (_lblWorld.x * 0.5 + 0.5) * w;
+  const cy = (-_lblWorld.y * 0.5 + 0.5) * h;
+
+  labelLayer.children.forEach(o => {
+    const leader = o.userData.leader, content = o.userData.content;
+    if (!leader || !content) return;
+    o.getWorldPosition(_lblWorld).project(camera);
+    const sx = (_lblWorld.x * 0.5 + 0.5) * w;
+    const sy = (-_lblWorld.y * 0.5 + 0.5) * h;
+    let dx = sx - cx, dy = sy - cy;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-3) { dx = 0.7; dy = -0.7; } else { dx /= len; dy /= len; }
+
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    leader.style.transform = `rotate(${angle}deg)`;
+
+    const tipX = (LEADER_LEN + 4) * dx;
+    const tipY = (LEADER_LEN + 4) * dy;
+    content.style.left = `${tipX}px`;
+    content.style.top = `${tipY}px`;
+    // Anchor the text box on the side facing the model so it always reads
+    // outward: right-edge at the tip when pointing left, left-edge when right.
+    const tx = dx < -0.15 ? '-100%' : dx > 0.15 ? '0' : '-50%';
+    content.style.transform = `translate(${tx}, -50%)`;
+  });
+}
 
 // Edit mode: click the model surface to drop a labelled pin.
 renderer.domElement.addEventListener('click', e => {
@@ -784,29 +825,40 @@ function captureScreenshot() {
   // Visible labels: project each anchor and draw a dot + leader line + text,
   // matching the on-screen leader-line callout style.
   if (labelsVisible && labelLayer && labelLayer.children.length) {
-    const v = new THREE.Vector3();
-    const LX = 32 * scale, LY = 32 * scale; // leader offset (up-right)
+    const v = new THREE.Vector3(), c = new THREE.Vector3();
+    const LEN = (LEADER_LEN + 4) * scale; // leader length, matches on-screen
     ctx.textBaseline = 'middle';
     ctx.font = `600 ${13 * scale}px system-ui, sans-serif`;
+
+    // Model centre (origin) in screen space, for the radial-outward direction.
+    c.set(0, 0, 0).project(camera);
+    const cx = (c.x * 0.5 + 0.5) * W;
+    const cy = (-c.y * 0.5 + 0.5) * H;
+
     labelLayer.children.forEach(o => {
       o.getWorldPosition(v).project(camera);
       if (v.z > 1) return; // behind camera
       const x = (v.x * 0.5 + 0.5) * W;
       const y = (-v.y * 0.5 + 0.5) * H;
-      const ex = x + LX, ey = y - LY; // leader end / text anchor
+      let dx = x - cx, dy = y - cy;
+      const len = Math.hypot(dx, dy);
+      if (len < 1e-3) { dx = 0.7; dy = -0.7; } else { dx /= len; dy /= len; }
+      const ex = x + LEN * dx, ey = y + LEN * dy; // leader end / text anchor
       const name = o.element?.querySelector('.anno-text')?.textContent || '';
 
       // Leader line
       ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ex, ey);
       ctx.lineWidth = 1.5 * scale; ctx.strokeStyle = 'rgba(255,255,255,0.65)'; ctx.stroke();
 
-      // Text pill at the leader end
-      const padX = 7 * scale, txtX = ex + padX;
+      // Text pill, anchored on the side facing the model so it reads outward.
+      const padX = 7 * scale;
       const tw = ctx.measureText(name).width;
+      const boxW = tw + padX * 2;
+      const boxX = dx < -0.15 ? ex - boxW : dx > 0.15 ? ex : ex - boxW / 2;
       ctx.fillStyle = 'rgba(15,17,23,0.78)';
-      ctx.fillRect(ex, ey - 9 * scale, tw + padX * 2, 18 * scale);
+      ctx.fillRect(boxX, ey - 9 * scale, boxW, 18 * scale);
       ctx.fillStyle = '#fff';
-      ctx.fillText(name, txtX, ey + scale);
+      ctx.fillText(name, boxX + padX, ey + scale);
 
       // Anchor dot
       ctx.beginPath(); ctx.arc(x, y, 3.5 * scale, 0, Math.PI * 2);
