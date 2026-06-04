@@ -44,6 +44,19 @@
             </label>
             <button id="light-reset" type="button">Reset light</button>
           </div>
+
+          <!-- Labels (shown only when the current model has annotations) -->
+          <div id="labels-section" class="hidden">
+            <p class="sidebar-label">Labels</p>
+            <button id="labels-toggle" type="button">Show labels</button>
+          </div>
+
+          <!-- Author tools (only when the page URL contains ?edit) -->
+          <div id="edit-section" class="hidden">
+            <p class="sidebar-label">Edit labels</p>
+            <p id="edit-hint">Click the model to add a pin.</p>
+            <button id="edit-download" type="button">Download labels.json</button>
+          </div>
         </div>
       </aside>
 
@@ -73,6 +86,7 @@
         <!-- Top-right toolbar: reset button + orientation gizmo + view shortcuts -->
         <div id="viewer-toolbar" class="hidden">
           <div class="toolbar-row">
+            <button id="screenshot-btn" title="Save screenshot">&#128247;</button>
             <button id="reset-btn" title="Reset view">&#8635; Reset View</button>
             <canvas id="gizmo-canvas" title="Orientation indicator"></canvas>
           </div>
