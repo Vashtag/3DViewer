@@ -87,10 +87,12 @@
         <div id="viewer-toolbar" class="hidden">
           <div class="toolbar-row">
             <div class="toolbar-stack">
-              <button id="screenshot-btn" title="Save screenshot">&#128247;</button>
-              <button id="pin-btn" title="Drop a pin on the model">&#128204;</button>
+              <div class="toolbar-row">
+                <button id="screenshot-btn" title="Save screenshot">&#128247;</button>
+                <button id="pin-btn" title="Drop a pin on the model">&#128204;</button>
+              </div>
+              <button id="reset-btn" title="Reset view">&#8635; Reset View</button>
             </div>
-            <button id="reset-btn" title="Reset view">&#8635; Reset View</button>
             <canvas id="gizmo-canvas" title="Orientation indicator"></canvas>
           </div>
           <!-- View shortcut buttons are generated per-model in js/main.js -->
