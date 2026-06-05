@@ -70,7 +70,7 @@ const MODELS = [
   },
   {
     id: 'knee', label: 'Knee', file: 'models/knee/knee.glb',
-    rotation: [0, 0, 0],
+    rotation: [-30, 0, 0], // tip the scan's tilted long axis upright (anterior/lateral sit straight)
     views: [
       { label: 'Anterior',  dir: 'front' },
       { label: 'Posterior', dir: 'back'  },
