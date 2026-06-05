@@ -68,6 +68,16 @@ const MODELS = [
       { label: 'Right',     dir: 'left'  },
     ],
   },
+  {
+    id: 'knee', label: 'Knee', file: 'models/knee/knee.glb',
+    rotation: [0, 0, 0],
+    views: [
+      { label: 'Anterior',  dir: 'front' },
+      { label: 'Posterior', dir: 'back'  },
+      { label: 'Lateral',   dir: 'left'  },
+      { label: 'Medial',    dir: 'right' },
+    ],
+  },
 ];
 const MODEL_BY_ID = Object.fromEntries(MODELS.map(m => [m.id, m]));
 
