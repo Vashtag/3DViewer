@@ -328,6 +328,66 @@ body {
   flex-shrink: 0;
 }
 
+/* ── Pin markers (temporary student pins) ── */
+.pin-anchor {
+  position: relative;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  user-select: none;
+}
+.pin-dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #f0c040;
+  border: 2px solid #fff;
+  box-shadow: 0 0 6px rgba(240,192,64,0.7);
+}
+.pin-label {
+  position: absolute;
+  left: 10px;
+  top: -10px;
+  color: #f0c040;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-shadow: 0 0 4px #000, 0 1px 3px #000;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.pin-del {
+  position: absolute;
+  left: 9px;
+  top: -22px;
+  pointer-events: auto;
+  cursor: pointer;
+  color: #fff;
+  background: #555;
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.pin-anchor:hover .pin-del { opacity: 1; }
+
+/* Pin mode: crosshair cursor over the canvas */
+#viewer-container.pin-mode #viewer-canvas { cursor: crosshair; }
+
+/* Active state for pin button */
+#pin-btn.active {
+  background: rgba(240, 192, 64, 0.25);
+  color: #f0c040;
+  border-color: rgba(240, 192, 64, 0.6);
+}
+
 /* ── Viewer ── */
 #viewer-container {
   flex: 1;

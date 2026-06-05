@@ -30,6 +30,8 @@ const labelsSection   = document.getElementById('labels-section');
 const labelsToggle    = document.getElementById('labels-toggle');
 const editSection     = document.getElementById('edit-section');
 const editDownload    = document.getElementById('edit-download');
+const pinBtn          = document.getElementById('pin-btn');
+const clearPinsBtn    = document.getElementById('clear-pins-btn');
 
 // ── Model catalogue ───────────────────────────────────────
 // To add a model: convert your OBJ to a Draco GLB (see tools/README.md),
@@ -133,6 +135,7 @@ function flySpeedPerSec() {
 }
 
 document.addEventListener('keydown', e => {
+  if (e.code === 'Escape' && pinMode) { setPinMode(false); return; }
   // Q/E roll works in orbit mode.
   if (navMode === 'orbit') {
     if (e.code === 'KeyQ') rollKeys.ccw = true;
@@ -485,6 +488,8 @@ function loadRegion(region) {
 
   if (currentModel) {
     clearLabels();
+    clearPins();
+    setPinMode(false);
     scene.remove(currentModel);
     currentModel.traverse(child => {
       if (child.isMesh) {
@@ -516,6 +521,7 @@ function loadRegion(region) {
       fitCameraToModel(object);
       showViewerUI();
       loadLabels(model);
+      initPinLayer();
       setTimeout(hideLoading, 300);
     },
     (xhr) => {
@@ -739,6 +745,81 @@ editDownload.addEventListener('click', () => {
   URL.revokeObjectURL(a.href);
 });
 
+// ── Student pins ──────────────────────────────────────────
+// Temporary markers students drop while studying. Never saved; cleared when
+// switching models. A separate layer from author labels so they can't interfere.
+let pinLayer = null;
+let pinMode  = false;
+let pinCount = 0;
+
+function setPinMode(on) {
+  pinMode = on;
+  pinBtn.classList.toggle('active', on);
+  container.classList.toggle('pin-mode', on);
+  if (on && navMode === 'orbit') controls.enabled = false;
+  else if (!on && navMode === 'orbit' && !dragging) controls.enabled = true;
+}
+
+function dropPin(worldPoint) {
+  if (!currentModel || !pinLayer) return;
+  pinCount++;
+  const localPos = currentModel.worldToLocal(worldPoint.clone());
+
+  const el = document.createElement('div');
+  el.className = 'pin-anchor';
+  const dot = document.createElement('span'); dot.className = 'pin-dot';
+  const lbl = document.createElement('span'); lbl.className = 'pin-label';
+  lbl.textContent = `Pin ${pinCount}`;
+  const del = document.createElement('span'); del.className = 'pin-del';
+  del.textContent = '×'; del.title = 'Remove pin';
+  el.append(dot, lbl, del);
+
+  const obj = new CSS2DObject(el);
+  obj.position.copy(localPos);
+  pinLayer.add(obj);
+  clearPinsBtn.classList.remove('hidden');
+
+  del.addEventListener('pointerdown', e => e.stopPropagation());
+  del.addEventListener('click', e => {
+    e.stopPropagation();
+    pinLayer.remove(obj);
+    if (!pinLayer.children.length) clearPinsBtn.classList.add('hidden');
+  });
+}
+
+function clearPins() {
+  if (pinLayer) [...pinLayer.children].forEach(o => pinLayer.remove(o));
+  pinCount = 0;
+  clearPinsBtn.classList.add('hidden');
+}
+
+function initPinLayer() {
+  clearPins();
+  pinLayer = new THREE.Group();
+  if (currentModel) currentModel.add(pinLayer);
+}
+
+pinBtn.addEventListener('click', () => setPinMode(!pinMode));
+clearPinsBtn.addEventListener('click', clearPins);
+
+// Intercept clicks in pin mode before OrbitControls sees them.
+container.addEventListener('pointerdown', e => {
+  if (!pinMode || e.button !== 0) return;
+  e.stopPropagation();
+  const rect = canvas.getBoundingClientRect();
+  _ndc.set(
+    ((e.clientX - rect.left) / rect.width)  * 2 - 1,
+   -((e.clientY - rect.top)  / rect.height) * 2 + 1
+  );
+  _ray.setFromCamera(_ndc, camera);
+  const hits = currentModel ? _ray.intersectObject(currentModel, true) : [];
+  if (hits.length) {
+    dropPin(hits[0].point);
+    // Brief flash so user knows the click registered, then leave pin mode
+    // (one-shot: each click places one pin, mode stays on for rapid pinning)
+  }
+}, true); // capture phase so we beat OrbitControls
+
 // ── Navigation mode (orbit vs fly) ────────────────────────
 function updateHint(locked = flyControls.isLocked) {
   if (navMode === 'fly') {
@@ -754,6 +835,7 @@ function setNavMode(mode) {
   navMode = mode;
   navBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
   if (mode === 'fly') {
+    setPinMode(false); // can't pin while flying
     controls.enabled = false;
     camera.up.set(0, 1, 0);
   } else {
