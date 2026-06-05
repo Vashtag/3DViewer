@@ -336,6 +336,7 @@ body {
   pointer-events: none;
   user-select: none;
 }
+/* Click the dot itself to remove the pin */
 .pin-dot {
   position: absolute;
   left: 0;
@@ -347,6 +348,13 @@ body {
   background: #f0c040;
   border: 2px solid #fff;
   box-shadow: 0 0 6px rgba(240,192,64,0.7);
+  pointer-events: auto;
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.pin-dot:hover {
+  transform: translate(-50%, -50%) scale(1.25);
+  box-shadow: 0 0 9px rgba(240,192,64,0.95);
 }
 .pin-label {
   position: absolute;
@@ -359,24 +367,6 @@ body {
   white-space: nowrap;
   pointer-events: none;
 }
-.pin-del {
-  position: absolute;
-  left: 9px;
-  top: -22px;
-  pointer-events: auto;
-  cursor: pointer;
-  color: #fff;
-  background: #555;
-  border-radius: 50%;
-  width: 14px;
-  height: 14px;
-  font-size: 10px;
-  line-height: 14px;
-  text-align: center;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-.pin-anchor:hover .pin-del { opacity: 1; }
 
 /* Pin mode: crosshair cursor over the canvas */
 #viewer-container.pin-mode #viewer-canvas { cursor: crosshair; }
@@ -512,7 +502,14 @@ body {
 
 .toolbar-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+/* Stacks the screenshot + pin buttons vertically */
+.toolbar-stack {
+  display: flex;
+  flex-direction: column;
   gap: 10px;
 }
 
@@ -542,7 +539,7 @@ body {
   background: rgba(30, 37, 64, 0.75);
 }
 
-#reset-btn, #screenshot-btn {
+#reset-btn, #screenshot-btn, #pin-btn {
   padding: 8px 14px;
   border-radius: var(--radius);
   border: 1.5px solid var(--border);
@@ -555,9 +552,9 @@ body {
   transition: border-color 0.15s, background 0.15s;
 }
 
-#screenshot-btn { padding: 8px 11px; font-size: 0.95rem; line-height: 1; }
+#screenshot-btn, #pin-btn { padding: 8px 11px; font-size: 0.95rem; line-height: 1; }
 
-#reset-btn:hover, #screenshot-btn:hover {
+#reset-btn:hover, #screenshot-btn:hover, #pin-btn:hover {
   border-color: var(--accent);
   background: rgba(30, 37, 64, 0.95);
 }
