@@ -336,7 +336,7 @@ body {
   pointer-events: none;
   user-select: none;
 }
-/* Click the dot itself to remove the pin */
+/* Click the dot itself to remove the pin. Color set per-pin via inline style. */
 .pin-dot {
   position: absolute;
   left: 0;
@@ -345,22 +345,18 @@ body {
   width: 11px;
   height: 11px;
   border-radius: 50%;
-  background: #f0c040;
   border: 2px solid #fff;
-  box-shadow: 0 0 6px rgba(240,192,64,0.7);
   pointer-events: auto;
   cursor: pointer;
   transition: transform 0.12s, box-shadow 0.12s;
 }
 .pin-dot:hover {
-  transform: translate(-50%, -50%) scale(1.25);
-  box-shadow: 0 0 9px rgba(240,192,64,0.95);
+  transform: translate(-50%, -50%) scale(1.4);
 }
 .pin-label {
   position: absolute;
   left: 10px;
   top: -10px;
-  color: #f0c040;
   font-size: 0.72rem;
   font-weight: 700;
   text-shadow: 0 0 4px #000, 0 1px 3px #000;
@@ -506,7 +502,7 @@ body {
   gap: 10px;
 }
 
-/* Stacks the screenshot + pin buttons vertically */
+/* Stacks the [screenshot+pin row] then the reset button below */
 .toolbar-stack {
   display: flex;
   flex-direction: column;
@@ -553,6 +549,7 @@ body {
 }
 
 #screenshot-btn, #pin-btn { padding: 8px 11px; font-size: 0.95rem; line-height: 1; }
+#reset-btn { width: 100%; }
 
 #reset-btn:hover, #screenshot-btn:hover, #pin-btn:hover {
   border-color: var(--accent);

@@ -749,6 +749,16 @@ editDownload.addEventListener('click', () => {
 // switching models. A separate layer from author labels so they can't interfere.
 // The Pin button arms a single placement: one click on the model drops one pin
 // and disarms. Click a placed pin's dot to remove it.
+const PIN_COLORS = [
+  '#f05a5a', // red
+  '#f0a040', // orange
+  '#f0e040', // yellow
+  '#60d060', // green
+  '#40c4f0', // cyan
+  '#8060f0', // purple
+  '#f060c0', // pink
+  '#40f0b0', // teal
+];
 let pinLayer = null;
 let pinMode  = false;
 let pinCount = 0;
@@ -764,14 +774,18 @@ function setPinMode(on) {
 function dropPin(worldPoint) {
   if (!currentModel || !pinLayer) return;
   pinCount++;
+  const color = PIN_COLORS[(pinCount - 1) % PIN_COLORS.length];
   const localPos = currentModel.worldToLocal(worldPoint.clone());
 
   const el = document.createElement('div');
   el.className = 'pin-anchor';
   const dot = document.createElement('span'); dot.className = 'pin-dot';
   dot.title = 'Click to remove this pin';
+  dot.style.background = color;
+  dot.style.boxShadow = `0 0 6px ${color}aa`;
   const lbl = document.createElement('span'); lbl.className = 'pin-label';
   lbl.textContent = `Pin ${pinCount}`;
+  lbl.style.color = color;
   el.append(dot, lbl);
 
   const obj = new CSS2DObject(el);
