@@ -97,18 +97,18 @@ const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000);
 // Matched to overhead fluorescent lab lighting: bright cool-white from
 // above, high ambient to simulate the bounced light of a white-walled room,
 // and a soft low fill so undersides are still visible.
-const ambient = new THREE.AmbientLight(0xf0f4ff, 0.95); // cool, bright room
+const ambient = new THREE.AmbientLight(0xf0f4ff, 1.1); // cool, bright room
 scene.add(ambient);
 
-const keyLight = new THREE.DirectionalLight(0xffffff, 0.85); // overhead key
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.2); // overhead key
 keyLight.position.set(1, 5, 1); // roughly overhead — fine-tuned by sliders
 scene.add(keyLight);
 
-const fillLight = new THREE.DirectionalLight(0xddeeff, 0.25); // soft side fill
+const fillLight = new THREE.DirectionalLight(0xddeeff, 0.35); // soft side fill
 fillLight.position.set(-3, 1, -1);
 scene.add(fillLight);
 
-const backFill = new THREE.DirectionalLight(0xffffff, 0.15); // subtle under fill
+const backFill = new THREE.DirectionalLight(0xffffff, 0.2); // subtle under fill
 backFill.position.set(0, -2, -1);
 scene.add(backFill);
 
@@ -895,7 +895,7 @@ screenshotBtn.addEventListener('click', captureScreenshot);
 // The two sliders orbit the key light around the model. Azimuth spins it
 // horizontally; elevation raises/lowers it. The fill lights stay fixed so
 // there's always some ambient shape, but the dominant light follows the user.
-const LIGHT_DEFAULT = { azimuth: 20, elevation: 72 };
+const LIGHT_DEFAULT = { azimuth: 0, elevation: 80 };
 
 function updateKeyLight() {
   const az = THREE.MathUtils.degToRad(Number(lightAzimuth.value));
