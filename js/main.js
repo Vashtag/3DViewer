@@ -31,7 +31,6 @@ const labelsToggle    = document.getElementById('labels-toggle');
 const editSection     = document.getElementById('edit-section');
 const editDownload    = document.getElementById('edit-download');
 const pinBtn          = document.getElementById('pin-btn');
-const clearPinsBtn    = document.getElementById('clear-pins-btn');
 
 // ── Model catalogue ───────────────────────────────────────
 // To add a model: convert your OBJ to a Draco GLB (see tools/README.md),
@@ -748,6 +747,8 @@ editDownload.addEventListener('click', () => {
 // ── Student pins ──────────────────────────────────────────
 // Temporary markers students drop while studying. Never saved; cleared when
 // switching models. A separate layer from author labels so they can't interfere.
+// The Pin button arms a single placement: one click on the model drops one pin
+// and disarms. Click a placed pin's dot to remove it.
 let pinLayer = null;
 let pinMode  = false;
 let pinCount = 0;
@@ -768,29 +769,26 @@ function dropPin(worldPoint) {
   const el = document.createElement('div');
   el.className = 'pin-anchor';
   const dot = document.createElement('span'); dot.className = 'pin-dot';
+  dot.title = 'Click to remove this pin';
   const lbl = document.createElement('span'); lbl.className = 'pin-label';
   lbl.textContent = `Pin ${pinCount}`;
-  const del = document.createElement('span'); del.className = 'pin-del';
-  del.textContent = '×'; del.title = 'Remove pin';
-  el.append(dot, lbl, del);
+  el.append(dot, lbl);
 
   const obj = new CSS2DObject(el);
   obj.position.copy(localPos);
   pinLayer.add(obj);
-  clearPinsBtn.classList.remove('hidden');
 
-  del.addEventListener('pointerdown', e => e.stopPropagation());
-  del.addEventListener('click', e => {
+  // Click the dot to remove the pin.
+  dot.addEventListener('pointerdown', e => e.stopPropagation());
+  dot.addEventListener('click', e => {
     e.stopPropagation();
     pinLayer.remove(obj);
-    if (!pinLayer.children.length) clearPinsBtn.classList.add('hidden');
   });
 }
 
 function clearPins() {
   if (pinLayer) [...pinLayer.children].forEach(o => pinLayer.remove(o));
   pinCount = 0;
-  clearPinsBtn.classList.add('hidden');
 }
 
 function initPinLayer() {
@@ -800,9 +798,9 @@ function initPinLayer() {
 }
 
 pinBtn.addEventListener('click', () => setPinMode(!pinMode));
-clearPinsBtn.addEventListener('click', clearPins);
 
-// Intercept clicks in pin mode before OrbitControls sees them.
+// Intercept clicks in pin mode before OrbitControls sees them. One click places
+// one pin, then pin mode disarms — press Pin again to place another.
 container.addEventListener('pointerdown', e => {
   if (!pinMode || e.button !== 0) return;
   e.stopPropagation();
@@ -813,11 +811,8 @@ container.addEventListener('pointerdown', e => {
   );
   _ray.setFromCamera(_ndc, camera);
   const hits = currentModel ? _ray.intersectObject(currentModel, true) : [];
-  if (hits.length) {
-    dropPin(hits[0].point);
-    // Brief flash so user knows the click registered, then leave pin mode
-    // (one-shot: each click places one pin, mode stays on for rapid pinning)
-  }
+  if (hits.length) dropPin(hits[0].point);
+  setPinMode(false); // one-shot: disarm whether or not the click hit the model
 }, true); // capture phase so we beat OrbitControls
 
 // ── Navigation mode (orbit vs fly) ────────────────────────
