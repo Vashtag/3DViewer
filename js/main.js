@@ -113,6 +113,13 @@ const backFill = new THREE.DirectionalLight(0xffffff, 0.2); // subtle under fill
 backFill.position.set(0, -2, -1);
 scene.add(backFill);
 
+// Fixed backlight: sits behind the model (−Z, slightly raised) to rim-light its
+// silhouette so it lifts off the dark background. Added to the scene (not the
+// model), so it stays put in world space and never rotates with the model.
+const backLight = new THREE.DirectionalLight(0xeaf2ff, 0.55);
+backLight.position.set(0, 1.5, -4);
+scene.add(backLight);
+
 // ── OrbitControls ─────────────────────────────────────────
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
