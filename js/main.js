@@ -653,7 +653,7 @@ function addLabel(name, localPos, category = '', record = true) {
 
   labelLayer.add(obj);
   entry._obj = obj;
-  if (!labelsVisible) el.classList.add('dots-only');
+  if (dotsOnlyMode) el.classList.add('dots-only');
   if (record) labelData.push(entry);
 }
 
@@ -674,31 +674,50 @@ function clearLabels() {
 
 function applyCategoryFilters() {
   const hiddenCats = new Set(
-    [...categoryFilters.querySelectorAll('input[type="checkbox"]')]
+    [...categoryFilters.querySelectorAll('input[type="checkbox"][data-cat]')]
       .filter(cb => !cb.checked).map(cb => cb.dataset.cat)
   );
   labelData.forEach(entry => {
-    if (entry._obj) entry._obj.visible = !hiddenCats.has(entry.category || '');
+    entry._filtered = hiddenCats.has(entry.category || '');
+    if (entry._obj) entry._obj.visible = !entry._filtered;
+  });
+  applyDotsOnlyMode();
+}
+categoryFilters.addEventListener('change', e => {
+  if (e.target.id === 'dots-only-toggle') {
+    dotsOnlyMode = e.target.checked;
+    applyDotsOnlyMode();
+  } else {
+    applyCategoryFilters();
+  }
+});
+
+let dotsOnlyMode = false;
+
+function applyDotsOnlyMode() {
+  labelData.forEach(entry => {
+    if (!entry._obj) return;
+    const el = entry._obj.element;
+    if (dotsOnlyMode) {
+      el.classList.add('dots-only');
+      el.classList.remove('label-peek');
+    } else {
+      el.classList.remove('dots-only', 'label-peek');
+    }
   });
 }
-categoryFilters.addEventListener('change', applyCategoryFilters);
 
 function setLabelsVisible(v) {
   labelsVisible = v;
-  // Keep labelLayer always visible so dots show; use CSS class to hide leaders/content.
   if (labelLayer) {
-    labelLayer.visible = true;
-    labelData.forEach(entry => {
-      if (!entry._obj) return;
-      const el = entry._obj.element;
-      if (v) {
-        el.classList.remove('dots-only', 'label-peek');
-      } else {
-        el.classList.add('dots-only');
-        el.classList.remove('label-peek');
-      }
-    });
-    applyCategoryFilters();
+    labelLayer.visible = v;
+    if (!v) {
+      // Clear any peek state when fully hiding.
+      labelData.forEach(entry => {
+        if (entry._obj) entry._obj.element.classList.remove('label-peek');
+      });
+    }
+    applyDotsOnlyMode();
   }
   labelsToggle.textContent = v ? 'Hide labels' : 'Show labels';
   labelsToggle.classList.toggle('active', v);
@@ -745,7 +764,7 @@ labelsToggle.addEventListener('click', () => setLabelsVisible(!labelsVisible));
 const _lblWorld = new THREE.Vector3();
 const LEADER_LEN = 45; // keep in sync with .anno-leader width
 function updateLabelLeaders() {
-  if (!labelLayer || !labelLayer.children.length) return;
+  if (!labelLayer || !labelsVisible || !labelLayer.children.length) return;
   const w = renderer.domElement.clientWidth;
   const h = renderer.domElement.clientHeight;
   // Model centre (origin) in screen space.
@@ -1162,12 +1181,12 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Dots-only hover peek ──────────────────────────────────
-// When labels are hidden, dots stay visible. Moving the mouse near a dot
-// temporarily shows its leader + content (peek). We project each label's 3D
-// position to screen space each frame and toggle .label-peek within ~18px.
+// When dots-only mode is active, moving the mouse near a dot temporarily
+// shows its leader + content. We project each label to screen space and
+// toggle .label-peek within ~18 px.
 const _peekVec = new THREE.Vector3();
 container.addEventListener('mousemove', e => {
-  if (labelsVisible || !labelLayer || !labelData.length) return;
+  if (!dotsOnlyMode || !labelsVisible || !labelLayer || !labelData.length) return;
   const rect = renderer.domElement.getBoundingClientRect();
   const mx = e.clientX - rect.left;
   const my = e.clientY - rect.top;

@@ -230,6 +230,10 @@ body {
   user-select: none;
 }
 .cat-filter-row input { accent-color: var(--accent); cursor: pointer; }
+.cat-filter-divider {
+  border-top: 1px solid var(--border);
+  margin: 4px 0;
+}
 .cat-indicator {
   width: 8px; height: 8px;
   border-radius: 50%;
