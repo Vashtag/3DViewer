@@ -211,7 +211,8 @@ body {
 /* ── Labels / edit sidebar controls ── */
 #labels-section.hidden, #edit-section.hidden { display: none; }
 
-#labels-toggle, #edit-download {
+#labels-toggle, #edit-download,
+#label-place-btn, #line-draw-btn, #line-finish-btn, #line-download-btn {
   width: 100%;
   padding: 8px 8px;
   border-radius: 8px;
@@ -224,7 +225,8 @@ body {
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 
-#labels-toggle:hover, #edit-download:hover {
+#labels-toggle:hover, #edit-download:hover,
+#label-place-btn:hover, #line-draw-btn:hover, #line-finish-btn:hover, #line-download-btn:hover {
   border-color: var(--accent);
   color: var(--text);
   background: #1e2540;
