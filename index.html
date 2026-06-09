@@ -126,6 +126,9 @@
         <!-- Three.js canvas -->
         <canvas id="viewer-canvas"></canvas>
 
+        <!-- Mobile menu button (shown only on small screens) -->
+        <button id="mobile-menu-btn" aria-label="Menu">&#9776;</button>
+
         <!-- Top-right toolbar: reset button + orientation gizmo + view shortcuts -->
         <div id="viewer-toolbar" class="hidden">
           <div class="toolbar-row">
@@ -197,6 +200,9 @@
       </main>
     </div>
   </div>
+
+  <!-- Backdrop that closes the mobile sidebar drawer when tapped -->
+  <div id="sidebar-backdrop"></div>
 
   <script type="importmap">
     {
