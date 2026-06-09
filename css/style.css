@@ -841,25 +841,81 @@ body {
 
 .divider { margin: 0 6px; opacity: 0.4; }
 
+/* ── Mobile menu button (hidden on desktop) ── */
+#mobile-menu-btn { display: none; }
+
+/* ── Sidebar backdrop (hidden on desktop) ── */
+#sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 49;
+  backdrop-filter: blur(1px);
+}
+#sidebar-backdrop.visible { display: block; }
+
 /* ── Mobile ── */
 @media (max-width: 600px) {
-  #header { padding: 10px 14px 8px; }
-  #header h1 { font-size: 1rem; }
+  /* Compact header */
+  #header { padding: 9px 14px; }
+  #header h1 { font-size: 0.95rem; }
+  .subtitle { display: none; }
 
-  /* Sidebar becomes a horizontal bar above the viewer */
-  #body { flex-direction: column; }
+  /* Viewer takes full width — sidebar is an overlay */
+  #body { flex-direction: row; }
+  #viewer-container { flex: 1; width: 100%; }
+
+  /* Sidebar: slide-in drawer */
   #sidebar {
-    width: 100%;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-    padding: 10px 14px;
+    position: fixed;
+    top: 0; left: 0;
+    height: 100dvh;
+    width: 220px;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 50;
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+    box-shadow: none;
+    padding: 16px 14px;
   }
-  .sidebar-label { display: none; }
-  #region-selector { flex-direction: row; gap: 8px; }
-  .region-btn { padding: 7px 14px; font-size: 0.85rem; }
+  #sidebar.open {
+    transform: translateX(0);
+    box-shadow: 6px 0 32px rgba(0, 0, 0, 0.6);
+  }
 
+  /* Menu button: top-left of the viewer */
+  #mobile-menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 10px; left: 10px;
+    z-index: 6;
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    border: 1.5px solid var(--border);
+    background: rgba(26, 29, 39, 0.85);
+    color: var(--text);
+    font-size: 1.1rem;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    transition: border-color 0.15s, background 0.15s;
+  }
+  #mobile-menu-btn:hover {
+    border-color: var(--accent);
+    background: rgba(30, 37, 64, 0.95);
+  }
+
+  /* Hide desktop-only chrome */
+  #view-buttons    { display: none; }
+  #gizmo-canvas   { display: none; }
+  #screenshot-btn { display: none; }
+  #controls-hint  { display: none; }
+  .nav-btn[data-mode="fly"] { display: none; }
+
+  /* Compact toolbar */
   #viewer-toolbar { top: 10px; right: 10px; gap: 8px; }
-  #reset-btn { padding: 7px 11px; }
-  #gizmo-canvas { width: 70px; height: 70px; }
-  #controls-hint { font-size: 0.7rem; }
+  #reset-btn { padding: 7px 11px; font-size: 0.8rem; }
 }

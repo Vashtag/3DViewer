@@ -39,6 +39,23 @@ const editDownload    = document.getElementById('edit-download');
 const lineDrawBtn     = document.getElementById('line-draw-btn');
 const lineFinishBtn   = document.getElementById('line-finish-btn');
 const pinBtn          = document.getElementById('pin-btn');
+const mobileMenuBtn   = document.getElementById('mobile-menu-btn');
+const sidebarEl       = document.getElementById('sidebar');
+const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+
+// ── Mobile drawer ─────────────────────────────────────────
+function openDrawer()  {
+  sidebarEl.classList.add('open');
+  sidebarBackdrop.classList.add('visible');
+}
+function closeDrawer() {
+  sidebarEl.classList.remove('open');
+  sidebarBackdrop.classList.remove('visible');
+}
+mobileMenuBtn.addEventListener('click', () =>
+  sidebarEl.classList.contains('open') ? closeDrawer() : openDrawer()
+);
+sidebarBackdrop.addEventListener('click', closeDrawer);
 
 // ── Model catalogue ───────────────────────────────────────
 // To add a model: convert your OBJ to a Draco GLB (see tools/README.md),
@@ -566,6 +583,7 @@ MODELS.forEach(model => {
     regionSelector.querySelectorAll('.region-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     loadRegion(model.id);
+    closeDrawer();
   });
   regionSelector.appendChild(btn);
 });
