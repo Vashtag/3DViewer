@@ -994,34 +994,46 @@ function _addLineEntry(entry) {
   lineLayer.add(mesh);
   entry._obj = mesh;
 
-  // Midpoint anchor: shows the line name and (in edit mode) a delete handle.
-  const mid = pts[Math.floor(pts.length / 2)];
-  const el = document.createElement('div'); el.className = 'line-del-anchor';
+  // Midpoint label: same dot + leader + content structure as annotation labels
+  // so updateLabelLeaders() handles it automatically and the style is consistent.
+  if (entry.name || EDIT_MODE) {
+    const mid = pts[Math.floor(pts.length / 2)];
+    const el = document.createElement('div'); el.className = 'anno-label';
 
-  if (entry.name) {
-    const txt = document.createElement('span');
-    txt.className = 'line-label-text';
-    txt.textContent = entry.name;
-    el.appendChild(txt);
+    const dot = document.createElement('span'); dot.className = 'anno-dot';
+    dot.style.background = entry.color;
+
+    const leader  = document.createElement('span'); leader.className  = 'anno-leader';
+    const content = document.createElement('span'); content.className = 'anno-content';
+
+    if (entry.name) {
+      const txt = document.createElement('span'); txt.className = 'anno-text';
+      txt.textContent = entry.name;
+      content.appendChild(txt);
+    }
+
+    if (EDIT_MODE) {
+      const del = document.createElement('span');
+      del.className = 'anno-del'; del.textContent = '×'; del.title = 'Delete line';
+      del.addEventListener('pointerdown', e => e.stopPropagation());
+      del.addEventListener('click', e => {
+        e.stopPropagation();
+        lineLayer.remove(entry._obj);
+        labelLayer.remove(entry._css);
+        lineData.splice(lineData.indexOf(entry), 1);
+      });
+      content.appendChild(del);
+    }
+
+    el.append(dot, leader, content);
+
+    const css = new CSS2DObject(el);
+    css.position.set(mid[0], mid[1], mid[2]);
+    css.userData.leader  = leader;
+    css.userData.content = content;
+    labelLayer.add(css);
+    entry._css = css;
   }
-
-  if (EDIT_MODE) {
-    const del = document.createElement('span');
-    del.className = 'line-del'; del.textContent = '×'; del.title = 'Delete line';
-    el.appendChild(del);
-    del.addEventListener('pointerdown', e => e.stopPropagation());
-    del.addEventListener('click', e => {
-      e.stopPropagation();
-      lineLayer.remove(entry._obj);
-      labelLayer.remove(entry._css);
-      lineData.splice(lineData.indexOf(entry), 1);
-    });
-  }
-
-  const css = new CSS2DObject(el);
-  css.position.set(mid[0], mid[1], mid[2]);
-  labelLayer.add(css);
-  entry._css = css;
 }
 
 let _pendingLineEntry = null;
