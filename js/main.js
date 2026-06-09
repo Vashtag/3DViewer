@@ -1057,7 +1057,7 @@ function _addLineEntry(entry) {
     const el = document.createElement('div'); el.className = 'anno-label';
 
     const dot = document.createElement('span'); dot.className = 'anno-dot';
-    dot.style.background = CATEGORY_COLORS[entry.category] ?? CATEGORY_COLORS['other'];
+    dot.style.background = entry.color;
 
     const leader  = document.createElement('span'); leader.className  = 'anno-leader';
     const content = document.createElement('span'); content.className = 'anno-content';
