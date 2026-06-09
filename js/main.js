@@ -331,11 +331,9 @@ const _ndc = new THREE.Vector2();
 // ── Render loop ───────────────────────────────────────────
 let fitRadius = 0; // bounding-sphere radius of current model
 
-const _gizmoDir  = new THREE.Vector3();
-const _flyFwd    = new THREE.Vector3();
-const _flyRight  = new THREE.Vector3();
-const _occRay    = new THREE.Raycaster();
-const _occWp     = new THREE.Vector3();
+const _gizmoDir = new THREE.Vector3();
+const _flyFwd   = new THREE.Vector3();
+const _flyRight = new THREE.Vector3();
 
 function animate() {
   requestAnimationFrame(animate);
@@ -381,7 +379,6 @@ function animate() {
   renderer.render(scene, camera);
   labelRenderer.render(scene, camera);
   updateLabelLeaders();
-  updateLabelOcclusion();
 
   // Sync gizmo to the main camera's actual view direction, so it reflects
   // orientation correctly in both orbit and fly modes.
@@ -681,8 +678,7 @@ function applyCategoryFilters() {
       .filter(cb => !cb.checked).map(cb => cb.dataset.cat)
   );
   labelData.forEach(entry => {
-    entry._filtered = hiddenCats.has(entry.category || '');
-    if (entry._obj) entry._obj.visible = !entry._filtered;
+    if (entry._obj) entry._obj.visible = !hiddenCats.has(entry.category || '');
   });
 }
 categoryFilters.addEventListener('change', applyCategoryFilters);
@@ -716,25 +712,6 @@ async function loadLabels(model) {
 }
 
 labelsToggle.addEventListener('click', () => setLabelsVisible(!labelsVisible));
-
-// Per-frame occlusion test: hide labels whose 3D point is behind the model surface
-// from the current camera angle. This lets both faces of a thin bone be labelled
-// independently — each label disappears when its face rotates away from the viewer.
-function updateLabelOcclusion() {
-  if (!labelLayer || !labelsVisible || !currentModel) return;
-  const camPos = camera.position;
-  labelData.forEach(entry => {
-    if (!entry._obj || entry._filtered) return;
-    _occWp.set(entry.position[0], entry.position[1], entry.position[2]);
-    currentModel.localToWorld(_occWp);
-    const dist = _occWp.distanceTo(camPos);
-    if (dist < 0.001) { entry._obj.visible = true; return; }
-    _occRay.set(camPos, _occWp.clone().sub(camPos).divideScalar(dist));
-    const hits = _occRay.intersectObject(currentModel, true);
-    // Occluded if any surface hit is meaningfully closer than the label itself.
-    entry._obj.visible = !hits.some(h => h.distance < dist * 0.97);
-  });
-}
 
 // Orient each label's leader line radially outward from the model centre
 // (which sits at world origin and is the orbit target), so callouts fan out
