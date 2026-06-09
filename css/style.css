@@ -240,6 +240,17 @@ body {
 /* Hidden-by-category labels (filter checkbox unchecked) */
 .anno-label.cat-hidden { display: none !important; }
 
+/* Dots-only mode: labels are hidden but dots stay visible for hover-peek */
+.anno-label.dots-only .anno-leader,
+.anno-label.dots-only .anno-content { display: none; }
+
+/* Peek on hover: restore leader + content at higher specificity */
+.anno-label.dots-only.label-peek .anno-leader { display: block; }
+.anno-label.dots-only.label-peek .anno-content { display: flex; }
+
+/* Make dot itself interactive so hover works in dots-only mode */
+.anno-label.dots-only .anno-dot { pointer-events: auto; cursor: default; }
+
 /* ── Label creation modal ── */
 #label-modal {
   position: absolute;

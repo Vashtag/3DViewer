@@ -653,6 +653,7 @@ function addLabel(name, localPos, category = '', record = true) {
 
   labelLayer.add(obj);
   entry._obj = obj;
+  if (!labelsVisible) el.classList.add('dots-only');
   if (record) labelData.push(entry);
 }
 
@@ -684,11 +685,24 @@ categoryFilters.addEventListener('change', applyCategoryFilters);
 
 function setLabelsVisible(v) {
   labelsVisible = v;
-  if (labelLayer) labelLayer.visible = v;
+  // Keep labelLayer always visible so dots show; use CSS class to hide leaders/content.
+  if (labelLayer) {
+    labelLayer.visible = true;
+    labelData.forEach(entry => {
+      if (!entry._obj) return;
+      const el = entry._obj.element;
+      if (v) {
+        el.classList.remove('dots-only', 'label-peek');
+      } else {
+        el.classList.add('dots-only');
+        el.classList.remove('label-peek');
+      }
+    });
+    applyCategoryFilters();
+  }
   labelsToggle.textContent = v ? 'Hide labels' : 'Show labels';
   labelsToggle.classList.toggle('active', v);
   categoryFilters.classList.toggle('hidden', !v);
-  if (v) applyCategoryFilters();
   setLinesVisible(v);
 }
 
@@ -731,7 +745,7 @@ labelsToggle.addEventListener('click', () => setLabelsVisible(!labelsVisible));
 const _lblWorld = new THREE.Vector3();
 const LEADER_LEN = 45; // keep in sync with .anno-leader width
 function updateLabelLeaders() {
-  if (!labelLayer || !labelsVisible || !labelLayer.children.length) return;
+  if (!labelLayer || !labelLayer.children.length) return;
   const w = renderer.domElement.clientWidth;
   const h = renderer.domElement.clientHeight;
   // Model centre (origin) in screen space.
@@ -1145,6 +1159,36 @@ renderer.domElement.addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if (!lineDrawing) return;
   if (e.code === 'Enter') { e.preventDefault(); _finishLine(); }
+});
+
+// ── Dots-only hover peek ──────────────────────────────────
+// When labels are hidden, dots stay visible. Moving the mouse near a dot
+// temporarily shows its leader + content (peek). We project each label's 3D
+// position to screen space each frame and toggle .label-peek within ~18px.
+const _peekVec = new THREE.Vector3();
+container.addEventListener('mousemove', e => {
+  if (labelsVisible || !labelLayer || !labelData.length) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const w = rect.width, h = rect.height;
+  const THRESH = 18 * 18; // squared pixel radius
+
+  labelData.forEach(entry => {
+    if (!entry._obj || !entry._obj.visible) return;
+    entry._obj.getWorldPosition(_peekVec);
+    _peekVec.project(camera);
+    const sx = (_peekVec.x * 0.5 + 0.5) * w;
+    const sy = (-_peekVec.y * 0.5 + 0.5) * h;
+    const dx = sx - mx, dy = sy - my;
+    entry._obj.element.classList.toggle('label-peek', dx * dx + dy * dy <= THRESH);
+  });
+});
+
+container.addEventListener('mouseleave', () => {
+  labelData.forEach(entry => {
+    if (entry._obj) entry._obj.element.classList.remove('label-peek');
+  });
 });
 
 
