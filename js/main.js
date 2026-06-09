@@ -317,7 +317,8 @@ addAxis(0, 0, 1.4, 0x4488ff); // Z – blue
 // updateLabelLeaders(), which reads these. Saved labels live in
 // models/<id>/<id>_labels.json as [{ name, position: [x,y,z] }] with position
 // in the model's local space, so they track rotation, centring and zoom.
-const EDIT_MODE = new URLSearchParams(location.search).has('edit');
+const EDIT_MODE = new URLSearchParams(location.search).has('edit')
+               && !window.matchMedia('(pointer: coarse)').matches;
 let labelLayer = null;     // THREE.Group (child of currentModel) holding labels
 let labelData = [];        // current label records
 let labelsVisible      = false;
