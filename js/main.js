@@ -797,10 +797,15 @@ function setLineDrawing(on) {
   }
 }
 
+// Builds smooth curve geometry through control points using a Catmull-Rom
+// spline, sampled at enough segments for a visually smooth result.
 function _makeLineGeo(pts) {
-  return new THREE.BufferGeometry().setFromPoints(
-    pts.map(p => new THREE.Vector3(p[0], p[1], p[2]))
-  );
+  const v3s = pts.map(p => new THREE.Vector3(p[0], p[1], p[2]));
+  if (v3s.length < 2) return new THREE.BufferGeometry().setFromPoints(v3s);
+  const curve = new THREE.CatmullRomCurve3(v3s);
+  // More control points → more samples for smoother curve.
+  const samples = Math.max(64, v3s.length * 16);
+  return new THREE.BufferGeometry().setFromPoints(curve.getPoints(samples));
 }
 
 function _addLineEntry(entry) {
@@ -897,11 +902,11 @@ renderer.domElement.addEventListener('click', e => {
   if (!hits.length) return;
   _wip.push(hits[0].point.clone());
 
-  // Refresh the in-progress preview line.
+  // Refresh the in-progress preview line (also smooth via spline).
   if (_wipLine) lineLayer.remove(_wipLine);
   if (_wip.length >= 2) {
     const localPts = _wip.map(wp => currentModel.worldToLocal(wp.clone()));
-    const geo = new THREE.BufferGeometry().setFromPoints(localPts);
+    const geo = _makeLineGeo(localPts.map(v => [v.x, v.y, v.z]));
     _wipLine = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.5 }));
     lineLayer.add(_wipLine);
     if (!linesVisible) { lineLayer.visible = true; } // show preview even if hidden
