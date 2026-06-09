@@ -604,8 +604,8 @@ function buildViewButtons(model) {
 // Author tools appear only when the URL contains ?edit (hidden from students).
 
 const CATEGORY_COLORS = {
-  ligament: '#f0a030',
-  nerve:    '#70d0ff',
+  ligament: '#4f7cff',
+  nerve:    '#f0e040',
   vessel:   '#e04040',
   '':       '#4f7cff', // default / structure
 };
