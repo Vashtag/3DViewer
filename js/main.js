@@ -698,16 +698,29 @@ async function loadLabels(model) {
   labelLayer = new THREE.Group();
   currentModel.add(labelLayer);
 
-  let data = [];
+  let raw = [];
   try {
     const res = await fetch(`models/${model.id}/${model.id}_labels.json`, { cache: 'no-store' });
-    if (res.ok) data = await res.json();
+    if (res.ok) raw = await res.json();
   } catch (e) { /* no labels file — fine */ }
-  data.forEach(d => addLabel(d.name, new THREE.Vector3(d.position[0], d.position[1], d.position[2]), d.category || ''));
 
-  labelsSection.classList.toggle('hidden', !(labelData.length || EDIT_MODE));
+  // Support both old array format (labels only) and combined {labels, lines} format.
+  const labels = Array.isArray(raw) ? raw       : (raw.labels || []);
+  const lines  = Array.isArray(raw) ? []        : (raw.lines  || []);
+
+  labels.forEach(d => addLabel(d.name, new THREE.Vector3(d.position[0], d.position[1], d.position[2]), d.category || ''));
+
+  // Load lines from the combined file (lineLayer exists by now — initLineLayer
+  // is called synchronously right after loadLabels in the model-load callback).
+  if (lines.length && lineLayer) {
+    lines.forEach(d => { lineData.push(d); _addLineEntry(d); });
+    _lineColorIdx = lineData.length;
+    setLinesVisible(labelsVisible);
+  }
+
+  labelsSection.classList.toggle('hidden', !(labelData.length || lines.length || EDIT_MODE));
   editSection.classList.toggle('hidden', !EDIT_MODE);
-  setLabelsVisible(EDIT_MODE); // labels start visible while authoring, hidden otherwise
+  setLabelsVisible(EDIT_MODE);
 }
 
 labelsToggle.addEventListener('click', () => setLabelsVisible(!labelsVisible));
@@ -870,7 +883,7 @@ editDownload.addEventListener('click', () => {
   const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `${activeModelId || 'model'}_annotations.json`;
+  a.download = `${activeModelId || 'model'}_labels.json`;
   a.click();
   URL.revokeObjectURL(a.href);
 });
