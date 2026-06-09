@@ -606,6 +606,7 @@ const CATEGORY_COLORS = {
   ligament: '#70d0ff',
   nerve:    '#f0e040',
   vessel:   '#e04040',
+  other:    '#a0a0b8',
   '':       '#4f7cff', // default / structure
 };
 
@@ -680,6 +681,11 @@ function applyCategoryFilters() {
   labelData.forEach(entry => {
     entry._filtered = hiddenCats.has(entry.category || '');
     if (entry._obj) entry._obj.visible = !entry._filtered;
+  });
+  lineData.forEach(entry => {
+    const hidden = hiddenCats.has(entry.category || 'other');
+    if (entry._obj) entry._obj.visible = !hidden; // tube mesh
+    if (entry._css) entry._css.visible = !hidden; // midpoint label
   });
   applyDotsOnlyMode();
 }
@@ -915,7 +921,7 @@ labelFileInput.addEventListener('change', () => {
 editDownload.addEventListener('click', () => {
   const exportData = {
     labels: labelData.map(({ name, position, category }) => ({ name, position, category })),
-    lines:  lineData.map(({ color, points, name })       => ({ color, points, name: name || '' })),
+    lines:  lineData.map(({ color, points, name, category }) => ({ color, points, name: name || '', category: category || 'other' })),
   };
   const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
@@ -1051,7 +1057,7 @@ function _addLineEntry(entry) {
     const el = document.createElement('div'); el.className = 'anno-label';
 
     const dot = document.createElement('span'); dot.className = 'anno-dot';
-    dot.style.background = entry.color;
+    dot.style.background = CATEGORY_COLORS[entry.category] ?? CATEGORY_COLORS['other'];
 
     const leader  = document.createElement('span'); leader.className  = 'anno-leader';
     const content = document.createElement('span'); content.className = 'anno-content';
@@ -1100,20 +1106,25 @@ function _finishLine() {
   if (_wipLine) { lineLayer.remove(_wipLine); _wipLine = null; }
   _wip = [];
   setLineDrawing(false);
-  _pendingLineEntry = { color, points: pts, projected: true, name: '' };
-  // Reuse the label modal with category hidden for naming the line.
+  _pendingLineEntry = { color, points: pts, projected: true, name: '', category: 'other' };
+  // Reuse the label modal — show category picker with Other pre-selected.
   labelModalName.value = '';
+  const otherRadio = labelModal.querySelector('input[name="lcat"][value="other"]');
+  if (otherRadio) otherRadio.checked = true;
   labelModal.querySelector('.modal-title').textContent = 'Name this line (optional)';
-  labelModal.classList.add('line-mode');
+  labelModal.classList.remove('line-mode');
   labelModal.classList.remove('hidden');
   setTimeout(() => labelModalName.focus(), 30);
 }
 
 function _commitLine(name) {
   _pendingLineEntry.name = name || '';
+  _pendingLineEntry.category = document.querySelector('input[name="lcat"]:checked')?.value ?? 'other';
   labelModal.classList.add('hidden');
-  labelModal.classList.remove('line-mode');
   labelModal.querySelector('.modal-title').textContent = 'New label';
+  // Reset radio to Structure for next label creation.
+  const structRadio = labelModal.querySelector('input[name="lcat"][value=""]');
+  if (structRadio) structRadio.checked = true;
   lineData.push(_pendingLineEntry);
   _addLineEntry(_pendingLineEntry);
   _pendingLineEntry = null;
