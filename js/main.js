@@ -678,7 +678,7 @@ function applyCategoryFilters() {
   );
   document.querySelectorAll('.anno-label').forEach(el => {
     const cat = el.dataset.category || '';
-    el.classList.toggle('cat-hidden', cat !== '' && hiddenCats.has(cat));
+    el.classList.toggle('cat-hidden', hiddenCats.has(cat));
   });
 }
 categoryFilters.addEventListener('change', applyCategoryFilters);
