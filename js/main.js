@@ -793,6 +793,7 @@ labelModalCancel.addEventListener('click', () => {
   _pendingLabelHit = null;
 });
 labelModalName.addEventListener('keydown', e => {
+  e.stopPropagation(); // prevent OrbitControls / app hotkeys from firing while typing
   if (e.key === 'Enter') _commitLabel();
   if (e.key === 'Escape') labelModalCancel.click();
 });
