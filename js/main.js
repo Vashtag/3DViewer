@@ -800,7 +800,15 @@ async function loadLabels(model) {
   setLabelsVisible(EDIT_MODE);
 }
 
-labelsToggle.addEventListener('click', () => setLabelsVisible(!labelsVisible));
+labelsToggle.addEventListener('click', () => {
+  const next = !labelsVisible;
+  if (next && isTouchPrimary && !dotsOnlyMode) {
+    dotsOnlyMode = true;
+    const cb = document.getElementById('dots-only-toggle');
+    if (cb) cb.checked = true;
+  }
+  setLabelsVisible(next);
+});
 
 // Orient each label's leader line radially outward from the model centre
 // (which sits at world origin and is the orbit target), so callouts fan out
