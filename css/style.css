@@ -210,6 +210,135 @@ body {
 
 /* ── Labels / edit sidebar controls ── */
 #labels-section.hidden, #edit-section.hidden { display: none; }
+#category-filters.hidden { display: none; }
+
+#category-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 10px;
+  padding-left: 2px;
+}
+
+.cat-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.cat-filter-row input { accent-color: var(--accent); cursor: pointer; }
+.cat-indicator {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.2);
+  flex-shrink: 0;
+}
+
+/* Hidden-by-category labels (filter checkbox unchecked) */
+.anno-label.cat-hidden { display: none !important; }
+
+/* ── Label creation modal ── */
+#label-modal {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  background: rgba(15, 17, 23, 0.55);
+  backdrop-filter: blur(3px);
+}
+#label-modal.hidden { display: none; }
+
+#label-modal-box {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+
+.modal-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+#label-modal-name {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+#label-modal-name:focus { border-color: var(--accent); }
+
+#label-modal-cats {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.lcat-option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.12s;
+}
+.lcat-option:has(input:checked) { color: var(--text); }
+.lcat-option input { accent-color: var(--accent); cursor: pointer; }
+.lcat-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.2);
+  flex-shrink: 0;
+}
+
+#label-modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+#label-modal-cancel {
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+#label-modal-cancel:hover { border-color: var(--accent); color: var(--text); }
+
+#label-modal-confirm {
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1.5px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+#label-modal-confirm:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 
 #labels-toggle, #edit-download,
 #label-place-btn, #line-draw-btn, #line-finish-btn, #line-download-btn {

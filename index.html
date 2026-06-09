@@ -49,6 +49,23 @@
           <div id="labels-section" class="hidden">
             <p class="sidebar-label">Labels</p>
             <button id="labels-toggle" type="button">Show labels</button>
+            <div id="category-filters" class="hidden">
+              <label class="cat-filter-row">
+                <input type="checkbox" data-cat="ligament" checked>
+                <span class="cat-indicator" style="background:#f0a030"></span>
+                Ligaments
+              </label>
+              <label class="cat-filter-row">
+                <input type="checkbox" data-cat="nerve" checked>
+                <span class="cat-indicator" style="background:#70d0ff"></span>
+                Nerves
+              </label>
+              <label class="cat-filter-row">
+                <input type="checkbox" data-cat="vessel" checked>
+                <span class="cat-indicator" style="background:#e04040"></span>
+                Vessels
+              </label>
+            </div>
           </div>
 
           <!-- Author tools (only when the page URL contains ?edit) -->
@@ -120,6 +137,39 @@
             <span>Scroll to zoom</span>
             <span class="divider">·</span>
             <span>Right-drag to pan</span>
+          </div>
+        </div>
+        <!-- Label creation modal (edit mode only) -->
+        <div id="label-modal" class="hidden">
+          <div id="label-modal-box">
+            <p class="modal-title">New label</p>
+            <input type="text" id="label-modal-name" placeholder="Label name…" autocomplete="off" />
+            <div id="label-modal-cats">
+              <label class="lcat-option">
+                <input type="radio" name="lcat" value="" checked>
+                <span class="lcat-dot" style="background:#4f7cff"></span>
+                Structure
+              </label>
+              <label class="lcat-option">
+                <input type="radio" name="lcat" value="ligament">
+                <span class="lcat-dot" style="background:#f0a030"></span>
+                Ligament
+              </label>
+              <label class="lcat-option">
+                <input type="radio" name="lcat" value="nerve">
+                <span class="lcat-dot" style="background:#70d0ff"></span>
+                Nerve
+              </label>
+              <label class="lcat-option">
+                <input type="radio" name="lcat" value="vessel">
+                <span class="lcat-dot" style="background:#e04040"></span>
+                Vessel
+              </label>
+            </div>
+            <div id="label-modal-actions">
+              <button id="label-modal-cancel" type="button">Cancel</button>
+              <button id="label-modal-confirm" type="button">Add label</button>
+            </div>
           </div>
         </div>
       </main>
