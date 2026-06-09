@@ -28,8 +28,6 @@ const lightReset      = document.getElementById('light-reset');
 const navBtns         = document.querySelectorAll('.nav-btn');
 const labelsSection   = document.getElementById('labels-section');
 const labelsToggle    = document.getElementById('labels-toggle');
-const linesSection    = document.getElementById('lines-section');
-const linesToggle     = document.getElementById('lines-toggle');
 const editSection     = document.getElementById('edit-section');
 const labelPlaceBtn   = document.getElementById('label-place-btn');
 const editDownload    = document.getElementById('edit-download');
@@ -510,7 +508,6 @@ function loadRegion(region) {
     if (EDIT_MODE) setLabelPlacementMode(false);
     clearPins();
     setPinMode(false);
-    linesSection.classList.add('hidden');
     scene.remove(currentModel);
     currentModel.traverse(child => {
       if (child.isMesh) {
@@ -664,6 +661,7 @@ function setLabelsVisible(v) {
   if (labelLayer) labelLayer.visible = v;
   labelsToggle.textContent = v ? 'Hide labels' : 'Show labels';
   labelsToggle.classList.toggle('active', v);
+  setLinesVisible(v);
 }
 
 async function loadLabels(model) {
@@ -793,8 +791,6 @@ let _lineColorIdx = 0;
 function setLinesVisible(v) {
   linesVisible = v;
   if (lineLayer) lineLayer.visible = v;
-  linesToggle.textContent = v ? 'Hide lines' : 'Show lines';
-  linesToggle.classList.toggle('active', v);
 }
 
 function setLineDrawing(on) {
@@ -869,6 +865,12 @@ function _projectLineToSurface(worldPts) {
   });
 }
 
+// Returns a tube radius appropriate for the current model's scale (~0.35% of diagonal).
+function _tubeRadius() {
+  const bbox = new THREE.Box3().setFromObject(currentModel);
+  return bbox.getSize(new THREE.Vector3()).length() * 0.0035;
+}
+
 function _addLineEntry(entry) {
   // Sparse entries (loaded from old JSON with only a few control points) are
   // re-sampled via CatmullRom and surface-projected so they hug the model.
@@ -881,13 +883,15 @@ function _addLineEntry(entry) {
     pts = _projectLineToSurface(worldSampled).map(v => [v.x, v.y, v.z]);
   }
 
-  const mat = new THREE.LineBasicMaterial({
-    color: entry.color,
-    polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4,
-  });
-  const line = new THREE.Line(_makeLineGeo(pts), mat);
-  lineLayer.add(line);
-  entry._obj = line;
+  // Use TubeGeometry so lines render as solid thick ribbons regardless of platform.
+  // (WebGL ignores LineBasicMaterial.linewidth > 1.)
+  const v3s = pts.map(p => new THREE.Vector3(p[0], p[1], p[2]));
+  const curve = new THREE.CatmullRomCurve3(v3s, false, 'catmullrom', 0.5);
+  const geo = new THREE.TubeGeometry(curve, Math.max(pts.length - 1, 40), _tubeRadius(), 5, false);
+  const mat = new THREE.MeshBasicMaterial({ color: entry.color, side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(geo, mat);
+  lineLayer.add(mesh);
+  entry._obj = mesh;
 
   if (EDIT_MODE) {
     // Place a × handle at the midpoint vertex so the author can delete the line.
@@ -927,9 +931,8 @@ function _finishLine() {
   const entry = { color, points: pts, projected: true };
   lineData.push(entry);
   _addLineEntry(entry);
-  if (!linesVisible) setLinesVisible(true);
   setLineDrawing(false);
-  linesSection.classList.remove('hidden');
+  if (!labelsVisible) setLabelsVisible(true);
 }
 
 function clearLines() {
@@ -954,8 +957,8 @@ async function loadLines(model) {
     const data = await res.json();
     data.forEach(d => { lineData.push(d); _addLineEntry(d); });
     _lineColorIdx = lineData.length;
-    linesSection.classList.remove('hidden');
-    setLinesVisible(false); // hidden by default, like labels
+    labelsSection.classList.remove('hidden');
+    setLinesVisible(labelsVisible);
   } catch { /* no lines file — fine */ }
 }
 
@@ -996,8 +999,6 @@ document.addEventListener('keydown', e => {
   if (!lineDrawing) return;
   if (e.code === 'Enter') { e.preventDefault(); _finishLine(); }
 });
-
-linesToggle.addEventListener('click', () => setLinesVisible(!linesVisible));
 
 lineDownloadBtn.addEventListener('click', () => {
   const exportable = lineData.map(({ color, points }) => ({ color, points }));
