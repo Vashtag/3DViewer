@@ -374,8 +374,16 @@ body {
   border-color: rgba(240, 192, 64, 0.6);
 }
 
-/* ── Line drawing ── */
-#viewer-container.line-draw-mode #viewer-canvas { cursor: crosshair; }
+/* ── Edit mode cursors ── */
+#viewer-container.label-place-mode #viewer-canvas { cursor: crosshair; }
+#viewer-container.line-draw-mode   #viewer-canvas { cursor: crosshair; }
+
+/* Active state for Place label button */
+#label-place-btn.active {
+  background: rgba(79, 124, 255, 0.2);
+  color: var(--accent);
+  border-color: rgba(79, 124, 255, 0.55);
+}
 
 #line-draw-controls {
   display: flex;

@@ -31,6 +31,7 @@ const labelsToggle    = document.getElementById('labels-toggle');
 const linesSection    = document.getElementById('lines-section');
 const linesToggle     = document.getElementById('lines-toggle');
 const editSection     = document.getElementById('edit-section');
+const labelPlaceBtn   = document.getElementById('label-place-btn');
 const editDownload    = document.getElementById('edit-download');
 const lineDrawBtn     = document.getElementById('line-draw-btn');
 const lineFinishBtn   = document.getElementById('line-finish-btn');
@@ -148,6 +149,7 @@ function flySpeedPerSec() {
 document.addEventListener('keydown', e => {
   if (e.code === 'Escape') {
     if (lineDrawing) { setLineDrawing(false); return; }
+    if (labelPlacementMode) { setLabelPlacementMode(false); return; }
     if (pinMode) { setPinMode(false); return; }
   }
   // Q/E roll works in orbit mode.
@@ -316,9 +318,10 @@ addAxis(0, 0, 1.4, 0x4488ff); // Z – blue
 const EDIT_MODE = new URLSearchParams(location.search).has('edit');
 let labelLayer = null;     // THREE.Group (child of currentModel) holding labels
 let labelData = [];        // current label records
-let labelsVisible = false;
-let activeModelId = null;
-let dragging = null; // { entry, obj } while a label is being dragged in edit mode
+let labelsVisible      = false;
+let activeModelId      = null;
+let dragging           = null; // { entry, obj } while a label is being dragged in edit mode
+let labelPlacementMode = false; // edit-mode: explicit button activates click-to-place
 const _ray = new THREE.Raycaster();
 const _ndc = new THREE.Vector2();
 
@@ -504,6 +507,7 @@ function loadRegion(region) {
     clearLabels();
     clearLines();
     setLineDrawing(false);
+    if (EDIT_MODE) setLabelPlacementMode(false);
     clearPins();
     setPinMode(false);
     linesSection.classList.add('hidden');
@@ -720,9 +724,17 @@ function updateLabelLeaders() {
   });
 }
 
-// Edit mode: click the model surface to drop a labelled pin.
+// Edit mode: label placement — only active when labelPlacementMode is on.
+function setLabelPlacementMode(on) {
+  labelPlacementMode = on;
+  labelPlaceBtn.classList.toggle('active', on);
+  container.classList.toggle('label-place-mode', on);
+}
+
+labelPlaceBtn.addEventListener('click', () => setLabelPlacementMode(!labelPlacementMode));
+
 renderer.domElement.addEventListener('click', e => {
-  if (!EDIT_MODE || navMode !== 'orbit' || !currentModel || lineDrawing) return;
+  if (!labelPlacementMode || navMode !== 'orbit' || !currentModel) return;
   const rect = renderer.domElement.getBoundingClientRect();
   _ndc.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
   _ndc.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
