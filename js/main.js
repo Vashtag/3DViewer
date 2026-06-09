@@ -834,34 +834,37 @@ const _projDir = new THREE.Vector3();
 // Returns an array of THREE.Vector3 in the model's local coordinate space,
 // lifted slightly along the face normal to prevent z-fighting.
 function _projectLineToSurface(worldPts) {
-  const modelCenter = new THREE.Vector3();
-  currentModel.getWorldPosition(modelCenter);
+  // Cast from the camera — this always hits the frontmost visible surface,
+  // which is correct for non-convex geometry like the concave pelvis bowl.
+  const camPos = camera.position.clone();
 
   return worldPts.map(wp => {
-    _projDir.copy(wp).sub(modelCenter);
-    const dist = _projDir.length();
-    if (dist < 1e-6) return currentModel.worldToLocal(wp.clone());
-    _projDir.divideScalar(dist);
+    _projDir.copy(wp).sub(camPos);
+    const distToCam = _projDir.length();
+    if (distToCam < 1e-6) return currentModel.worldToLocal(wp.clone());
+    _projDir.divideScalar(distToCam);
 
-    // Cast from well outside the model inward toward this point.
-    _projRay.set(
-      wp.clone().addScaledVector(_projDir, dist + 2),
-      _projDir.clone().negate()
-    );
+    _projRay.set(camPos, _projDir);
     const hits = _projRay.intersectObject(currentModel, true);
     if (!hits.length) return currentModel.worldToLocal(wp.clone());
 
-    // Lift slightly along the face normal so the line sits on the surface.
-    // face can be null on some mesh types — fall back to the outward direction.
-    const hitPt = hits[0].point;
+    // Among all intersections pick the one closest to the original sample point.
+    // For a convex surface there is one hit; for concave geometry there may be
+    // several — the closest one is the correct visible face.
+    let best = hits[0];
+    for (let i = 1; i < hits.length; i++) {
+      if (hits[i].point.distanceTo(wp) < best.point.distanceTo(wp)) best = hits[i];
+    }
+
+    // Lift slightly along face normal (or camera back-direction) to prevent z-fighting.
     let normalWorld;
-    if (hits[0].face) {
-      normalWorld = hits[0].face.normal.clone()
+    if (best.face) {
+      normalWorld = best.face.normal.clone()
         .transformDirection(currentModel.matrixWorld).normalize();
     } else {
-      normalWorld = _projDir.clone(); // outward direction from center
+      normalWorld = _projDir.clone().negate();
     }
-    const lifted = hitPt.clone().addScaledVector(normalWorld, 0.004);
+    const lifted = best.point.clone().addScaledVector(normalWorld, 0.004);
     return currentModel.worldToLocal(lifted);
   });
 }
