@@ -28,8 +28,13 @@ const lightReset      = document.getElementById('light-reset');
 const navBtns         = document.querySelectorAll('.nav-btn');
 const labelsSection   = document.getElementById('labels-section');
 const labelsToggle    = document.getElementById('labels-toggle');
+const linesSection    = document.getElementById('lines-section');
+const linesToggle     = document.getElementById('lines-toggle');
 const editSection     = document.getElementById('edit-section');
 const editDownload    = document.getElementById('edit-download');
+const lineDrawBtn     = document.getElementById('line-draw-btn');
+const lineFinishBtn   = document.getElementById('line-finish-btn');
+const lineDownloadBtn = document.getElementById('line-download-btn');
 const pinBtn          = document.getElementById('pin-btn');
 
 // ── Model catalogue ───────────────────────────────────────
@@ -141,7 +146,10 @@ function flySpeedPerSec() {
 }
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'Escape' && pinMode) { setPinMode(false); return; }
+  if (e.code === 'Escape') {
+    if (lineDrawing) { setLineDrawing(false); return; }
+    if (pinMode) { setPinMode(false); return; }
+  }
   // Q/E roll works in orbit mode.
   if (navMode === 'orbit') {
     if (e.code === 'KeyQ') rollKeys.ccw = true;
@@ -494,8 +502,11 @@ function loadRegion(region) {
 
   if (currentModel) {
     clearLabels();
+    clearLines();
+    setLineDrawing(false);
     clearPins();
     setPinMode(false);
+    linesSection.classList.add('hidden');
     scene.remove(currentModel);
     currentModel.traverse(child => {
       if (child.isMesh) {
@@ -527,6 +538,8 @@ function loadRegion(region) {
       fitCameraToModel(object);
       showViewerUI();
       loadLabels(model);
+      initLineLayer();
+      loadLines(model);
       initPinLayer();
       setTimeout(hideLoading, 300);
     },
@@ -709,7 +722,7 @@ function updateLabelLeaders() {
 
 // Edit mode: click the model surface to drop a labelled pin.
 renderer.domElement.addEventListener('click', e => {
-  if (!EDIT_MODE || navMode !== 'orbit' || !currentModel) return;
+  if (!EDIT_MODE || navMode !== 'orbit' || !currentModel || lineDrawing) return;
   const rect = renderer.domElement.getBoundingClientRect();
   _ndc.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
   _ndc.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
@@ -747,6 +760,174 @@ editDownload.addEventListener('click', () => {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `${activeModelId || 'model'}_labels.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+// ── Drawn lines ───────────────────────────────────────────
+// Author-placed polylines (e.g. gluteal lines on the pelvis). Stored as local-
+// space vertices in <id>_lines.json, rendered as THREE.Line objects that are
+// children of the model so they automatically rotate/zoom with it.
+// Only authors (?edit) can create or delete lines; students get Show/Hide.
+const LINE_COLORS = ['#ff8c00','#00c8ff','#80e040','#e040c8','#ffe040','#e06040'];
+let lineLayer     = null;  // THREE.Group child of currentModel
+let lineData      = [];    // [{color, points:[[x,y,z],…]}, …]
+let linesVisible  = false;
+let lineDrawing   = false;
+let _wip          = [];    // world-space points accumulating the current line
+let _wipLine      = null;  // temporary THREE.Line showing the work-in-progress
+let _lineColorIdx = 0;
+
+function setLinesVisible(v) {
+  linesVisible = v;
+  if (lineLayer) lineLayer.visible = v;
+  linesToggle.textContent = v ? 'Hide lines' : 'Show lines';
+  linesToggle.classList.toggle('active', v);
+}
+
+function setLineDrawing(on) {
+  lineDrawing = on;
+  lineDrawBtn.classList.toggle('active', on);
+  container.classList.toggle('line-draw-mode', on);
+  lineFinishBtn.classList.toggle('hidden', !on);
+  if (!on && _wipLine) {
+    lineLayer.remove(_wipLine);
+    _wipLine = null;
+    _wip = [];
+  }
+}
+
+// Builds smooth curve geometry through control points using a Catmull-Rom
+// spline, sampled at enough segments for a visually smooth result.
+function _makeLineGeo(pts) {
+  const v3s = pts.map(p => new THREE.Vector3(p[0], p[1], p[2]));
+  if (v3s.length < 2) return new THREE.BufferGeometry().setFromPoints(v3s);
+  const curve = new THREE.CatmullRomCurve3(v3s);
+  // More control points → more samples for smoother curve.
+  const samples = Math.max(64, v3s.length * 16);
+  return new THREE.BufferGeometry().setFromPoints(curve.getPoints(samples));
+}
+
+function _addLineEntry(entry) {
+  const mat  = new THREE.LineBasicMaterial({ color: entry.color });
+  const line = new THREE.Line(_makeLineGeo(entry.points), mat);
+  lineLayer.add(line);
+  entry._obj = line;
+
+  if (EDIT_MODE) {
+    // Place a × handle at the midpoint vertex so the author can delete the line.
+    const mid = entry.points[Math.floor(entry.points.length / 2)];
+    const el  = document.createElement('div'); el.className = 'line-del-anchor';
+    const del = document.createElement('span');
+    del.className = 'line-del'; del.textContent = '×'; del.title = 'Delete line';
+    el.appendChild(del);
+    const css = new CSS2DObject(el);
+    css.position.set(mid[0], mid[1], mid[2]);
+    labelLayer.add(css);
+    entry._css = css;
+
+    del.addEventListener('pointerdown', e => e.stopPropagation());
+    del.addEventListener('click', e => {
+      e.stopPropagation();
+      lineLayer.remove(entry._obj);
+      labelLayer.remove(entry._css);
+      lineData.splice(lineData.indexOf(entry), 1);
+    });
+  }
+}
+
+function _finishLine() {
+  if (_wip.length < 2) return;
+  const color = LINE_COLORS[_lineColorIdx % LINE_COLORS.length];
+  _lineColorIdx++;
+  // Convert accumulated world-space points to local space.
+  const pts = _wip.map(wp => {
+    const lp = currentModel.worldToLocal(wp.clone());
+    return [lp.x, lp.y, lp.z];
+  });
+  if (_wipLine) { lineLayer.remove(_wipLine); _wipLine = null; }
+  _wip = [];
+  const entry = { color, points: pts };
+  lineData.push(entry);
+  _addLineEntry(entry);
+  if (!linesVisible) setLinesVisible(true);
+  setLineDrawing(false);
+  linesSection.classList.remove('hidden');
+}
+
+function clearLines() {
+  if (lineLayer) [...lineLayer.children].forEach(o => lineLayer.remove(o));
+  lineData.forEach(e => { if (e._css && labelLayer) labelLayer.remove(e._css); });
+  lineData = [];
+  _lineColorIdx = 0;
+  _wip = [];
+  _wipLine = null;
+}
+
+function initLineLayer() {
+  clearLines();
+  lineLayer = new THREE.Group();
+  if (currentModel) currentModel.add(lineLayer);
+}
+
+async function loadLines(model) {
+  try {
+    const res = await fetch(`models/${model.id}/${model.id}_lines.json`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    data.forEach(d => { lineData.push(d); _addLineEntry(d); });
+    _lineColorIdx = lineData.length;
+    linesSection.classList.remove('hidden');
+    setLinesVisible(false); // hidden by default, like labels
+  } catch { /* no lines file — fine */ }
+}
+
+// ── Line drawing UI ───────────────────────────────────────
+lineDrawBtn.addEventListener('click', () => setLineDrawing(!lineDrawing));
+
+lineFinishBtn.addEventListener('click', _finishLine);
+
+// Intercept canvas clicks in line-drawing mode to add vertices.
+// stopImmediatePropagation() is needed (not just stopPropagation()) because
+// the label-drop handler is on the same element — stopPropagation only prevents
+// bubbling to ancestor elements, not same-element listeners.
+renderer.domElement.addEventListener('click', e => {
+  if (!lineDrawing || !currentModel) return;
+  e.stopImmediatePropagation();
+  const rect = renderer.domElement.getBoundingClientRect();
+  _ndc.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
+  _ndc.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
+  _ray.setFromCamera(_ndc, camera);
+  const hits = _ray.intersectObject(currentModel, true);
+  if (!hits.length) return;
+  _wip.push(hits[0].point.clone());
+
+  // Refresh the in-progress preview line (also smooth via spline).
+  if (_wipLine) lineLayer.remove(_wipLine);
+  if (_wip.length >= 2) {
+    const localPts = _wip.map(wp => currentModel.worldToLocal(wp.clone()));
+    const geo = _makeLineGeo(localPts.map(v => [v.x, v.y, v.z]));
+    _wipLine = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.5 }));
+    lineLayer.add(_wipLine);
+    if (!linesVisible) { lineLayer.visible = true; } // show preview even if hidden
+    lineFinishBtn.classList.remove('hidden');
+  }
+}, true);
+
+// Enter key also finishes the current line.
+document.addEventListener('keydown', e => {
+  if (!lineDrawing) return;
+  if (e.code === 'Enter') { e.preventDefault(); _finishLine(); }
+});
+
+linesToggle.addEventListener('click', () => setLinesVisible(!linesVisible));
+
+lineDownloadBtn.addEventListener('click', () => {
+  const exportable = lineData.map(({ color, points }) => ({ color, points }));
+  const blob = new Blob([JSON.stringify(exportable, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${activeModelId || 'model'}_lines.json`;
   a.click();
   URL.revokeObjectURL(a.href);
 });
