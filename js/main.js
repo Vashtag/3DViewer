@@ -38,7 +38,6 @@ const labelPlaceBtn   = document.getElementById('label-place-btn');
 const editDownload    = document.getElementById('edit-download');
 const lineDrawBtn     = document.getElementById('line-draw-btn');
 const lineFinishBtn   = document.getElementById('line-finish-btn');
-const lineDownloadBtn = document.getElementById('line-download-btn');
 const pinBtn          = document.getElementById('pin-btn');
 
 // ── Model catalogue ───────────────────────────────────────
@@ -787,14 +786,24 @@ function _commitLabel() {
   _pendingLabelHit = null;
 }
 
-labelModalConfirm.addEventListener('click', _commitLabel);
+labelModalConfirm.addEventListener('click', () => {
+  if (_pendingLineEntry) _commitLine(labelModalName.value.trim());
+  else _commitLabel();
+});
 labelModalCancel.addEventListener('click', () => {
-  labelModal.classList.add('hidden');
-  _pendingLabelHit = null;
+  if (_pendingLineEntry) {
+    _commitLine(''); // keep the drawn line, just unnamed
+  } else {
+    labelModal.classList.add('hidden');
+    _pendingLabelHit = null;
+  }
 });
 labelModalName.addEventListener('keydown', e => {
   e.stopPropagation(); // prevent OrbitControls / app hotkeys from firing while typing
-  if (e.key === 'Enter') _commitLabel();
+  if (e.key === 'Enter') {
+    if (_pendingLineEntry) _commitLine(labelModalName.value.trim());
+    else _commitLabel();
+  }
   if (e.key === 'Escape') labelModalCancel.click();
 });
 
@@ -829,25 +838,39 @@ labelFileInput.addEventListener('change', () => {
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      const data = JSON.parse(e.target.result);
-      if (!Array.isArray(data)) throw new Error('not an array');
-      data.forEach(d => {
+      const raw = JSON.parse(e.target.result);
+      // Support old array format (labels only) and new combined {labels, lines} format.
+      const labels = Array.isArray(raw) ? raw : (raw.labels || []);
+      const lines  = Array.isArray(raw) ? []  : (raw.lines  || []);
+      labels.forEach(d => {
         if (!d.name || !Array.isArray(d.position)) return;
         addLabel(d.name, new THREE.Vector3(d.position[0], d.position[1], d.position[2]), d.category || '');
       });
-      if (!labelsVisible) setLabelsVisible(true);
-      labelsSection.classList.remove('hidden');
-    } catch { alert('Invalid labels JSON file.'); }
+      lines.forEach(d => {
+        if (!Array.isArray(d.points)) return;
+        lineData.push(d);
+        _addLineEntry(d);
+      });
+      if (lines.length) _lineColorIdx = lineData.length;
+      if (labels.length || lines.length) {
+        labelsSection.classList.remove('hidden');
+        if (!labelsVisible) setLabelsVisible(true);
+      }
+    } catch { alert('Invalid annotations JSON file.'); }
   };
   reader.readAsText(file);
-  labelFileInput.value = ''; // reset so the same file can be re-loaded
+  labelFileInput.value = '';
 });
 
 editDownload.addEventListener('click', () => {
-  const blob = new Blob([JSON.stringify(labelData, null, 2)], { type: 'application/json' });
+  const exportData = {
+    labels: labelData.map(({ name, position, category }) => ({ name, position, category })),
+    lines:  lineData.map(({ color, points, name })       => ({ color, points, name: name || '' })),
+  };
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `${activeModelId || 'model'}_labels.json`;
+  a.download = `${activeModelId || 'model'}_annotations.json`;
   a.click();
   URL.revokeObjectURL(a.href);
 });
@@ -971,18 +994,21 @@ function _addLineEntry(entry) {
   lineLayer.add(mesh);
   entry._obj = mesh;
 
+  // Midpoint anchor: shows the line name and (in edit mode) a delete handle.
+  const mid = pts[Math.floor(pts.length / 2)];
+  const el = document.createElement('div'); el.className = 'line-del-anchor';
+
+  if (entry.name) {
+    const txt = document.createElement('span');
+    txt.className = 'line-label-text';
+    txt.textContent = entry.name;
+    el.appendChild(txt);
+  }
+
   if (EDIT_MODE) {
-    // Place a × handle at the midpoint vertex so the author can delete the line.
-    const mid = pts[Math.floor(pts.length / 2)];
-    const el  = document.createElement('div'); el.className = 'line-del-anchor';
     const del = document.createElement('span');
     del.className = 'line-del'; del.textContent = '×'; del.title = 'Delete line';
     el.appendChild(del);
-    const css = new CSS2DObject(el);
-    css.position.set(mid[0], mid[1], mid[2]);
-    labelLayer.add(css);
-    entry._css = css;
-
     del.addEventListener('pointerdown', e => e.stopPropagation());
     del.addEventListener('click', e => {
       e.stopPropagation();
@@ -991,25 +1017,43 @@ function _addLineEntry(entry) {
       lineData.splice(lineData.indexOf(entry), 1);
     });
   }
+
+  const css = new CSS2DObject(el);
+  css.position.set(mid[0], mid[1], mid[2]);
+  labelLayer.add(css);
+  entry._css = css;
 }
+
+let _pendingLineEntry = null;
 
 function _finishLine() {
   if (_wip.length < 2) return;
   const color = LINE_COLORS[_lineColorIdx % LINE_COLORS.length];
   _lineColorIdx++;
-  // Sample a dense CatmullRom spline through the world-space control points,
-  // then project every sample onto the model surface so the line follows the
-  // convex surface instead of cutting through the interior.
   const curve = new THREE.CatmullRomCurve3(_wip);
   const worldSampled = curve.getPoints(Math.max(80, _wip.length * 20));
   const localProjected = _projectLineToSurface(worldSampled);
   const pts = localProjected.map(v => [v.x, v.y, v.z]);
   if (_wipLine) { lineLayer.remove(_wipLine); _wipLine = null; }
   _wip = [];
-  const entry = { color, points: pts, projected: true };
-  lineData.push(entry);
-  _addLineEntry(entry);
   setLineDrawing(false);
+  _pendingLineEntry = { color, points: pts, projected: true, name: '' };
+  // Reuse the label modal with category hidden for naming the line.
+  labelModalName.value = '';
+  labelModal.querySelector('.modal-title').textContent = 'Name this line (optional)';
+  labelModal.classList.add('line-mode');
+  labelModal.classList.remove('hidden');
+  setTimeout(() => labelModalName.focus(), 30);
+}
+
+function _commitLine(name) {
+  _pendingLineEntry.name = name || '';
+  labelModal.classList.add('hidden');
+  labelModal.classList.remove('line-mode');
+  labelModal.querySelector('.modal-title').textContent = 'New label';
+  lineData.push(_pendingLineEntry);
+  _addLineEntry(_pendingLineEntry);
+  _pendingLineEntry = null;
   if (!labelsVisible) setLabelsVisible(true);
 }
 
@@ -1078,15 +1122,6 @@ document.addEventListener('keydown', e => {
   if (e.code === 'Enter') { e.preventDefault(); _finishLine(); }
 });
 
-lineDownloadBtn.addEventListener('click', () => {
-  const exportable = lineData.map(({ color, points }) => ({ color, points }));
-  const blob = new Blob([JSON.stringify(exportable, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${activeModelId || 'model'}_lines.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-});
 
 // ── Student pins ──────────────────────────────────────────
 // Temporary markers students drop while studying. Never saved; cleared when

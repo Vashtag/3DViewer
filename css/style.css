@@ -341,7 +341,7 @@ body {
 #label-modal-confirm:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 
 #labels-toggle, #edit-download, #edit-load,
-#label-place-btn, #line-draw-btn, #line-finish-btn, #line-download-btn {
+#label-place-btn, #line-draw-btn, #line-finish-btn {
   width: 100%;
   padding: 8px 8px;
   border-radius: 8px;
@@ -355,7 +355,7 @@ body {
 }
 
 #labels-toggle:hover, #edit-download:hover, #edit-load:hover,
-#label-place-btn:hover, #line-draw-btn:hover, #line-finish-btn:hover, #line-download-btn:hover {
+#label-place-btn:hover, #line-draw-btn:hover, #line-finish-btn:hover {
   border-color: var(--accent);
   color: var(--text);
   background: #1e2540;
@@ -536,8 +536,27 @@ body {
   line-height: 1.4;
 }
 
-/* Delete handle that sits at the midpoint of each drawn line in edit mode */
+/* Hide category selector when the modal is used to name a line */
+#label-modal.line-mode #label-modal-cats { display: none; }
+
+/* Name label shown at the midpoint of each drawn line */
 .line-del-anchor { position: relative; width: 0; height: 0; pointer-events: none; }
+.line-label-text {
+  position: absolute;
+  left: 0; top: 0;
+  transform: translate(-50%, -190%);
+  white-space: nowrap;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: rgba(15, 17, 23, 0.78);
+  padding: 2px 8px;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px #0007;
+  pointer-events: none;
+}
+
+/* Delete handle that sits at the midpoint of each drawn line in edit mode */
 .line-del {
   position: absolute;
   left: 0; top: 0;
