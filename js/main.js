@@ -26,8 +26,13 @@ const lightAzimuth    = document.getElementById('light-azimuth');
 const lightElevation  = document.getElementById('light-elevation');
 const lightReset      = document.getElementById('light-reset');
 const navBtns         = document.querySelectorAll('.nav-btn');
-const labelsSection   = document.getElementById('labels-section');
-const labelsToggle    = document.getElementById('labels-toggle');
+const labelsSection    = document.getElementById('labels-section');
+const labelsToggle     = document.getElementById('labels-toggle');
+const categoryFilters  = document.getElementById('category-filters');
+const labelModal       = document.getElementById('label-modal');
+const labelModalName   = document.getElementById('label-modal-name');
+const labelModalConfirm = document.getElementById('label-modal-confirm');
+const labelModalCancel = document.getElementById('label-modal-cancel');
 const editSection     = document.getElementById('edit-section');
 const labelPlaceBtn   = document.getElementById('label-place-btn');
 const editDownload    = document.getElementById('edit-download');
@@ -598,16 +603,26 @@ function buildViewButtons(model) {
 // ── Annotations / labels ─────────────────────────────────
 // Author tools appear only when the URL contains ?edit (hidden from students).
 
-function addLabel(name, localPos, record = true) {
+const CATEGORY_COLORS = {
+  ligament: '#f0a030',
+  nerve:    '#70d0ff',
+  vessel:   '#e04040',
+  '':       '#4f7cff', // default / structure
+};
+
+function addLabel(name, localPos, category = '', record = true) {
   if (!labelLayer) return;
-  const entry = { name, position: [localPos.x, localPos.y, localPos.z] };
+  const entry = { name, position: [localPos.x, localPos.y, localPos.z], category };
 
   // The label is a zero-size anchor so CSS2DRenderer pins the DOT exactly on
   // the 3D point. The text/buttons float to the side without shifting it,
   // so the dot stays accurate at any zoom level.
   const el = document.createElement('div');
   el.className = 'anno-label';
-  const dot = document.createElement('span'); dot.className = 'anno-dot';
+  el.dataset.category = category;
+  const dot = document.createElement('span');
+  dot.className = 'anno-dot';
+  dot.style.background = CATEGORY_COLORS[category] ?? CATEGORY_COLORS[''];
   const leader = document.createElement('span'); leader.className = 'anno-leader';
   const content = document.createElement('span'); content.className = 'anno-content';
   const txt = document.createElement('span'); txt.className = 'anno-text'; txt.textContent = name;
@@ -656,11 +671,25 @@ function clearLabels() {
   labelData = [];
 }
 
+function applyCategoryFilters() {
+  const hiddenCats = new Set(
+    [...categoryFilters.querySelectorAll('input[type="checkbox"]')]
+      .filter(cb => !cb.checked).map(cb => cb.dataset.cat)
+  );
+  document.querySelectorAll('.anno-label').forEach(el => {
+    const cat = el.dataset.category || '';
+    el.classList.toggle('cat-hidden', cat !== '' && hiddenCats.has(cat));
+  });
+}
+categoryFilters.addEventListener('change', applyCategoryFilters);
+
 function setLabelsVisible(v) {
   labelsVisible = v;
   if (labelLayer) labelLayer.visible = v;
   labelsToggle.textContent = v ? 'Hide labels' : 'Show labels';
   labelsToggle.classList.toggle('active', v);
+  categoryFilters.classList.toggle('hidden', !v);
+  if (v) applyCategoryFilters();
   setLinesVisible(v);
 }
 
@@ -675,7 +704,7 @@ async function loadLabels(model) {
     const res = await fetch(`models/${model.id}/${model.id}_labels.json`, { cache: 'no-store' });
     if (res.ok) data = await res.json();
   } catch (e) { /* no labels file — fine */ }
-  data.forEach(d => addLabel(d.name, new THREE.Vector3(d.position[0], d.position[1], d.position[2])));
+  data.forEach(d => addLabel(d.name, new THREE.Vector3(d.position[0], d.position[1], d.position[2]), d.category || ''));
 
   labelsSection.classList.toggle('hidden', !(labelData.length || EDIT_MODE));
   editSection.classList.toggle('hidden', !EDIT_MODE);
@@ -731,6 +760,8 @@ function setLabelPlacementMode(on) {
 
 labelPlaceBtn.addEventListener('click', () => setLabelPlacementMode(!labelPlacementMode));
 
+let _pendingLabelHit = null;
+
 renderer.domElement.addEventListener('click', e => {
   if (!labelPlacementMode || navMode !== 'orbit' || !currentModel) return;
   const rect = renderer.domElement.getBoundingClientRect();
@@ -739,10 +770,31 @@ renderer.domElement.addEventListener('click', e => {
   _ray.setFromCamera(_ndc, camera);
   const hits = _ray.intersectObject(currentModel, true);
   if (!hits.length) return;
-  const name = prompt('Label name:');
-  if (!name) return;
+  _pendingLabelHit = hits[0].point.clone();
+  labelModalName.value = '';
+  document.querySelector('input[name="lcat"][value=""]').checked = true;
+  labelModal.classList.remove('hidden');
+  setTimeout(() => labelModalName.focus(), 30);
+});
+
+function _commitLabel() {
+  const name = labelModalName.value.trim();
+  if (!name) { labelModalName.focus(); return; }
+  const cat = document.querySelector('input[name="lcat"]:checked')?.value ?? '';
+  labelModal.classList.add('hidden');
   if (!labelsVisible) setLabelsVisible(true);
-  addLabel(name, currentModel.worldToLocal(hits[0].point.clone()));
+  addLabel(name, currentModel.worldToLocal(_pendingLabelHit.clone()), cat);
+  _pendingLabelHit = null;
+}
+
+labelModalConfirm.addEventListener('click', _commitLabel);
+labelModalCancel.addEventListener('click', () => {
+  labelModal.classList.add('hidden');
+  _pendingLabelHit = null;
+});
+labelModalName.addEventListener('keydown', e => {
+  if (e.key === 'Enter') _commitLabel();
+  if (e.key === 'Escape') labelModalCancel.click();
 });
 
 // Edit mode: drag a pin's dot to re-place it on the surface (a spot chosen in
