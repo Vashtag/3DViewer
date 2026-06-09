@@ -653,6 +653,7 @@ function addLabel(name, localPos, category = '', record = true) {
   }
 
   labelLayer.add(obj);
+  entry._obj = obj;
   if (record) labelData.push(entry);
 }
 
@@ -676,9 +677,8 @@ function applyCategoryFilters() {
     [...categoryFilters.querySelectorAll('input[type="checkbox"]')]
       .filter(cb => !cb.checked).map(cb => cb.dataset.cat)
   );
-  document.querySelectorAll('.anno-label').forEach(el => {
-    const cat = el.dataset.category || '';
-    el.classList.toggle('cat-hidden', hiddenCats.has(cat));
+  labelData.forEach(entry => {
+    if (entry._obj) entry._obj.visible = !hiddenCats.has(entry.category || '');
   });
 }
 categoryFilters.addEventListener('change', applyCategoryFilters);
