@@ -695,9 +695,13 @@ categoryFilters.addEventListener('change', e => {
 let dotsOnlyMode = false;
 
 function applyDotsOnlyMode() {
-  labelData.forEach(entry => {
-    if (!entry._obj) return;
-    const el = entry._obj.element;
+  const allEntries = [
+    ...labelData.map(e => e._obj),
+    ...lineData.map(e => e._css),
+  ];
+  allEntries.forEach(obj => {
+    if (!obj) return;
+    const el = obj.element;
     if (dotsOnlyMode) {
       el.classList.add('dots-only');
       el.classList.remove('label-peek');
@@ -1079,6 +1083,7 @@ function _addLineEntry(entry) {
     css.userData.content = content;
     labelLayer.add(css);
     entry._css = css;
+    if (dotsOnlyMode) css.element.classList.add('dots-only');
   }
 }
 
