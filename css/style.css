@@ -340,7 +340,7 @@ body {
 }
 #label-modal-confirm:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 
-#labels-toggle, #edit-download,
+#labels-toggle, #edit-download, #edit-load,
 #label-place-btn, #line-draw-btn, #line-finish-btn, #line-download-btn {
   width: 100%;
   padding: 8px 8px;
@@ -354,7 +354,7 @@ body {
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 
-#labels-toggle:hover, #edit-download:hover,
+#labels-toggle:hover, #edit-download:hover, #edit-load:hover,
 #label-place-btn:hover, #line-draw-btn:hover, #line-finish-btn:hover, #line-download-btn:hover {
   border-color: var(--accent);
   color: var(--text);

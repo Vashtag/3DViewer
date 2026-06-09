@@ -818,6 +818,31 @@ window.addEventListener('pointerup', () => {
   if (navMode === 'orbit') controls.enabled = true;
 });
 
+const editLoad       = document.getElementById('edit-load');
+const labelFileInput = document.getElementById('label-file-input');
+
+editLoad.addEventListener('click', () => labelFileInput.click());
+
+labelFileInput.addEventListener('change', () => {
+  const file = labelFileInput.files[0];
+  if (!file || !currentModel) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) throw new Error('not an array');
+      data.forEach(d => {
+        if (!d.name || !Array.isArray(d.position)) return;
+        addLabel(d.name, new THREE.Vector3(d.position[0], d.position[1], d.position[2]), d.category || '');
+      });
+      if (!labelsVisible) setLabelsVisible(true);
+      labelsSection.classList.remove('hidden');
+    } catch { alert('Invalid labels JSON file.'); }
+  };
+  reader.readAsText(file);
+  labelFileInput.value = ''; // reset so the same file can be re-loaded
+});
+
 editDownload.addEventListener('click', () => {
   const blob = new Blob([JSON.stringify(labelData, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
