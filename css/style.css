@@ -374,6 +374,47 @@ body {
   border-color: rgba(240, 192, 64, 0.6);
 }
 
+/* ── Line drawing ── */
+#viewer-container.line-draw-mode #viewer-canvas { cursor: crosshair; }
+
+#line-draw-controls {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+#line-draw-controls button { flex: 1; }
+
+#line-draw-btn.active {
+  background: rgba(255, 140, 0, 0.2);
+  color: #ff8c00;
+  border-color: rgba(255, 140, 0, 0.55);
+}
+
+.edit-hint-small {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  margin: 0 0 8px;
+  line-height: 1.4;
+}
+
+/* Delete handle that sits at the midpoint of each drawn line in edit mode */
+.line-del-anchor { position: relative; width: 0; height: 0; pointer-events: none; }
+.line-del {
+  position: absolute;
+  left: 0; top: 0;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  cursor: pointer;
+  color: #fff;
+  background: rgba(192, 57, 43, 0.85);
+  border-radius: 50%;
+  width: 18px; height: 18px;
+  font-size: 12px; line-height: 18px;
+  text-align: center;
+  transition: background 0.12s, transform 0.12s;
+}
+.line-del:hover { background: #c0392b; transform: translate(-50%, -50%) scale(1.15); }
+
 /* ── Viewer ── */
 #viewer-container {
   flex: 1;
