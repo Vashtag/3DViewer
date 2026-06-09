@@ -1191,27 +1191,32 @@ document.addEventListener('keydown', e => {
 // toggle .label-peek within ~18 px.
 const _peekVec = new THREE.Vector3();
 container.addEventListener('mousemove', e => {
-  if (!dotsOnlyMode || !labelsVisible || !labelLayer || !labelData.length) return;
+  if (!dotsOnlyMode || !labelsVisible || !labelLayer) return;
   const rect = renderer.domElement.getBoundingClientRect();
   const mx = e.clientX - rect.left;
   const my = e.clientY - rect.top;
   const w = rect.width, h = rect.height;
   const THRESH = 18 * 18; // squared pixel radius
 
-  labelData.forEach(entry => {
-    if (!entry._obj || !entry._obj.visible) return;
-    entry._obj.getWorldPosition(_peekVec);
+  const peekTargets = [
+    ...labelData.map(e => ({ obj: e._obj })),
+    ...lineData.map(e => ({ obj: e._css })),
+  ];
+
+  peekTargets.forEach(({ obj }) => {
+    if (!obj || !obj.visible) return;
+    obj.getWorldPosition(_peekVec);
     _peekVec.project(camera);
     const sx = (_peekVec.x * 0.5 + 0.5) * w;
     const sy = (-_peekVec.y * 0.5 + 0.5) * h;
     const dx = sx - mx, dy = sy - my;
-    entry._obj.element.classList.toggle('label-peek', dx * dx + dy * dy <= THRESH);
+    obj.element.classList.toggle('label-peek', dx * dx + dy * dy <= THRESH);
   });
 });
 
 container.addEventListener('mouseleave', () => {
-  labelData.forEach(entry => {
-    if (entry._obj) entry._obj.element.classList.remove('label-peek');
+  [...labelData.map(e => e._obj), ...lineData.map(e => e._css)].forEach(obj => {
+    if (obj) obj.element.classList.remove('label-peek');
   });
 });
 
