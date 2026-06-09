@@ -655,13 +655,17 @@ function addLabel(name, localPos, category = '', record = true) {
   labelLayer.add(obj);
   entry._obj = obj;
   if (dotsOnlyMode) el.classList.add('dots-only');
-  if (record) labelData.push(entry);
+  if (record) {
+    labelData.push(entry);
+    updateCategoryFilterVisibility();
+  }
 }
 
 function removeLabel(entry, obj) {
   labelLayer.remove(obj); // fires CSS2DObject 'removed' → cleans up the DOM node
   const i = labelData.indexOf(entry);
   if (i >= 0) labelData.splice(i, 1);
+  updateCategoryFilterVisibility();
 }
 
 function clearLabels() {
@@ -671,6 +675,16 @@ function clearLabels() {
   }
   labelLayer = null;
   labelData = [];
+}
+
+function updateCategoryFilterVisibility() {
+  const usedCats = new Set([
+    ...labelData.map(e => e.category || ''),
+    ...lineData.map(e => e.category || 'other'),
+  ]);
+  categoryFilters.querySelectorAll('.cat-filter-row[data-filter-cat]').forEach(row => {
+    row.style.display = usedCats.has(row.dataset.filterCat) ? '' : 'none';
+  });
 }
 
 function applyCategoryFilters() {
@@ -763,6 +777,7 @@ async function loadLabels(model) {
 
   labelsSection.classList.toggle('hidden', !(labelData.length || lines.length || EDIT_MODE));
   editSection.classList.toggle('hidden', !EDIT_MODE);
+  updateCategoryFilterVisibility();
   setLabelsVisible(EDIT_MODE);
 }
 
@@ -1077,6 +1092,7 @@ function _addLineEntry(entry) {
         lineLayer.remove(entry._obj);
         labelLayer.remove(entry._css);
         lineData.splice(lineData.indexOf(entry), 1);
+        updateCategoryFilterVisibility();
       });
       content.appendChild(del);
     }
@@ -1128,6 +1144,7 @@ function _commitLine(name) {
   lineData.push(_pendingLineEntry);
   _addLineEntry(_pendingLineEntry);
   _pendingLineEntry = null;
+  updateCategoryFilterVisibility();
   if (!labelsVisible) setLabelsVisible(true);
 }
 
