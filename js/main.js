@@ -809,26 +809,86 @@ function setLineDrawing(on) {
   }
 }
 
-// Builds smooth curve geometry through control points using a Catmull-Rom
-// spline, sampled at enough segments for a visually smooth result.
+// Direct geometry from a flat array of [x,y,z] triples (dense / surface-projected).
 function _makeLineGeo(pts) {
+  return new THREE.BufferGeometry().setFromPoints(
+    pts.map(p => new THREE.Vector3(p[0], p[1], p[2]))
+  );
+}
+
+// CatmullRom spline geometry — used only for the live WIP preview.
+function _makeSplineGeo(pts) {
   const v3s = pts.map(p => new THREE.Vector3(p[0], p[1], p[2]));
   if (v3s.length < 2) return new THREE.BufferGeometry().setFromPoints(v3s);
   const curve = new THREE.CatmullRomCurve3(v3s);
-  // More control points → more samples for smoother curve.
-  const samples = Math.max(64, v3s.length * 16);
-  return new THREE.BufferGeometry().setFromPoints(curve.getPoints(samples));
+  return new THREE.BufferGeometry().setFromPoints(
+    curve.getPoints(Math.max(64, v3s.length * 16))
+  );
+}
+
+// Reusable helpers for surface projection.
+const _projRay = new THREE.Raycaster();
+const _projDir = new THREE.Vector3();
+
+// Projects an array of world-space points onto the nearest model surface.
+// Returns an array of THREE.Vector3 in the model's local coordinate space,
+// lifted slightly along the face normal to prevent z-fighting.
+function _projectLineToSurface(worldPts) {
+  const modelCenter = new THREE.Vector3();
+  currentModel.getWorldPosition(modelCenter);
+
+  return worldPts.map(wp => {
+    _projDir.copy(wp).sub(modelCenter);
+    const dist = _projDir.length();
+    if (dist < 1e-6) return currentModel.worldToLocal(wp.clone());
+    _projDir.divideScalar(dist);
+
+    // Cast from well outside the model inward toward this point.
+    _projRay.set(
+      wp.clone().addScaledVector(_projDir, dist + 2),
+      _projDir.clone().negate()
+    );
+    const hits = _projRay.intersectObject(currentModel, true);
+    if (!hits.length) return currentModel.worldToLocal(wp.clone());
+
+    // Lift slightly along the face normal so the line sits on the surface.
+    // face can be null on some mesh types — fall back to the outward direction.
+    const hitPt = hits[0].point;
+    let normalWorld;
+    if (hits[0].face) {
+      normalWorld = hits[0].face.normal.clone()
+        .transformDirection(currentModel.matrixWorld).normalize();
+    } else {
+      normalWorld = _projDir.clone(); // outward direction from center
+    }
+    const lifted = hitPt.clone().addScaledVector(normalWorld, 0.004);
+    return currentModel.worldToLocal(lifted);
+  });
 }
 
 function _addLineEntry(entry) {
-  const mat  = new THREE.LineBasicMaterial({ color: entry.color });
-  const line = new THREE.Line(_makeLineGeo(entry.points), mat);
+  // Sparse entries (loaded from old JSON with only a few control points) are
+  // re-sampled via CatmullRom and surface-projected so they hug the model.
+  let pts = entry.points;
+  if (!entry.projected && pts.length >= 2 && pts.length < 20 && currentModel) {
+    const v3s = pts.map(p => new THREE.Vector3(p[0], p[1], p[2]));
+    const curve = new THREE.CatmullRomCurve3(v3s);
+    const localSampled = curve.getPoints(Math.max(80, v3s.length * 20));
+    const worldSampled = localSampled.map(lp => currentModel.localToWorld(lp.clone()));
+    pts = _projectLineToSurface(worldSampled).map(v => [v.x, v.y, v.z]);
+  }
+
+  const mat = new THREE.LineBasicMaterial({
+    color: entry.color,
+    polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4,
+  });
+  const line = new THREE.Line(_makeLineGeo(pts), mat);
   lineLayer.add(line);
   entry._obj = line;
 
   if (EDIT_MODE) {
     // Place a × handle at the midpoint vertex so the author can delete the line.
-    const mid = entry.points[Math.floor(entry.points.length / 2)];
+    const mid = pts[Math.floor(pts.length / 2)];
     const el  = document.createElement('div'); el.className = 'line-del-anchor';
     const del = document.createElement('span');
     del.className = 'line-del'; del.textContent = '×'; del.title = 'Delete line';
@@ -852,14 +912,16 @@ function _finishLine() {
   if (_wip.length < 2) return;
   const color = LINE_COLORS[_lineColorIdx % LINE_COLORS.length];
   _lineColorIdx++;
-  // Convert accumulated world-space points to local space.
-  const pts = _wip.map(wp => {
-    const lp = currentModel.worldToLocal(wp.clone());
-    return [lp.x, lp.y, lp.z];
-  });
+  // Sample a dense CatmullRom spline through the world-space control points,
+  // then project every sample onto the model surface so the line follows the
+  // convex surface instead of cutting through the interior.
+  const curve = new THREE.CatmullRomCurve3(_wip);
+  const worldSampled = curve.getPoints(Math.max(80, _wip.length * 20));
+  const localProjected = _projectLineToSurface(worldSampled);
+  const pts = localProjected.map(v => [v.x, v.y, v.z]);
   if (_wipLine) { lineLayer.remove(_wipLine); _wipLine = null; }
   _wip = [];
-  const entry = { color, points: pts };
+  const entry = { color, points: pts, projected: true };
   lineData.push(entry);
   _addLineEntry(entry);
   if (!linesVisible) setLinesVisible(true);
@@ -914,11 +976,11 @@ renderer.domElement.addEventListener('click', e => {
   if (!hits.length) return;
   _wip.push(hits[0].point.clone());
 
-  // Refresh the in-progress preview line (also smooth via spline).
+  // Refresh the in-progress preview line (smooth spline, no projection needed for preview).
   if (_wipLine) lineLayer.remove(_wipLine);
   if (_wip.length >= 2) {
     const localPts = _wip.map(wp => currentModel.worldToLocal(wp.clone()));
-    const geo = _makeLineGeo(localPts.map(v => [v.x, v.y, v.z]));
+    const geo = _makeSplineGeo(localPts.map(v => [v.x, v.y, v.z]));
     _wipLine = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.5 }));
     lineLayer.add(_wipLine);
     if (!linesVisible) { lineLayer.visible = true; } // show preview even if hidden
