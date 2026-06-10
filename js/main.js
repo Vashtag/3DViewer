@@ -106,7 +106,8 @@ const MODELS = [
   },
   {
     id: 'brainstem', label: 'Brainstem', file: 'models/brainstem/brainstem.glb',
-    rotation: [0, 0, 0],
+    rotation: [0, 180, 0],
+    brightness: 2.2,
     views: [
       { label: 'Anterior',  dir: 'front' },
       { label: 'Posterior', dir: 'back'  },
@@ -448,7 +449,7 @@ function showViewerUI() {
 // ── Material softening ────────────────────────────────────
 // Artec scans export near-mirror MTL (Ks 1 1 1, Ns 1000).
 // Flatten specular so surface texture reads clearly at all angles.
-function softenMaterials(object) {
+function softenMaterials(object, brightness = 1) {
   object.traverse(child => {
     if (!child.isMesh) return;
     const mats = Array.isArray(child.material) ? child.material : [child.material];
@@ -457,6 +458,7 @@ function softenMaterials(object) {
       if (m.specular)       m.specular.setScalar(0.03);
       if ('roughness' in m) m.roughness = 0.9;
       if ('metalness' in m) m.metalness = 0.0;
+      if (brightness !== 1 && m.color) m.color.multiplyScalar(brightness);
       m.needsUpdate = true;
     });
   });
@@ -559,7 +561,7 @@ function loadRegion(region) {
     (gltf) => {
       const object = gltf.scene;
       setProgress(100);
-      softenMaterials(object);
+      softenMaterials(object, model.brightness ?? 1);
       if (model.rotation) {
         object.rotation.set(
           THREE.MathUtils.degToRad(model.rotation[0]),
