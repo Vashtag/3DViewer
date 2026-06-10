@@ -106,7 +106,7 @@ const MODELS = [
   },
   {
     id: 'brainstem', label: 'Brainstem', file: 'models/brainstem/brainstem.glb',
-    rotation: [0, 180, 0],
+    rotation: [0, 0, 0],
     brightness: 2.2,
     views: [
       { label: 'Anterior',  dir: 'front' },
