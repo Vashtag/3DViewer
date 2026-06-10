@@ -104,6 +104,18 @@ const MODELS = [
       { label: 'Medial',    dir: 'right' },
     ],
   },
+  {
+    id: 'brainstem', label: 'Brainstem', file: 'models/brainstem/brainstem.glb',
+    rotation: [0, 0, 0],
+    views: [
+      { label: 'Anterior',  dir: 'front' },
+      { label: 'Posterior', dir: 'back'  },
+      { label: 'Left',      dir: 'left'  },
+      { label: 'Right',     dir: 'right' },
+      { label: 'Superior',  dir: 'top'   },
+      { label: 'Inferior',  dir: 'bottom'},
+    ],
+  },
 ];
 const MODEL_BY_ID = Object.fromEntries(MODELS.map(m => [m.id, m]));
 
