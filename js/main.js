@@ -39,6 +39,9 @@ const editDownload    = document.getElementById('edit-download');
 const lineDrawBtn     = document.getElementById('line-draw-btn');
 const lineFinishBtn   = document.getElementById('line-finish-btn');
 const pinBtn          = document.getElementById('pin-btn');
+const orientToggle    = document.getElementById('orient-toggle');
+const orientSave      = document.getElementById('orient-save');
+const orientGrid      = document.getElementById('orient-grid');
 const mobileMenuBtn   = document.getElementById('mobile-menu-btn');
 const sidebarEl       = document.getElementById('sidebar');
 const sidebarBackdrop = document.getElementById('sidebar-backdrop');
@@ -464,16 +467,24 @@ function softenMaterials(object, brightness = 1) {
   });
 }
 
+// Keep the model's geometric centre pinned at the orbit origin, regardless of
+// its current orientation. Driven by userData.centerLocal (computed once at
+// load, in rotation-independent local space) so re-orienting in edit mode
+// doesn't make the model drift off-centre.
+function recenterModel() {
+  const c = currentModel?.userData?.centerLocal;
+  if (!c) return;
+  const w = c.clone().applyQuaternion(currentModel.quaternion);
+  currentModel.position.copy(w.negate());
+  currentModel.updateMatrixWorld(true);
+}
+
 // ── Camera fit ────────────────────────────────────────────
 function fitCameraToModel(object) {
   const box    = new THREE.Box3().setFromObject(object);
-  const center = box.getCenter(new THREE.Vector3());
   const sphere = box.getBoundingSphere(new THREE.Sphere());
   const radius = sphere.radius;
   fitRadius    = radius;
-
-  // Centre model at origin
-  object.position.sub(center);
 
   // Distance that fits the bounding sphere in the vertical FOV
   const fov = camera.fov * (Math.PI / 180);
@@ -530,18 +541,28 @@ dracoLoader.setDecoderPath('js/draco/');
 const gltfLoader = new GLTFLoader();
 gltfLoader.setDRACOLoader(dracoLoader);
 
-function loadRegion(region) {
+async function loadRegion(region) {
   const model = MODEL_BY_ID[region];
   if (!model) { console.error('Unknown model:', region); return; }
   showLoading('Loading ' + model.label + ' model…');
   buildViewButtons(model);
   updateGizmoLabels(model);
 
+  // A saved orientation (set in edit mode) overrides the hardcoded default.
+  let savedRotation = null;
+  try {
+    const res = await fetch(`models/${model.id}/${model.id}_view.json`, { cache: 'no-store' });
+    if (res.ok) {
+      const cfg = await res.json();
+      if (Array.isArray(cfg.rotation)) savedRotation = cfg.rotation;
+    }
+  } catch (e) { /* no saved orientation — use the default */ }
+
   if (currentModel) {
     clearLabels();
     clearLines();
     setLineDrawing(false);
-    if (EDIT_MODE) setLabelPlacementMode(false);
+    if (EDIT_MODE) { setLabelPlacementMode(false); setOrientMode(false); }
     clearPins();
     setPinMode(false);
     scene.remove(currentModel);
@@ -562,16 +583,23 @@ function loadRegion(region) {
       const object = gltf.scene;
       setProgress(100);
       softenMaterials(object, model.brightness ?? 1);
-      if (model.rotation) {
-        object.rotation.set(
-          THREE.MathUtils.degToRad(model.rotation[0]),
-          THREE.MathUtils.degToRad(model.rotation[1]),
-          THREE.MathUtils.degToRad(model.rotation[2])
-        );
-        object.updateMatrixWorld(true);
-      }
+
+      // Geometric centre in rotation-independent local space — computed at
+      // identity so re-orienting later keeps the model pinned at the origin.
+      object.updateMatrixWorld(true);
+      const box0 = new THREE.Box3().setFromObject(object);
+      object.userData.centerLocal = box0.getCenter(new THREE.Vector3());
+
+      const rot = savedRotation ?? model.rotation ?? [0, 0, 0];
+      object.rotation.set(
+        THREE.MathUtils.degToRad(rot[0]),
+        THREE.MathUtils.degToRad(rot[1]),
+        THREE.MathUtils.degToRad(rot[2])
+      );
+
       scene.add(object);
       currentModel = object;
+      recenterModel();
       fitCameraToModel(object);
       showViewerUI();
       loadLabels(model);
@@ -864,6 +892,7 @@ function updateLabelLeaders() {
 
 // Edit mode: label placement — only active when labelPlacementMode is on.
 function setLabelPlacementMode(on) {
+  if (on) setOrientMode(false);
   labelPlacementMode = on;
   labelPlaceBtn.classList.toggle('active', on);
   container.classList.toggle('label-place-mode', on);
@@ -987,6 +1016,78 @@ editDownload.addEventListener('click', () => {
   URL.revokeObjectURL(a.href);
 });
 
+// ── Orient model (edit mode) ──────────────────────────────
+// Drag or snap-rotate the model so its anatomical anterior faces +Z (the
+// camera in the default/Anterior view). Saving downloads <id>_view.json, which
+// loadRegion fetches on startup so the orientation applies for everyone.
+let orientMode = false;
+const _WORLD_X = new THREE.Vector3(1, 0, 0);
+const _WORLD_Y = new THREE.Vector3(0, 1, 0);
+const _WORLD_Z = new THREE.Vector3(0, 0, 1);
+
+function setOrientMode(on) {
+  orientMode = on;
+  orientToggle.classList.toggle('active', on);
+  container.classList.toggle('orient-mode', on);
+  if (on) {
+    setLabelPlacementMode(false);
+    setLineDrawing(false);
+    setPinMode(false);
+    controls.enabled = false;
+  } else if (navMode === 'orbit' && !dragging) {
+    controls.enabled = true;
+  }
+}
+orientToggle.addEventListener('click', () => setOrientMode(!orientMode));
+
+// Rotate the model about a world axis (premultiply = world-space), then re-pin
+// its centre so it spins in place.
+function rotateModel(axis, deg) {
+  if (!currentModel) return;
+  const q = new THREE.Quaternion().setFromAxisAngle(axis, THREE.MathUtils.degToRad(deg));
+  currentModel.quaternion.premultiply(q);
+  recenterModel();
+}
+
+orientGrid.addEventListener('click', e => {
+  const btn = e.target.closest('.orient-btn');
+  if (!btn) return;
+  const axis = { x: _WORLD_X, y: _WORLD_Y, z: _WORLD_Z }[btn.dataset.axis];
+  rotateModel(axis, parseFloat(btn.dataset.deg));
+});
+
+let _orientLast = null;
+renderer.domElement.addEventListener('pointerdown', e => {
+  if (!orientMode || !currentModel) return;
+  _orientLast = { x: e.clientX, y: e.clientY };
+  e.preventDefault();
+});
+window.addEventListener('pointermove', e => {
+  if (!_orientLast || !currentModel) return;
+  const dx = e.clientX - _orientLast.x;
+  const dy = e.clientY - _orientLast.y;
+  _orientLast = { x: e.clientX, y: e.clientY };
+  const k = 0.01; // radians per pixel
+  currentModel.quaternion
+    .premultiply(new THREE.Quaternion().setFromAxisAngle(_WORLD_Y, dx * k))
+    .premultiply(new THREE.Quaternion().setFromAxisAngle(_WORLD_X, dy * k));
+  recenterModel();
+});
+window.addEventListener('pointerup', () => { _orientLast = null; });
+
+orientSave.addEventListener('click', () => {
+  if (!currentModel) { alert('Load a model first.'); return; }
+  const e = currentModel.rotation;
+  const round = v => Math.round(THREE.MathUtils.radToDeg(v) * 100) / 100;
+  const cfg = { rotation: [round(e.x), round(e.y), round(e.z)] };
+  const blob = new Blob([JSON.stringify(cfg, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${activeModelId || 'model'}_view.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
 // ── Drawn lines ───────────────────────────────────────────
 // Author-placed polylines (e.g. gluteal lines on the pelvis). Stored as local-
 // space vertices in <id>_lines.json, rendered as THREE.Line objects that are
@@ -1007,6 +1108,7 @@ function setLinesVisible(v) {
 }
 
 function setLineDrawing(on) {
+  if (on) setOrientMode(false);
   lineDrawing = on;
   lineDrawBtn.classList.toggle('active', on);
   container.classList.toggle('line-draw-mode', on);
@@ -1310,6 +1412,7 @@ let pinMode  = false;
 let pinCount = 0;
 
 function setPinMode(on) {
+  if (on) setOrientMode(false);
   pinMode = on;
   pinBtn.classList.toggle('active', on);
   container.classList.toggle('pin-mode', on);
