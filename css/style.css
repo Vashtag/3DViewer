@@ -591,7 +591,6 @@ body {
   gap: 8px;
   margin: 8px 0 4px;
 }
-#orient-view-row.hidden { display: none; }
 .orient-view-label {
   font-size: 0.75rem;
   color: var(--text-muted);
