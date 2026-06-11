@@ -41,6 +41,7 @@ const lineFinishBtn   = document.getElementById('line-finish-btn');
 const pinBtn          = document.getElementById('pin-btn');
 const orientToggle    = document.getElementById('orient-toggle');
 const orientSave      = document.getElementById('orient-save');
+const orientDownload  = document.getElementById('orient-download');
 const orientViewRow   = document.getElementById('orient-view-row');
 const orientViewSel   = document.getElementById('orient-view-select');
 const mobileMenuBtn   = document.getElementById('mobile-menu-btn');
@@ -525,16 +526,35 @@ const VIEW_DIRS = {
   bottom: [ 0, -1,  0],
 };
 
+// Per-view saved orientation, loaded from <id>_view.json. Keyed by view dir:
+//   { front: { rotation: [x,y,z], zoom: dist }, back: {…}, … }
+// Authored in edit mode; applied here so each view button snaps to its own
+// model orientation and zoom.
+let savedViews = {};
+
 function setView(name) {
   if (!currentModel || !fitRadius) return;
   const d = VIEW_DIRS[name];
   if (!d) return;
+
+  // Apply this view's saved model orientation, if one was authored.
+  const saved = savedViews[name];
+  if (saved && Array.isArray(saved.rotation)) {
+    currentModel.rotation.set(
+      THREE.MathUtils.degToRad(saved.rotation[0]),
+      THREE.MathUtils.degToRad(saved.rotation[1]),
+      THREE.MathUtils.degToRad(saved.rotation[2])
+    );
+    recenterModel();
+  }
+
   if      (name === 'top')    camera.up.set(0, 0, -1);
   else if (name === 'bottom') camera.up.set(0, 0,  1);
   else                         camera.up.set(0, 1,  0);
 
-  const dist = camera._defaultPos ? camera._defaultPos.length()
-                                   : fitRadius / Math.sin((camera.fov * Math.PI / 180) / 2) * 1.15;
+  const dist = saved?.zoom
+            ?? (camera._defaultPos ? camera._defaultPos.length()
+                                    : fitRadius / Math.sin((camera.fov * Math.PI / 180) / 2) * 1.15);
   camera.position.set(d[0] * dist, d[1] * dist, d[2] * dist);
   controls.target.set(0, 0, 0);
   controls.update();
@@ -554,15 +574,20 @@ async function loadRegion(region) {
   updateGizmoLabels(model);
   if (EDIT_MODE) populateOrientViewSelect(model);
 
-  // A saved orientation (set in edit mode) overrides the hardcoded default.
-  let savedRotation = null;
+  // Saved per-view orientation (authored in edit mode) overrides the default.
+  savedViews = {};
   try {
     const res = await fetch(`models/${model.id}/${model.id}_view.json`, { cache: 'no-store' });
     if (res.ok) {
       const cfg = await res.json();
-      if (Array.isArray(cfg.rotation)) savedRotation = cfg.rotation;
+      if (cfg && typeof cfg === 'object') savedViews = cfg;
     }
   } catch (e) { /* no saved orientation — use the default */ }
+
+  // The model loads showing its first view (e.g. Anterior); use that view's
+  // saved orientation if present, otherwise the hardcoded default.
+  const firstDir = (model.views ?? DEFAULT_VIEWS)[0]?.dir;
+  const savedRotation = savedViews[firstDir]?.rotation ?? null;
 
   if (currentModel) {
     clearLabels();
@@ -607,6 +632,8 @@ async function loadRegion(region) {
       currentModel = object;
       recenterModel();
       fitCameraToModel(object);
+      // If the first view has a saved zoom, frame the model with it.
+      if (savedViews[firstDir]?.zoom != null) setView(firstDir);
       showViewerUI();
       loadLabels(model);
       initLineLayer();
@@ -1069,12 +1096,20 @@ function setOrientMode(on) {
     setLabelPlacementMode(false);
     setLineDrawing(false);
     setPinMode(false);
-    controls.enabled = false;
+    // Keep controls on for scroll-to-zoom, but disable camera rotate/pan so
+    // dragging rotates the model (via our handler) and the view stays fixed.
+    controls.enabled = true;
+    controls.enableRotate = false;
+    controls.enablePan = false;
+    controls.enableZoom = true;
     // Snap camera to the currently-selected view so the user sees
     // which anatomical direction they're looking at.
     setView(orientViewSel.value);
-  } else if (navMode === 'orbit' && !dragging) {
-    controls.enabled = true;
+  } else {
+    controls.enableRotate = true;
+    controls.enablePan = true;
+    controls.enableZoom = true;
+    controls.enabled = (navMode === 'orbit' && !dragging);
   }
 }
 orientToggle.addEventListener('click', () => setOrientMode(!orientMode));
@@ -1103,12 +1138,39 @@ window.addEventListener('pointermove', e => {
 });
 window.addEventListener('pointerup', () => { _orientLast = null; });
 
+// Save the current model orientation + zoom for the selected view into the
+// in-memory savedViews accumulator. Download writes all saved views to file.
+let _saveFlashTimer = null;
 orientSave.addEventListener('click', () => {
   if (!currentModel) { alert('Load a model first.'); return; }
   const e = currentModel.rotation;
-  const round = v => Math.round(THREE.MathUtils.radToDeg(v) * 100) / 100;
-  const cfg = { rotation: [round(e.x), round(e.y), round(e.z)] };
-  const blob = new Blob([JSON.stringify(cfg, null, 2)], { type: 'application/json' });
+  const round = v => Math.round(v * 100) / 100;
+  const name = orientViewSel.value;
+  savedViews[name] = {
+    rotation: [
+      round(THREE.MathUtils.radToDeg(e.x)),
+      round(THREE.MathUtils.radToDeg(e.y)),
+      round(THREE.MathUtils.radToDeg(e.z)),
+    ],
+    zoom: round(camera.position.length()),
+  };
+  // Brief "Saved ✓" confirmation on the button.
+  const label = orientViewSel.options[orientViewSel.selectedIndex]?.text || name;
+  orientSave.textContent = `Saved ${label} ✓`;
+  orientSave.classList.add('saved');
+  clearTimeout(_saveFlashTimer);
+  _saveFlashTimer = setTimeout(() => {
+    orientSave.textContent = 'Save this view';
+    orientSave.classList.remove('saved');
+  }, 1400);
+});
+
+orientDownload.addEventListener('click', () => {
+  if (!Object.keys(savedViews).length) {
+    alert('Save at least one view first.');
+    return;
+  }
+  const blob = new Blob([JSON.stringify(savedViews, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `${activeModelId || 'model'}_view.json`;
