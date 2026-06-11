@@ -882,9 +882,13 @@ async function loadLabels(model) {
   setLabelsVisible(EDIT_MODE);
 }
 
+// Models that should open straight into dots-only mode when labels are shown.
+const DOTS_ONLY_DEFAULT_MODELS = new Set(['brainstem']);
+
 labelsToggle.addEventListener('click', () => {
   const next = !labelsVisible;
-  if (next && isTouchPrimary && !dotsOnlyMode) {
+  const wantDotsDefault = isTouchPrimary || DOTS_ONLY_DEFAULT_MODELS.has(activeModelId);
+  if (next && wantDotsDefault && !dotsOnlyMode) {
     dotsOnlyMode = true;
     const cb = document.getElementById('dots-only-toggle');
     if (cb) cb.checked = true;
