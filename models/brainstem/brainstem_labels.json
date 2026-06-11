@@ -1,0 +1,311 @@
+{
+  "labels": [
+    {
+      "name": "Optic Nerve",
+      "position": [
+        8.327628402523034,
+        21.52772801644693,
+        35.62234918448753
+      ],
+      "category": "nerve"
+    },
+    {
+      "name": "Oculomotor Nerve",
+      "position": [
+        5.0108930832238,
+        8.441501508051685,
+        9.359241060108218
+      ],
+      "category": "nerve"
+    },
+    {
+      "name": "Trochlear Nerve",
+      "position": [
+        18.3813644693026,
+        3.3967546923733094,
+        6.602917939134301
+      ],
+      "category": "nerve"
+    },
+    {
+      "name": "Trigeminal Nerve",
+      "position": [
+        26.826144175609286,
+        -10.276105933695941,
+        5.929214255784076
+      ],
+      "category": "nerve"
+    },
+    {
+      "name": "Abducens Nerve",
+      "position": [
+        5.19317398959543,
+        -33.325125016131636,
+        6.498127828402502
+      ],
+      "category": "nerve"
+    },
+    {
+      "name": "Facial Nerve",
+      "position": [
+        14.359334019193286,
+        -29.403150346879414,
+        2.899661762784121
+      ],
+      "category": "nerve"
+    },
+    {
+      "name": "Vestibulocochlear Nerve",
+      "position": [
+        19.788305323153,
+        -28.165416707211342,
+        1.5870006547221758
+      ],
+      "category": "nerve"
+    },
+    {
+      "name": "Glossopharyngeal Nerve",
+      "position": [
+        17.001228149242028,
+        -39.015809552032074,
+        -6.987878788115893
+      ],
+      "category": "nerve"
+    },
+    {
+      "name": "Vagus Nerve",
+      "position": [
+        15.423637576602529,
+        -46.0211177345117,
+        -8.497830482625519
+      ],
+      "category": "nerve"
+    },
+    {
+      "name": "Accessory Nerve",
+      "position": [
+        6.692577558094715,
+        -66.54882512239273,
+        -18.549395322122436
+      ],
+      "category": "nerve"
+    },
+    {
+      "name": "Hypoglossal Nerve",
+      "position": [
+        3.849089541491627,
+        -46.788120542586746,
+        -2.842538104019499
+      ],
+      "category": "nerve"
+    },
+    {
+      "name": "Edinger-Westphal",
+      "position": [
+        7.7015935194281075,
+        27.317773561753974,
+        -8.558178105655758
+      ],
+      "category": "nuclei"
+    },
+    {
+      "name": "Oculomotor",
+      "position": [
+        6.3984630103897535,
+        18.354113825198514,
+        -10.16510805461404
+      ],
+      "category": "nuclei"
+    },
+    {
+      "name": "Trochlear",
+      "position": [
+        5.026363512295461,
+        13.279321642957028,
+        -10.63920515752861
+      ],
+      "category": "nuclei"
+    },
+    {
+      "name": "Trigeminal",
+      "position": [
+        6.057121151347803,
+        -4.32116662881293,
+        -15.422953175141657
+      ],
+      "category": "nuclei"
+    },
+    {
+      "name": "Vestibular Complex",
+      "position": [
+        11.56769251886202,
+        -17.164523265481872,
+        -20.860760867696047
+      ],
+      "category": "nuclei"
+    },
+    {
+      "name": "Abducens",
+      "position": [
+        1.0334574429654564,
+        -15.947001172052287,
+        -19.806058756203544
+      ],
+      "category": "nuclei"
+    },
+    {
+      "name": "Accessory",
+      "position": [
+        -2.122199342971814,
+        -59.447323472674015,
+        -21.594668592572685
+      ],
+      "category": "nuclei"
+    },
+    {
+      "name": "Hypoglossal",
+      "position": [
+        -2.3662789436440375,
+        -32.62564327466045,
+        -20.61185987535676
+      ],
+      "category": "nuclei"
+    },
+    {
+      "name": "Ambiguus",
+      "position": [
+        3.0304234244281654,
+        -45.89562793397709,
+        -17.239175295924824
+      ],
+      "category": "nuclei"
+    },
+    {
+      "name": "Tractus Solitarius",
+      "position": [
+        2.3100495455606462,
+        -41.96116003365383,
+        -21.358873508890976
+      ],
+      "category": "nuclei"
+    },
+    {
+      "name": "Dorsal Motor of Vagus",
+      "position": [
+        1.4884406370544674,
+        -34.64955942486678,
+        -20.706716889921676
+      ],
+      "category": "nuclei"
+    },
+    {
+      "name": "Spinal Trigeminal",
+      "position": [
+        1.583179504382756,
+        -56.81379295362334,
+        -22.698325573609356
+      ],
+      "category": "nuclei"
+    },
+    {
+      "name": "Superior Colliculus",
+      "position": [
+        0.7879763410929932,
+        26.796445476635782,
+        -21.59316014559117
+      ],
+      "category": ""
+    },
+    {
+      "name": "Inferior Colliculus",
+      "position": [
+        0.24630595407697248,
+        17.717780208821846,
+        -21.65023745840472
+      ],
+      "category": ""
+    },
+    {
+      "name": "Medial Geniculate Body",
+      "position": [
+        -14.12826567980959,
+        30.75376935681031,
+        -18.175333624257636
+      ],
+      "category": ""
+    },
+    {
+      "name": "Lateral Geniculate Body",
+      "position": [
+        -24.314352433373788,
+        29.107862862514693,
+        -12.43972348106621
+      ],
+      "category": ""
+    },
+    {
+      "name": "Fasciculus Gracilis",
+      "position": [
+        -13.859170535292836,
+        -85.92668631313745,
+        -39.1880348641657
+      ],
+      "category": ""
+    },
+    {
+      "name": "Fasciculus Cuneatus",
+      "position": [
+        -20.414917122813634,
+        -94.65913741666907,
+        -40.765360819360076
+      ],
+      "category": ""
+    },
+    {
+      "name": "Pineal Body",
+      "position": [
+        5.935792375545766,
+        35.53959518612184,
+        -19.063980514625566
+      ],
+      "category": ""
+    },
+    {
+      "name": "Thalamus",
+      "position": [
+        19.586129361584053,
+        54.26281758162616,
+        0.6907232164961695
+      ],
+      "category": ""
+    },
+    {
+      "name": "Caudate Nucleus",
+      "position": [
+        -10.463809128069117,
+        74.14674526896953,
+        6.820860366362951
+      ],
+      "category": ""
+    },
+    {
+      "name": "Stria Terminalis",
+      "position": [
+        38.26356096097228,
+        48.18175358935735,
+        -10.336068539568407
+      ],
+      "category": ""
+    },
+    {
+      "name": "Mamillary Body",
+      "position": [
+        -1.625859427178061,
+        19.676684562838314,
+        8.40441179094792
+      ],
+      "category": ""
+    }
+  ],
+  "lines": []
+}
