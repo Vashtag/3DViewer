@@ -41,7 +41,8 @@ const lineFinishBtn   = document.getElementById('line-finish-btn');
 const pinBtn          = document.getElementById('pin-btn');
 const orientToggle    = document.getElementById('orient-toggle');
 const orientSave      = document.getElementById('orient-save');
-const orientGrid      = document.getElementById('orient-grid');
+const orientViewRow   = document.getElementById('orient-view-row');
+const orientViewSel   = document.getElementById('orient-view-select');
 const mobileMenuBtn   = document.getElementById('mobile-menu-btn');
 const sidebarEl       = document.getElementById('sidebar');
 const sidebarBackdrop = document.getElementById('sidebar-backdrop');
@@ -547,6 +548,7 @@ async function loadRegion(region) {
   showLoading('Loading ' + model.label + ' model…');
   buildViewButtons(model);
   updateGizmoLabels(model);
+  if (EDIT_MODE) populateOrientViewSelect(model);
 
   // A saved orientation (set in edit mode) overrides the hardcoded default.
   let savedRotation = null;
@@ -1023,37 +1025,40 @@ editDownload.addEventListener('click', () => {
 let orientMode = false;
 const _WORLD_X = new THREE.Vector3(1, 0, 0);
 const _WORLD_Y = new THREE.Vector3(0, 1, 0);
-const _WORLD_Z = new THREE.Vector3(0, 0, 1);
+
+function populateOrientViewSelect(model) {
+  orientViewSel.innerHTML = '';
+  const views = model?.views ?? DEFAULT_VIEWS;
+  views.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.dir;
+    opt.textContent = v.label;
+    orientViewSel.appendChild(opt);
+  });
+}
 
 function setOrientMode(on) {
   orientMode = on;
   orientToggle.classList.toggle('active', on);
   container.classList.toggle('orient-mode', on);
+  orientViewRow.classList.toggle('hidden', !on);
   if (on) {
     setLabelPlacementMode(false);
     setLineDrawing(false);
     setPinMode(false);
     controls.enabled = false;
+    // Snap camera to the currently-selected view so the user sees
+    // which anatomical direction they're looking at.
+    setView(orientViewSel.value);
   } else if (navMode === 'orbit' && !dragging) {
     controls.enabled = true;
   }
 }
 orientToggle.addEventListener('click', () => setOrientMode(!orientMode));
 
-// Rotate the model about a world axis (premultiply = world-space), then re-pin
-// its centre so it spins in place.
-function rotateModel(axis, deg) {
-  if (!currentModel) return;
-  const q = new THREE.Quaternion().setFromAxisAngle(axis, THREE.MathUtils.degToRad(deg));
-  currentModel.quaternion.premultiply(q);
-  recenterModel();
-}
-
-orientGrid.addEventListener('click', e => {
-  const btn = e.target.closest('.orient-btn');
-  if (!btn) return;
-  const axis = { x: _WORLD_X, y: _WORLD_Y, z: _WORLD_Z }[btn.dataset.axis];
-  rotateModel(axis, parseFloat(btn.dataset.deg));
+// When the user picks a different view from the dropdown, snap camera to it.
+orientViewSel.addEventListener('change', () => {
+  if (orientMode) setView(orientViewSel.value);
 });
 
 let _orientLast = null;
