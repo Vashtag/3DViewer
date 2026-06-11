@@ -392,11 +392,19 @@ function animate() {
     }
   } else {
     // Q/E roll: rotate the camera's up vector around the view axis, which
-    // tilts the OrbitControls horizon.
+    // tilts the OrbitControls horizon. In orient mode, roll the model itself
+    // (about the view axis) so the roll becomes part of the saved rotation.
     if (rollKeys.ccw || rollKeys.cw) {
       const rollAng = ((rollKeys.ccw ? 1 : 0) - (rollKeys.cw ? 1 : 0)) * 1.4 * dt;
       camera.getWorldDirection(_flyFwd);
-      camera.up.applyAxisAngle(_flyFwd, rollAng);
+      if (orientMode && currentModel) {
+        currentModel.quaternion.premultiply(
+          new THREE.Quaternion().setFromAxisAngle(_flyFwd, -rollAng)
+        );
+        recenterModel();
+      } else {
+        camera.up.applyAxisAngle(_flyFwd, rollAng);
+      }
     }
     controls.update();
   }
