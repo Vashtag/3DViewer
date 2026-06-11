@@ -558,7 +558,7 @@ body {
 .edit-group-body.hidden { display: none; }
 
 /* ── Orient model controls ── */
-#orient-toggle, #orient-save {
+#orient-toggle, #orient-save, #orient-download {
   width: 100%;
   padding: 8px 8px;
   border-radius: 8px;
@@ -570,10 +570,15 @@ body {
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
-#orient-toggle:hover, #orient-save:hover {
+#orient-toggle:hover, #orient-save:hover, #orient-download:hover {
   border-color: var(--accent);
   color: var(--text);
   background: #1e2540;
+}
+#orient-save { margin-bottom: 6px; }
+#orient-save.saved {
+  border-color: #3ec98a;
+  color: #6ee0a8;
 }
 #orient-toggle.active {
   background: rgba(124, 90, 255, 0.2);
