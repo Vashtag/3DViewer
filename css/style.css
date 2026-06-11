@@ -525,6 +525,36 @@ body {
 #viewer-container.line-draw-mode   #viewer-canvas { cursor: crosshair; }
 #viewer-container.orient-mode      #viewer-canvas { cursor: move; }
 
+/* Centering guides — only visible while orienting a model in edit mode. */
+#orient-guides {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  display: none;
+}
+#viewer-container.orient-mode #orient-guides { display: block; }
+.orient-guide-v, .orient-guide-h {
+  position: absolute;
+  background: rgba(124, 90, 255, 0.45);
+}
+.orient-guide-v {
+  left: 50%; top: 0; bottom: 0;
+  width: 1px; transform: translateX(-0.5px);
+}
+.orient-guide-h {
+  top: 50%; left: 0; right: 0;
+  height: 1px; transform: translateY(-0.5px);
+}
+.orient-guide-dot {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 10px; height: 10px;
+  border: 1.5px solid rgba(124, 90, 255, 0.9);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
 /* ── Edit-mode collapsible groups ── */
 .edit-group { margin-bottom: 8px; }
 .edit-group-toggle {
