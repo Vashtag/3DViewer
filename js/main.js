@@ -705,6 +705,7 @@ function buildViewButtons(model) {
 const CATEGORY_COLORS = {
   ligament: '#70d0ff',
   nerve:    '#f0e040',
+  nuclei:   '#e89020', // darker amber/orange, distinct from the bright nerve yellow
   vessel:   '#e04040',
   other:    '#a0a0b8',
   '':       '#4f7cff', // default / structure
