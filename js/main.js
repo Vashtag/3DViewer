@@ -476,11 +476,15 @@ function softenMaterials(object, brightness = 1) {
 // its current orientation. Driven by userData.centerLocal (computed once at
 // load, in rotation-independent local space) so re-orienting in edit mode
 // doesn't make the model drift off-centre.
+// Per-view pan offset (world space) applied on top of the centred position so
+// authors can nudge a model to line its anatomy up with the centring guides.
+const _orientOffset = new THREE.Vector3();
+
 function recenterModel() {
   const c = currentModel?.userData?.centerLocal;
   if (!c) return;
   const w = c.clone().applyQuaternion(currentModel.quaternion);
-  currentModel.position.copy(w.negate());
+  currentModel.position.copy(w.negate()).add(_orientOffset);
   currentModel.updateMatrixWorld(true);
 }
 
@@ -536,16 +540,17 @@ function setView(name) {
   const d = VIEW_DIRS[name];
   if (!d) return;
 
-  // Apply this view's saved model orientation, if one was authored.
+  // Apply this view's saved model orientation + pan offset, if authored.
   const saved = savedViews[name];
+  _orientOffset.set(...(Array.isArray(saved?.offset) ? saved.offset : [0, 0, 0]));
   if (saved && Array.isArray(saved.rotation)) {
     currentModel.rotation.set(
       THREE.MathUtils.degToRad(saved.rotation[0]),
       THREE.MathUtils.degToRad(saved.rotation[1]),
       THREE.MathUtils.degToRad(saved.rotation[2])
     );
-    recenterModel();
   }
+  recenterModel();
 
   if      (name === 'top')    camera.up.set(0, 0, -1);
   else if (name === 'bottom') camera.up.set(0, 0,  1);
@@ -575,6 +580,7 @@ async function loadRegion(region) {
 
   // Saved per-view orientation (authored in edit mode) overrides the default.
   savedViews = {};
+  _orientOffset.set(0, 0, 0);
   try {
     const res = await fetch(`models/${model.id}/${model.id}_view.json`, { cache: 'no-store' });
     if (res.ok) {
@@ -631,8 +637,9 @@ async function loadRegion(region) {
       currentModel = object;
       recenterModel();
       fitCameraToModel(object);
-      // If the first view has a saved zoom, frame the model with it.
-      if (savedViews[firstDir]?.zoom != null) setView(firstDir);
+      // If the first view was authored, frame the model with its saved
+      // zoom and pan offset.
+      if (savedViews[firstDir]) setView(firstDir);
       showViewerUI();
       loadLabels(model);
       initLineLayer();
@@ -1115,24 +1122,47 @@ function setOrientMode(on) {
 // Changing the dropdown snaps camera to that view (always, not just in orient mode).
 orientViewSel.addEventListener('change', () => setView(orientViewSel.value));
 
+// Left-drag rotates the model; right-drag (or Shift+left-drag) pans it so the
+// author can centre it against the guides.
 let _orientLast = null;
+let _orientPan  = false;
+const _camRight = new THREE.Vector3();
+const _camUp    = new THREE.Vector3();
 renderer.domElement.addEventListener('pointerdown', e => {
   if (!orientMode || !currentModel) return;
   _orientLast = { x: e.clientX, y: e.clientY };
+  _orientPan  = (e.button === 2 || e.shiftKey);
   e.preventDefault();
 });
+renderer.domElement.addEventListener('contextmenu', e => {
+  if (orientMode) e.preventDefault(); // allow right-drag panning without a menu
+});
 window.addEventListener('pointermove', e => {
-  if (!_orientLast || !currentModel) return;
+  if (_orientLast == null || !currentModel) return;
   const dx = e.clientX - _orientLast.x;
   const dy = e.clientY - _orientLast.y;
   _orientLast = { x: e.clientX, y: e.clientY };
+
+  if (_orientPan) {
+    // Convert pixel drag to a world-space shift in the camera's screen plane.
+    const dist   = camera.position.distanceTo(controls.target);
+    const vH     = 2 * dist * Math.tan((camera.fov * Math.PI / 180) / 2);
+    const perPx  = vH / renderer.domElement.clientHeight;
+    camera.matrixWorld.extractBasis(_camRight, _camUp, new THREE.Vector3());
+    _orientOffset
+      .addScaledVector(_camRight,  dx * perPx)
+      .addScaledVector(_camUp,    -dy * perPx);
+    recenterModel();
+    return;
+  }
+
   const k = 0.01; // radians per pixel
   currentModel.quaternion
     .premultiply(new THREE.Quaternion().setFromAxisAngle(_WORLD_Y, dx * k))
     .premultiply(new THREE.Quaternion().setFromAxisAngle(_WORLD_X, dy * k));
   recenterModel();
 });
-window.addEventListener('pointerup', () => { _orientLast = null; });
+window.addEventListener('pointerup', () => { _orientLast = null; _orientPan = false; });
 
 // Save the current model orientation + zoom for the selected view into the
 // in-memory savedViews accumulator. Download writes all saved views to file.
@@ -1149,6 +1179,7 @@ orientSave.addEventListener('click', () => {
       round(THREE.MathUtils.radToDeg(e.z)),
     ],
     zoom: round(camera.position.length()),
+    offset: [round(_orientOffset.x), round(_orientOffset.y), round(_orientOffset.z)],
   };
   // Brief "Saved ✓" confirmation on the button.
   const label = orientViewSel.options[orientViewSel.selectedIndex]?.text || name;
