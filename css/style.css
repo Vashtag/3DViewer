@@ -523,6 +523,53 @@ body {
 /* ── Edit mode cursors ── */
 #viewer-container.label-place-mode #viewer-canvas { cursor: crosshair; }
 #viewer-container.line-draw-mode   #viewer-canvas { cursor: crosshair; }
+#viewer-container.orient-mode      #viewer-canvas { cursor: move; }
+
+/* ── Orient model controls ── */
+#orient-toggle, #orient-save {
+  width: 100%;
+  padding: 8px 8px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+#orient-toggle:hover, #orient-save:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  background: #1e2540;
+}
+#orient-toggle.active {
+  background: rgba(124, 90, 255, 0.2);
+  color: #b39dff;
+  border-color: rgba(124, 90, 255, 0.55);
+}
+#orient-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 8px 0;
+}
+.orient-btn {
+  padding: 7px 6px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.orient-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  background: #1e2540;
+}
 
 /* Active state for Place label button */
 #label-place-btn.active {
