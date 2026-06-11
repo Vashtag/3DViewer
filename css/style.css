@@ -548,27 +548,31 @@ body {
   color: #b39dff;
   border-color: rgba(124, 90, 255, 0.55);
 }
-#orient-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin: 8px 0;
+#orient-view-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 4px;
 }
-.orient-btn {
-  padding: 7px 6px;
-  border-radius: 8px;
-  border: 1.5px solid var(--border);
-  background: transparent;
+#orient-view-row.hidden { display: none; }
+.orient-view-label {
+  font-size: 0.75rem;
   color: var(--text-muted);
-  font-size: 0.74rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  white-space: nowrap;
 }
-.orient-btn:hover {
-  border-color: var(--accent);
+#orient-view-select {
+  flex: 1;
+  padding: 5px 6px;
+  border-radius: 7px;
+  border: 1.5px solid var(--border);
+  background: var(--panel);
   color: var(--text);
-  background: #1e2540;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+#orient-view-select:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 /* Active state for Place label button */

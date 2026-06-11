@@ -87,15 +87,11 @@
           <!-- Author tools (only when the page URL contains ?edit) -->
           <div id="edit-section" class="hidden">
             <p class="sidebar-label">Orient model</p>
-            <p class="edit-hint-small">Drag the model to rotate it. Use the buttons for 90° flips. Position it so the anterior face points at you, then Save — this sets all anatomical views and applies for everyone.</p>
+            <p class="edit-hint-small">Pick a view, drag the model until it looks right, then save.</p>
             <button id="orient-toggle" type="button">Rotate model</button>
-            <div id="orient-grid">
-              <button class="orient-btn" data-axis="x" data-deg="-90" type="button" title="Tilt up">⤓ Tilt</button>
-              <button class="orient-btn" data-axis="x" data-deg="90"  type="button" title="Tilt down">⤒ Tilt</button>
-              <button class="orient-btn" data-axis="y" data-deg="-90" type="button" title="Turn left">⟲ Turn</button>
-              <button class="orient-btn" data-axis="y" data-deg="90"  type="button" title="Turn right">⟳ Turn</button>
-              <button class="orient-btn" data-axis="z" data-deg="-90" type="button" title="Roll left">⤺ Roll</button>
-              <button class="orient-btn" data-axis="z" data-deg="90"  type="button" title="Roll right">⤻ Roll</button>
+            <div id="orient-view-row" class="hidden">
+              <span class="orient-view-label">Viewing:</span>
+              <select id="orient-view-select"></select>
             </div>
             <button id="orient-save" type="button">Save orientation</button>
 
