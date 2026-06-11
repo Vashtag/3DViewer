@@ -115,10 +115,6 @@ const MODELS = [
     views: [
       { label: 'Anterior',  dir: 'front' },
       { label: 'Posterior', dir: 'back'  },
-      { label: 'Left',      dir: 'left'  },
-      { label: 'Right',     dir: 'right' },
-      { label: 'Superior',  dir: 'top'   },
-      { label: 'Inferior',  dir: 'bottom'},
     ],
   },
 ];
