@@ -1026,6 +1026,25 @@ editDownload.addEventListener('click', () => {
   URL.revokeObjectURL(a.href);
 });
 
+// ── Edit-mode collapsible groups ──────────────────────────
+// Each edit tool (Orient, Labels, Lines) lives behind its own toggle so the
+// sidebar stays short. Opening one collapses the others.
+document.querySelectorAll('.edit-group-toggle').forEach(toggle => {
+  toggle.addEventListener('click', () => {
+    const group = toggle.closest('.edit-group');
+    const body  = group.querySelector('.edit-group-body');
+    const open  = group.classList.contains('open');
+    document.querySelectorAll('.edit-group').forEach(g => {
+      g.classList.remove('open');
+      g.querySelector('.edit-group-body').classList.add('hidden');
+    });
+    if (!open) {
+      group.classList.add('open');
+      body.classList.remove('hidden');
+    }
+  });
+});
+
 // ── Orient model (edit mode) ──────────────────────────────
 // Drag or snap-rotate the model so its anatomical anterior faces +Z (the
 // camera in the default/Anterior view). Saving downloads <id>_view.json, which

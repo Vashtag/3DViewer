@@ -525,6 +525,38 @@ body {
 #viewer-container.line-draw-mode   #viewer-canvas { cursor: crosshair; }
 #viewer-container.orient-mode      #viewer-canvas { cursor: move; }
 
+/* ── Edit-mode collapsible groups ── */
+.edit-group { margin-bottom: 8px; }
+.edit-group-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.edit-group-toggle:hover {
+  border-color: var(--accent);
+  background: #1e2540;
+}
+.edit-group-caret {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  transition: transform 0.15s;
+}
+.edit-group.open .edit-group-caret { transform: rotate(90deg); }
+.edit-group-body {
+  padding: 8px 2px 2px;
+}
+.edit-group-body.hidden { display: none; }
+
 /* ── Orient model controls ── */
 #orient-toggle, #orient-save {
   width: 100%;
