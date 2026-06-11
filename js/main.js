@@ -1091,7 +1091,6 @@ function setOrientMode(on) {
   orientMode = on;
   orientToggle.classList.toggle('active', on);
   container.classList.toggle('orient-mode', on);
-  orientViewRow.classList.toggle('hidden', !on);
   if (on) {
     setLabelPlacementMode(false);
     setLineDrawing(false);
@@ -1102,8 +1101,7 @@ function setOrientMode(on) {
     controls.enableRotate = false;
     controls.enablePan = false;
     controls.enableZoom = true;
-    // Snap camera to the currently-selected view so the user sees
-    // which anatomical direction they're looking at.
+    // Snap camera to the currently-selected view.
     setView(orientViewSel.value);
   } else {
     controls.enableRotate = true;
@@ -1114,10 +1112,8 @@ function setOrientMode(on) {
 }
 orientToggle.addEventListener('click', () => setOrientMode(!orientMode));
 
-// When the user picks a different view from the dropdown, snap camera to it.
-orientViewSel.addEventListener('change', () => {
-  if (orientMode) setView(orientViewSel.value);
-});
+// Changing the dropdown snaps camera to that view (always, not just in orient mode).
+orientViewSel.addEventListener('change', () => setView(orientViewSel.value));
 
 let _orientLast = null;
 renderer.domElement.addEventListener('pointerdown', e => {
