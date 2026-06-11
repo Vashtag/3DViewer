@@ -39,7 +39,6 @@ const editDownload    = document.getElementById('edit-download');
 const lineDrawBtn     = document.getElementById('line-draw-btn');
 const lineFinishBtn   = document.getElementById('line-finish-btn');
 const pinBtn          = document.getElementById('pin-btn');
-const orientToggle    = document.getElementById('orient-toggle');
 const orientSave      = document.getElementById('orient-save');
 const orientDownload  = document.getElementById('orient-download');
 const orientViewRow   = document.getElementById('orient-view-row');
@@ -1061,10 +1060,13 @@ document.querySelectorAll('.edit-group-toggle').forEach(toggle => {
       g.classList.remove('open');
       g.querySelector('.edit-group-body').classList.add('hidden');
     });
-    if (!open) {
+    const nowOpen = !open;
+    if (nowOpen) {
       group.classList.add('open');
       body.classList.remove('hidden');
     }
+    // Orienting is implicit: it's on whenever the Orient group is open.
+    setOrientMode(nowOpen && toggle.dataset.group === 'orient');
   });
 });
 
@@ -1089,7 +1091,6 @@ function populateOrientViewSelect(model) {
 
 function setOrientMode(on) {
   orientMode = on;
-  orientToggle.classList.toggle('active', on);
   container.classList.toggle('orient-mode', on);
   if (on) {
     setLabelPlacementMode(false);
@@ -1110,7 +1111,6 @@ function setOrientMode(on) {
     controls.enabled = (navMode === 'orbit' && !dragging);
   }
 }
-orientToggle.addEventListener('click', () => setOrientMode(!orientMode));
 
 // Changing the dropdown snaps camera to that view (always, not just in orient mode).
 orientViewSel.addEventListener('change', () => setView(orientViewSel.value));
