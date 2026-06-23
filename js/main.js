@@ -61,6 +61,24 @@ mobileMenuBtn.addEventListener('click', () =>
 );
 sidebarBackdrop.addEventListener('click', closeDrawer);
 
+// ── Settings panel (top-right gear) ───────────────────────
+const settingsBtn      = document.getElementById('settings-btn');
+const settingsPanel    = document.getElementById('settings-panel');
+const colorblindToggle = document.getElementById('colorblind-toggle');
+
+settingsBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  settingsPanel.classList.toggle('hidden');
+});
+document.addEventListener('click', e => {
+  if (!settingsPanel.classList.contains('hidden')
+      && !settingsPanel.contains(e.target) && e.target !== settingsBtn) {
+    settingsPanel.classList.add('hidden');
+  }
+});
+// Colour-blind toggle behaviour is wired up further down, once the
+// category colour schemes are defined.
+
 // ── Model catalogue ───────────────────────────────────────
 // To add a model: convert your OBJ to a Draco GLB (see tools/README.md),
 // drop it in models/<id>/<id>.glb, then add one entry here.
@@ -757,14 +775,58 @@ function buildViewButtons(model) {
 // ── Annotations / labels ─────────────────────────────────
 // Author tools appear only when the URL contains ?edit (hidden from students).
 
-const CATEGORY_COLORS = {
-  ligament: '#70d0ff',
-  nerve:    '#f0e040',
-  nuclei:   '#e89020', // darker amber/orange, distinct from the bright nerve yellow
-  vessel:   '#e04040',
-  other:    '#a0a0b8',
-  '':       '#4f7cff', // default / structure
+const CATEGORY_COLOR_SCHEMES = {
+  normal: {
+    ligament: '#70d0ff',
+    nerve:    '#f0e040',
+    nuclei:   '#e89020', // darker amber/orange, distinct from the bright nerve yellow
+    vessel:   '#e04040',
+    other:    '#a0a0b8',
+    '':       '#4f7cff', // default / structure
+  },
+  // Okabe–Ito inspired palette: avoids hues that are hard to tell apart
+  // under red-green colour vision deficiency.
+  colorblind: {
+    ligament: '#56b4e9', // sky blue
+    nerve:    '#f0e442', // yellow
+    nuclei:   '#e69f00', // orange
+    vessel:   '#cc79a7', // reddish purple
+    other:    '#999999', // neutral grey
+    '':       '#0072b2', // blue
+  },
 };
+
+let colorblindMode = localStorage.getItem('colorblindMode') === '1';
+function categoryColors() {
+  return colorblindMode ? CATEGORY_COLOR_SCHEMES.colorblind : CATEGORY_COLOR_SCHEMES.normal;
+}
+
+// Re-colours every category-driven swatch: placed label dots, the show-
+// labels filter legend, and the add-label category picker.
+function applyCategoryColorScheme() {
+  const colors = categoryColors();
+  document.querySelectorAll('.anno-label[data-category]').forEach(el => {
+    const dot = el.querySelector('.anno-dot');
+    if (dot) dot.style.background = colors[el.dataset.category] ?? colors[''];
+  });
+  document.querySelectorAll('.cat-filter-row[data-filter-cat]').forEach(row => {
+    const ind = row.querySelector('.cat-indicator');
+    if (ind) ind.style.background = colors[row.dataset.filterCat] ?? colors[''];
+  });
+  document.querySelectorAll('#label-modal-cats .lcat-option').forEach(opt => {
+    const input = opt.querySelector('input[name="lcat"]');
+    const dot = opt.querySelector('.lcat-dot');
+    if (input && dot) dot.style.background = colors[input.value] ?? colors[''];
+  });
+}
+
+colorblindToggle.checked = colorblindMode;
+colorblindToggle.addEventListener('change', () => {
+  colorblindMode = colorblindToggle.checked;
+  localStorage.setItem('colorblindMode', colorblindMode ? '1' : '0');
+  applyCategoryColorScheme();
+});
+applyCategoryColorScheme();
 
 function addLabel(name, localPos, category = '', record = true) {
   if (!labelLayer) return;
@@ -778,7 +840,7 @@ function addLabel(name, localPos, category = '', record = true) {
   el.dataset.category = category;
   const dot = document.createElement('span');
   dot.className = 'anno-dot';
-  dot.style.background = CATEGORY_COLORS[category] ?? CATEGORY_COLORS[''];
+  dot.style.background = categoryColors()[category] ?? categoryColors()[''];
   const leader = document.createElement('span'); leader.className = 'anno-leader';
   const content = document.createElement('span'); content.className = 'anno-content';
   const txt = document.createElement('span'); txt.className = 'anno-text'; txt.textContent = name;

@@ -11,8 +11,19 @@
   <div id="app">
     <!-- Header -->
     <header id="header">
-      <h1>Anatomy Lab 3D Viewer</h1>
-      <p class="subtitle">University of Waterloo</p>
+      <div id="header-titles">
+        <h1>Anatomy Lab 3D Viewer</h1>
+        <p class="subtitle">University of Waterloo</p>
+      </div>
+      <div id="settings-wrap">
+        <button id="settings-btn" type="button" aria-label="Settings" title="Settings">&#9881;</button>
+        <div id="settings-panel" class="hidden">
+          <label class="settings-row">
+            <input type="checkbox" id="colorblind-toggle">
+            Colour-blind safe mode
+          </label>
+        </div>
+      </div>
     </header>
 
     <!-- Body: sidebar + viewer -->
