@@ -66,6 +66,7 @@ const settingsBtn        = document.getElementById('settings-btn');
 const settingsModal      = document.getElementById('settings-modal');
 const settingsModalClose = document.getElementById('settings-modal-close');
 const colorblindToggle    = document.getElementById('colorblind-toggle');
+const autorotateToggle    = document.getElementById('autorotate-toggle');
 
 settingsBtn.addEventListener('click', () => settingsModal.classList.remove('hidden'));
 settingsModalClose.addEventListener('click', () => settingsModal.classList.add('hidden'));
@@ -180,7 +181,14 @@ scene.add(backLight);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.07;
+controls.autoRotate = false;
+controls.autoRotateSpeed = 1.2;
 // min/max distance are set per-model in fitCameraToModel.
+
+autorotateToggle.checked = false;
+autorotateToggle.addEventListener('change', () => {
+  controls.autoRotate = autorotateToggle.checked;
+});
 
 // ── Fly mode (first-person WASD navigation) ──────────────
 // PointerLockControls: click the viewer to capture the mouse for looking,
