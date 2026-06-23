@@ -69,6 +69,9 @@ sidebarBackdrop.addEventListener('click', closeDrawer);
 //   views:    the shortcut buttons under the gizmo — { label, dir } where dir
 //             is the camera direction (front/back/left/right/top/bottom).
 //             Omit to use DEFAULT_VIEWS.
+//   category: optional group name (e.g. "Central Nervous System") — models
+//             sharing a category are nested under one expandable region
+//             group instead of listed as a top-level region button.
 const DEFAULT_VIEWS = [
   { label: 'Anterior',  dir: 'front' },
   { label: 'Posterior', dir: 'back'  },
@@ -110,6 +113,7 @@ const MODELS = [
   },
   {
     id: 'brainstem', label: 'Brainstem', file: 'models/brainstem/brainstem.glb',
+    category: 'Central Nervous System',
     rotation: [0, 0, 0],
     brightness: 2.2,
     views: [
@@ -655,7 +659,10 @@ async function loadRegion(region) {
 }
 
 // ── Region buttons (generated from MODELS) ───────────────
-MODELS.forEach(model => {
+// Models with no `category` are listed directly; models sharing a category
+// are nested under one expandable group button (e.g. "Central Nervous
+// System" containing Brainstem, with room for more CNS models later).
+function makeRegionButton(model) {
   const btn = document.createElement('button');
   btn.className = 'region-btn';
   btn.dataset.region = model.id;
@@ -666,7 +673,37 @@ MODELS.forEach(model => {
     loadRegion(model.id);
     closeDrawer();
   });
-  regionSelector.appendChild(btn);
+  return btn;
+}
+
+const regionCategories = new Map(); // category name -> [models]
+MODELS.forEach(model => {
+  if (!model.category) { regionSelector.appendChild(makeRegionButton(model)); return; }
+  if (!regionCategories.has(model.category)) regionCategories.set(model.category, []);
+  regionCategories.get(model.category).push(model);
+});
+
+regionCategories.forEach((models, categoryName) => {
+  const group = document.createElement('div');
+  group.className = 'region-group';
+
+  const toggle = document.createElement('button');
+  toggle.className = 'region-group-toggle';
+  toggle.type = 'button';
+  toggle.innerHTML = `<span>${categoryName}</span><span class="region-group-caret">▸</span>`;
+
+  const body = document.createElement('div');
+  body.className = 'region-group-body hidden';
+  models.forEach(model => body.appendChild(makeRegionButton(model)));
+
+  toggle.addEventListener('click', () => {
+    const open = group.classList.toggle('open');
+    body.classList.toggle('hidden', !open);
+  });
+
+  group.appendChild(toggle);
+  group.appendChild(body);
+  regionSelector.appendChild(group);
 });
 
 // ── Reset view ────────────────────────────────────────────
