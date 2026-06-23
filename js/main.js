@@ -113,7 +113,7 @@ const MODELS = [
   },
   {
     id: 'brainstem', label: 'Brainstem', file: 'models/brainstem/brainstem.glb',
-    category: 'Central Nervous System',
+    category: 'CNS',
     rotation: [0, 0, 0],
     brightness: 2.2,
     views: [
@@ -660,8 +660,17 @@ async function loadRegion(region) {
 
 // ── Region buttons (generated from MODELS) ───────────────
 // Models with no `category` are listed directly; models sharing a category
-// are nested under one expandable group button (e.g. "Central Nervous
-// System" containing Brainstem, with room for more CNS models later).
+// are nested under one expandable group button (e.g. "CNS" containing
+// Brainstem, with room for more CNS models later). Only one thing — a
+// top-level region, or one group — is ever highlighted/open at a time.
+function closeAllRegionGroups(except) {
+  regionSelector.querySelectorAll('.region-group.open').forEach(g => {
+    if (g === except) return;
+    g.classList.remove('open');
+    g.querySelector('.region-group-body').classList.add('hidden');
+  });
+}
+
 function makeRegionButton(model) {
   const btn = document.createElement('button');
   btn.className = 'region-btn';
@@ -670,6 +679,9 @@ function makeRegionButton(model) {
   btn.addEventListener('click', () => {
     regionSelector.querySelectorAll('.region-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
+    // Closing unrelated groups keeps the picked model's own group open
+    // (if it's nested) while making sure nothing else stays highlighted.
+    closeAllRegionGroups(btn.closest('.region-group'));
     loadRegion(model.id);
     closeDrawer();
   });
@@ -697,8 +709,14 @@ regionCategories.forEach((models, categoryName) => {
   models.forEach(model => body.appendChild(makeRegionButton(model)));
 
   toggle.addEventListener('click', () => {
-    const open = group.classList.toggle('open');
-    body.classList.toggle('hidden', !open);
+    const wasOpen = group.classList.contains('open');
+    closeAllRegionGroups();
+    if (!wasOpen) {
+      group.classList.add('open');
+      body.classList.remove('hidden');
+      // Opening a group deselects any active top-level region.
+      regionSelector.querySelectorAll('.region-btn').forEach(b => b.classList.remove('active'));
+    }
   });
 
   group.appendChild(toggle);
