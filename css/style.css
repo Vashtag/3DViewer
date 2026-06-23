@@ -103,6 +103,53 @@ body {
   color: var(--text);
 }
 
+/* ── Region groups (e.g. "Central Nervous System") ── */
+.region-group { display: flex; flex-direction: column; }
+
+.region-group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.region-group-toggle:hover {
+  background: #232739;
+  color: var(--text);
+}
+
+.region-group.open .region-group-toggle {
+  border-color: var(--accent);
+  background: #1e2540;
+}
+
+.region-group-caret {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  transition: transform 0.15s;
+}
+
+.region-group.open .region-group-caret { transform: rotate(90deg); }
+
+.region-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 0 0 10px;
+}
+
+.region-group-body.hidden { display: none; }
+
 /* ── Display controls ── */
 #display-controls.hidden { display: none; }
 #display-controls .sidebar-label { margin-top: 22px; }
