@@ -61,20 +61,17 @@ mobileMenuBtn.addEventListener('click', () =>
 );
 sidebarBackdrop.addEventListener('click', closeDrawer);
 
-// ── Settings panel (top-right gear) ───────────────────────
-const settingsBtn      = document.getElementById('settings-btn');
-const settingsPanel    = document.getElementById('settings-panel');
-const colorblindToggle = document.getElementById('colorblind-toggle');
+// ── Settings modal (top-right gear) ───────────────────────
+const settingsBtn        = document.getElementById('settings-btn');
+const settingsModal      = document.getElementById('settings-modal');
+const settingsModalClose = document.getElementById('settings-modal-close');
+const colorblindToggle    = document.getElementById('colorblind-toggle');
+const autorotateToggle    = document.getElementById('autorotate-toggle');
 
-settingsBtn.addEventListener('click', e => {
-  e.stopPropagation();
-  settingsPanel.classList.toggle('hidden');
-});
-document.addEventListener('click', e => {
-  if (!settingsPanel.classList.contains('hidden')
-      && !settingsPanel.contains(e.target) && e.target !== settingsBtn) {
-    settingsPanel.classList.add('hidden');
-  }
+settingsBtn.addEventListener('click', () => settingsModal.classList.remove('hidden'));
+settingsModalClose.addEventListener('click', () => settingsModal.classList.add('hidden'));
+settingsModal.addEventListener('click', e => {
+  if (e.target === settingsModal) settingsModal.classList.add('hidden');
 });
 // Colour-blind toggle behaviour is wired up further down, once the
 // category colour schemes are defined.
@@ -184,7 +181,14 @@ scene.add(backLight);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.07;
+controls.autoRotate = false;
+controls.autoRotateSpeed = 1.2;
 // min/max distance are set per-model in fitCameraToModel.
+
+autorotateToggle.checked = false;
+autorotateToggle.addEventListener('change', () => {
+  controls.autoRotate = autorotateToggle.checked;
+});
 
 // ── Fly mode (first-person WASD navigation) ──────────────
 // PointerLockControls: click the viewer to capture the mouse for looking,

@@ -15,16 +15,26 @@
         <h1>Anatomy Lab 3D Viewer</h1>
         <p class="subtitle">University of Waterloo</p>
       </div>
-      <div id="settings-wrap">
-        <button id="settings-btn" type="button" aria-label="Settings" title="Settings">&#9881;</button>
-        <div id="settings-panel" class="hidden">
-          <label class="settings-row">
-            <input type="checkbox" id="colorblind-toggle">
-            Colour-blind safe mode
-          </label>
+      <button id="settings-btn" type="button" aria-label="Settings" title="Settings">&#9881;</button>
+    </header>
+
+    <!-- Settings modal -->
+    <div id="settings-modal" class="hidden">
+      <div id="settings-modal-box">
+        <p class="modal-title">Settings</p>
+        <label class="settings-row">
+          <input type="checkbox" id="colorblind-toggle">
+          Colour-blind safe mode
+        </label>
+        <label class="settings-row">
+          <input type="checkbox" id="autorotate-toggle">
+          Auto-rotate model
+        </label>
+        <div id="settings-modal-actions">
+          <button id="settings-modal-close" type="button">Close</button>
         </div>
       </div>
-    </header>
+    </div>
 
     <!-- Body: sidebar + viewer -->
     <div id="body">
