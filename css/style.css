@@ -986,6 +986,12 @@ body {
   background: rgba(30, 37, 64, 0.75);
 }
 
+/* Long-labelled preset views (e.g. the pelvis "Anatomical Position") span the
+   full two-column grid so the text fits on one line. */
+.view-btn.view-btn-wide {
+  grid-column: 1 / -1;
+}
+
 #reset-btn, #screenshot-btn, #pin-btn {
   padding: 8px 14px;
   border-radius: var(--radius);

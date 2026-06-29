@@ -109,11 +109,15 @@ const MODELS = [
     id: 'pelvis', label: 'Pelvis', file: 'models/pelvis/pelvis.glb',
     rotation: [0, 0, 6], // level out the roll so the anterior view sits straight
     // Left/Right are swapped so each button shows the opposite anatomical side.
+    // "Anatomical Position" is a pelvis-only preset view: orient it in edit mode
+    // (?edit → Orient → pick "Anatomical Position" → Save → Download) so the
+    // saved rotation lands in models/pelvis/pelvis_view.json for everyone.
     views: [
       { label: 'Anterior',  dir: 'front' },
       { label: 'Posterior', dir: 'back'  },
       { label: 'Left',      dir: 'right' },
       { label: 'Right',     dir: 'left'  },
+      { label: 'Anatomical Position', dir: 'anatomical' },
     ],
   },
   {
@@ -553,6 +557,9 @@ const VIEW_DIRS = {
   right:  [ 1,  0,  0],
   top:    [ 0,  1,  0],
   bottom: [ 0, -1,  0],
+  // Custom preset views (e.g. the pelvis "Anatomical Position") view from the
+  // front; the saved per-view rotation does the actual orienting.
+  anatomical: [ 0,  0,  1],
 };
 
 // Per-view saved orientation, loaded from <id>_view.json. Keyed by view dir:
@@ -767,6 +774,9 @@ function buildViewButtons(model) {
   views.forEach(v => {
     const btn = document.createElement('button');
     btn.className = 'view-btn';
+    // Long-labelled preset views span the full grid row instead of wrapping
+    // inside a narrow half-width cell.
+    if (v.label.length > 10) btn.classList.add('view-btn-wide');
     btn.textContent = v.label;
     btn.addEventListener('click', () => {
       if (navMode === 'fly') setNavMode('orbit');
