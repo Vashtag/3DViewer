@@ -1,0 +1,92 @@
+{
+  "anatomical": {
+    "rotation": [
+      87.41,
+      28.66,
+      -78.09
+    ],
+    "zoom": 534.68,
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "cameraUp": [
+      0,
+      1,
+      0
+    ]
+  },
+  "front": {
+    "rotation": [
+      0,
+      0,
+      6
+    ],
+    "zoom": 482.55,
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "cameraUp": [
+      0,
+      1,
+      0
+    ]
+  },
+  "back": {
+    "rotation": [
+      0,
+      0,
+      6
+    ],
+    "zoom": 507.94,
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "cameraUp": [
+      0,
+      1,
+      0
+    ]
+  },
+  "right": {
+    "rotation": [
+      0,
+      0,
+      6
+    ],
+    "zoom": 562.82,
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "cameraUp": [
+      0,
+      1,
+      0
+    ]
+  },
+  "left": {
+    "rotation": [
+      0,
+      0,
+      6
+    ],
+    "zoom": 562.82,
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "cameraUp": [
+      0,
+      1,
+      0
+    ]
+  }
+}
