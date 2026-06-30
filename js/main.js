@@ -585,9 +585,15 @@ function setView(name) {
   }
   recenterModel();
 
-  if      (name === 'top')    camera.up.set(0, 0, -1);
-  else if (name === 'bottom') camera.up.set(0, 0,  1);
-  else                         camera.up.set(0, 1,  0);
+  if (saved?.cameraUp) {
+    camera.up.set(...saved.cameraUp);
+  } else if (name === 'top') {
+    camera.up.set(0, 0, -1);
+  } else if (name === 'bottom') {
+    camera.up.set(0, 0,  1);
+  } else {
+    camera.up.set(0, 1,  0);
+  }
 
   const dist = saved?.zoom
             ?? (camera._defaultPos ? camera._defaultPos.length()
@@ -1316,6 +1322,7 @@ orientSave.addEventListener('click', () => {
     ],
     zoom: round(camera.position.length()),
     offset: [round(_orientOffset.x), round(_orientOffset.y), round(_orientOffset.z)],
+    cameraUp: [round(camera.up.x), round(camera.up.y), round(camera.up.z)],
   };
   // Brief "Saved ✓" confirmation on the button.
   const label = orientViewSel.options[orientViewSel.selectedIndex]?.text || name;
