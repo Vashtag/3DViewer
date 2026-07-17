@@ -36,6 +36,20 @@ body {
   gap: 12px;
 }
 
+/* Logo + titles, grouped at the top-left of the header. */
+#header-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+#header-logo {
+  height: 38px;
+  width: auto;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
 #header h1 {
   font-size: 1.1rem;
   font-weight: 600;
@@ -1217,6 +1231,8 @@ body {
   /* Compact header */
   #header { padding: 9px 14px; }
   #header h1 { font-size: 0.95rem; }
+  #header-brand { gap: 9px; }
+  #header-logo { height: 30px; }
   .subtitle { display: none; }
 
   /* Viewer takes full width — sidebar is an overlay */
