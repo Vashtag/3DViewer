@@ -195,9 +195,6 @@ renderer.setClearColor(0x000000, 0); // fully transparent
 // ── Scene & Camera ────────────────────────────────────────
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000);
-window.__cam = camera;
-window.__cam = camera;
-window.__cam = camera;
 
 // ── Lighting ──────────────────────────────────────────────
 // Matched to overhead fluorescent lab lighting: bright cool-white from
@@ -227,7 +224,6 @@ scene.add(backLight);
 
 // ── OrbitControls ─────────────────────────────────────────
 const controls = new OrbitControls(camera, renderer.domElement);
-window.__controls = controls;
 controls.enableDamping = true;
 controls.dampingFactor = 0.07;
 controls.autoRotate = false;
