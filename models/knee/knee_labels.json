@@ -1,0 +1,131 @@
+{
+  "labels": [
+    {
+      "name": "Anterior Cruciate Ligament",
+      "position": [
+        6.822691626173376,
+        -1.2217714765692715,
+        26.23362946807876
+      ],
+      "category": "ligament"
+    },
+    {
+      "name": "Posterior Cruciate Ligament",
+      "position": [
+        13.36839601139286,
+        17.01145256148618,
+        3.0809961662311576
+      ],
+      "category": "ligament"
+    },
+    {
+      "name": "Lateral Collateral Ligament",
+      "position": [
+        -29.632714848369858,
+        5.738826256609843,
+        4.79473917408685
+      ],
+      "category": "ligament"
+    },
+    {
+      "name": "Medial Collateral Ligament",
+      "position": [
+        47.58183690173942,
+        -1.7342990254663455,
+        3.3724587963704806
+      ],
+      "category": "ligament"
+    },
+    {
+      "name": "Sciatic Nerve",
+      "position": [
+        -4.733981153054664,
+        122.80246894911085,
+        11.021080884655724
+      ],
+      "category": "nerve"
+    },
+    {
+      "name": "Tibial Nerve",
+      "position": [
+        -0.7028736548621239,
+        62.278685217310944,
+        11.27284850719343
+      ],
+      "category": "nerve"
+    },
+    {
+      "name": "Common Fibular Nerve",
+      "position": [
+        -12.633646215024086,
+        45.71078541899159,
+        8.125537749952855
+      ],
+      "category": "nerve"
+    },
+    {
+      "name": "Lateral Meniscus",
+      "position": [
+        -12.470086316243687,
+        8.019631627424147,
+        -9.473330085214371
+      ],
+      "category": ""
+    },
+    {
+      "name": "Medial Meniscus",
+      "position": [
+        30.596870011708898,
+        6.776738882908661,
+        -13.399294705067904
+      ],
+      "category": ""
+    },
+    {
+      "name": "Posterior Tibial Artery",
+      "position": [
+        8.331618332265883,
+        -61.471592201227374,
+        -44.597291930144856
+      ],
+      "category": "vessel"
+    },
+    {
+      "name": "Anterior Tibial Artery",
+      "position": [
+        -8.927175143205442,
+        -46.492385776756905,
+        -27.45029329428867
+      ],
+      "category": "vessel"
+    },
+    {
+      "name": "Fibular Artery",
+      "position": [
+        -0.3238406288828948,
+        -67.27118433881051,
+        -43.16119325333937
+      ],
+      "category": "vessel"
+    },
+    {
+      "name": "Superficial Fibular Nerve",
+      "position": [
+        -20.82904958968423,
+        -65.19953718989353,
+        -37.51133529466043
+      ],
+      "category": "nerve"
+    },
+    {
+      "name": "Deep Fibular Nerve",
+      "position": [
+        -16.672404264700376,
+        -57.84921524476328,
+        -29.98532130249025
+      ],
+      "category": "nerve"
+    }
+  ],
+  "lines": []
+}
