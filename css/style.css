@@ -1197,31 +1197,41 @@ body {
 }
 
 #controls-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  pointer-events: none;
   font-size: 0.75rem;
   color: var(--text-muted);
-  background: rgba(26, 29, 39, 0.7);
-  padding: 6px 14px;
-  border-radius: 20px;
-  pointer-events: none;
-  white-space: nowrap;
-  backdrop-filter: blur(6px);
 }
 
 #controls-hint.hidden { display: none; }
 
-/* The extra tips (everything after "Q / E to roll") collapse away a few seconds
-   after the orbit hint appears, leaving just the roll tip. */
-.hint-fade {
-  display: inline-block;
-  vertical-align: bottom;
-  overflow: hidden;
-  max-width: 60ch; /* comfortably fits the full tip list; collapses to 0 on fade */
+/* Two stacked pills: the upper .hint-fade (scroll / right-drag) sits above the
+   lower .hint-keep essentials (Q/E to roll, drag to rotate). */
+.hint-fade, .hint-keep {
+  background: rgba(26, 29, 39, 0.7);
+  padding: 6px 14px;
+  border-radius: 20px;
   white-space: nowrap;
-  transition: opacity 0.6s ease, max-width 0.6s ease;
+  backdrop-filter: blur(6px);
+}
+
+/* The upper tips collapse away a few seconds after the orbit hint appears,
+   leaving just the essentials line. */
+.hint-fade {
+  margin-bottom: 6px;
+  overflow: hidden;
+  max-height: 2.4em;
+  transition: opacity 0.5s ease, max-height 0.5s ease,
+              padding 0.5s ease, margin 0.5s ease;
 }
 #controls-hint.hint-faded .hint-fade {
   opacity: 0;
-  max-width: 0;
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-bottom: 0;
 }
 
 .divider { margin: 0 6px; opacity: 0.4; }

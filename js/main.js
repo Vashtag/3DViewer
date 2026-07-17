@@ -2019,18 +2019,15 @@ function updateHint(locked = flyControls.isLocked) {
   if (navMode === 'fly') {
     clearTimeout(_hintFadeTimer);
     controlsHint.classList.remove('hint-faded'); // fly guidance stays fully visible
-    controlsHint.innerHTML = locked
+    controlsHint.innerHTML = '<span class="hint-keep">' + (locked
       ? 'WASD to move <span class="divider">·</span> Space / Shift to rise · descend <span class="divider">·</span> mouse to look <span class="divider">·</span> <strong>Press Esc to leave fly mode</strong>'
-      : 'Click the model to start flying <span class="divider">·</span> then press Esc to leave';
+      : 'Click the model to start flying <span class="divider">·</span> then press Esc to leave') + '</span>';
   } else {
-    // "Q / E to roll" is kept; the rest sits in .hint-fade and fades away.
+    // Upper line (scroll / right-drag) fades out; lower line (Q/E to roll, drag
+    // to rotate) stays as the essentials.
     controlsHint.innerHTML =
-      '<span class="hint-keep">Q / E to roll</span>' +
-      '<span class="hint-fade">' +
-        '<span class="divider">·</span> Drag to rotate ' +
-        '<span class="divider">·</span> Scroll to zoom ' +
-        '<span class="divider">·</span> Right-drag to pan' +
-      '</span>';
+      '<span class="hint-fade">Scroll to zoom <span class="divider">·</span> Right-drag to pan</span>' +
+      '<span class="hint-keep">Q / E to roll <span class="divider">·</span> Drag to rotate</span>';
     scheduleHintFade();
   }
 }
