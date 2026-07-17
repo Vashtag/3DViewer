@@ -46,6 +46,9 @@ const orientViewSel   = document.getElementById('orient-view-select');
 const mobileMenuBtn   = document.getElementById('mobile-menu-btn');
 const sidebarEl       = document.getElementById('sidebar');
 const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+const bodyEl              = document.getElementById('body');
+const sidebarCollapseBtn  = document.getElementById('sidebar-collapse-btn');
+const sidebarOpenBtn      = document.getElementById('sidebar-open-btn');
 
 // ── Mobile drawer ─────────────────────────────────────────
 function openDrawer()  {
@@ -60,6 +63,18 @@ mobileMenuBtn.addEventListener('click', () =>
   sidebarEl.classList.contains('open') ? closeDrawer() : openDrawer()
 );
 sidebarBackdrop.addEventListener('click', closeDrawer);
+
+// ── Sidebar collapse (desktop) ────────────────────────────
+// Hide the whole sidebar to give the model more room; a floating button on the
+// viewer brings it back. The choice sticks across sessions. The viewer's
+// ResizeObserver re-fits the canvas automatically when the column width changes.
+function setSidebarCollapsed(collapsed) {
+  bodyEl.classList.toggle('sidebar-collapsed', collapsed);
+  localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0');
+}
+sidebarCollapseBtn.addEventListener('click', () => setSidebarCollapsed(true));
+sidebarOpenBtn.addEventListener('click', () => setSidebarCollapsed(false));
+if (localStorage.getItem('sidebarCollapsed') === '1') setSidebarCollapsed(true);
 
 // ── Settings modal (top-right gear) ───────────────────────
 const settingsBtn        = document.getElementById('settings-btn');
