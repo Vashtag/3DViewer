@@ -7,7 +7,7 @@
   --accent: #4f7cff;
   --accent-hover: #6b93ff;
   --text: #e8eaf0;
-  --text-muted: #7a7f9a;
+  --text-muted: #8b90ab; /* ~5.3:1 on the sidebar surface — clears WCAG AA */
   --radius: 10px;
 }
 
@@ -1293,4 +1293,17 @@ body {
   /* Compact toolbar */
   #viewer-toolbar { top: 10px; right: 10px; gap: 8px; }
   #reset-btn { padding: 7px 11px; font-size: 0.8rem; }
+}
+
+/* ── Touch devices: enlarge small tap targets ── */
+/* Applies on any touch-primary device (phones and tablets), where fine
+   pointer precision isn't available. ~40px+ targets follow touch guidance. */
+@media (pointer: coarse) {
+  .bg-swatch { width: 34px; height: 34px; }
+  .view-btn { padding: 11px 8px; }
+  #reset-btn, #screenshot-btn, #pin-btn { padding: 11px 14px; }
+  #labels-toggle { padding-top: 11px; padding-bottom: 11px; }
+  .cat-filter-row, .lcat-option { padding: 4px 0; }
+  .settings-row input[type="checkbox"] { width: 18px; height: 18px; }
+  .settings-seg button { padding: 9px 0; min-width: 38px; }
 }
