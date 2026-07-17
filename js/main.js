@@ -227,6 +227,7 @@ scene.add(backLight);
 
 // ── OrbitControls ─────────────────────────────────────────
 const controls = new OrbitControls(camera, renderer.domElement);
+window.__controls = controls;
 controls.enableDamping = true;
 controls.dampingFactor = 0.07;
 controls.autoRotate = false;
@@ -625,10 +626,10 @@ let savedViews = {};
 // A preset view transition (_viewTween, declared up by the render loop) is
 // advanced each frame by animate(), letting a view glide into place (model
 // orientation + camera arc) instead of snapping. See setView(name, animate=true).
-// Motion is reduced when either the OS asks for it or the in-app setting is on.
-const _mediaReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+// Motion effects (this tween, orbit inertia) follow the explicit in-app
+// settings only — the OS prefers-reduced-motion flag is intentionally not read
+// live, so it never silently removes the animation or the drag-coast.
 let reducedMotionSetting = localStorage.getItem('reducedMotion') === '1';
-function reducedMotionActive() { return reducedMotionSetting || _mediaReducedMotion.matches; }
 
 // Whether preset-view changes glide (vs. snap). Its own setting, on by default,
 // independent of the OS reduce-motion flag so the transition still plays for
@@ -1006,9 +1007,9 @@ let performanceMode = localStorage.getItem('performance') === '1';
 
 const LABEL_SIZES = { s: '0.66rem', m: '0.78rem', l: '0.94rem' };
 
-// Reduced motion drops orbit damping (and, via reducedMotionActive(), skips the
-// preset-view tween). It also tracks live OS changes.
-function applyReducedMotion() { controls.enableDamping = !reducedMotionActive(); }
+// Reduced motion drops orbit damping (the coast-after-release inertia). Follows
+// the in-app setting only; the view-change animation has its own toggle.
+function applyReducedMotion() { controls.enableDamping = !reducedMotionSetting; }
 function applyLabelSize(size) {
   document.documentElement.style.setProperty('--label-font-size', LABEL_SIZES[size] || LABEL_SIZES.m);
   labelSizeSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.size === size));
@@ -1033,7 +1034,6 @@ reducedMotionToggle.addEventListener('change', () => {
   localStorage.setItem('reducedMotion', reducedMotionSetting ? '1' : '0');
   applyReducedMotion();
 });
-_mediaReducedMotion.addEventListener('change', applyReducedMotion);
 applyReducedMotion();
 
 // Show labels by default
