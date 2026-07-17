@@ -1215,7 +1215,7 @@ body {
   display: inline-block;
   vertical-align: bottom;
   overflow: hidden;
-  max-width: 40ch;
+  max-width: 60ch; /* comfortably fits the full tip list; collapses to 0 on fade */
   white-space: nowrap;
   transition: opacity 0.6s ease, max-width 0.6s ease;
 }
