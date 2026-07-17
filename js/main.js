@@ -195,6 +195,9 @@ renderer.setClearColor(0x000000, 0); // fully transparent
 // ── Scene & Camera ────────────────────────────────────────
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000);
+window.__cam = camera;
+window.__cam = camera;
+window.__cam = camera;
 
 // ── Lighting ──────────────────────────────────────────────
 // Matched to overhead fluorescent lab lighting: bright cool-white from
@@ -626,6 +629,11 @@ let savedViews = {};
 const _mediaReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 let reducedMotionSetting = localStorage.getItem('reducedMotion') === '1';
 function reducedMotionActive() { return reducedMotionSetting || _mediaReducedMotion.matches; }
+
+// Whether preset-view changes glide (vs. snap). Its own setting, on by default,
+// independent of the OS reduce-motion flag so the transition still plays for
+// users who have that enabled — they can turn it off explicitly in Settings.
+let animateViewsOn = localStorage.getItem('animateViews') !== '0';
 const VIEW_TWEEN_DUR = 0.6; // seconds
 
 // Computes the target camera/model state for a named view without applying it.
@@ -677,7 +685,7 @@ function setView(name, animate = false) {
   const target = _computeViewTarget(name);
   if (!target) return;
 
-  if (animate && !reducedMotionActive()) {
+  if (animate && animateViewsOn) {
     _viewTween = {
       t: 0,
       from: {
@@ -983,6 +991,7 @@ applyCategoryColorScheme();
 // ── Settings: accessibility / display / performance ───────
 // Each setting reads its saved value at startup, applies it, and persists on
 // change so choices stick across sessions.
+const animateViewsToggle  = document.getElementById('animate-views-toggle');
 const reducedMotionToggle = document.getElementById('reduced-motion-toggle');
 const labelsDefaultToggle = document.getElementById('labels-default-toggle');
 const hintToggle          = document.getElementById('hint-toggle');
@@ -1009,6 +1018,13 @@ function applyPerformanceMode(on) {
   renderer.setPixelRatio(on ? 1 : Math.min(window.devicePixelRatio, 2));
   resize(); // apply the new pixel ratio to the drawing buffer
 }
+
+// Animate view changes
+animateViewsToggle.checked = animateViewsOn;
+animateViewsToggle.addEventListener('change', () => {
+  animateViewsOn = animateViewsToggle.checked;
+  localStorage.setItem('animateViews', animateViewsOn ? '1' : '0');
+});
 
 // Reduce motion
 reducedMotionToggle.checked = reducedMotionSetting;
@@ -1063,6 +1079,9 @@ settingsReset.addEventListener('click', () => {
 
   autorotateToggle.checked = false; controls.autoRotate = false;
   localStorage.setItem('autorotate', '0');
+
+  animateViewsOn = true; animateViewsToggle.checked = true;
+  localStorage.setItem('animateViews', '1');
 
   reducedMotionSetting = false; reducedMotionToggle.checked = false;
   localStorage.setItem('reducedMotion', '0'); applyReducedMotion();
