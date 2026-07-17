@@ -22,9 +22,7 @@ const displayControls = document.getElementById('display-controls');
 const regionSelector  = document.getElementById('region-selector');
 const bgSwatches      = document.querySelectorAll('.bg-swatch');
 const viewButtons     = document.getElementById('view-buttons');
-const lightAzimuth    = document.getElementById('light-azimuth');
-const lightElevation  = document.getElementById('light-elevation');
-const lightReset      = document.getElementById('light-reset');
+const lightBrightness = document.getElementById('light-brightness');
 const navBtns         = document.querySelectorAll('.nav-btn');
 const labelsSection    = document.getElementById('labels-section');
 const labelsToggle     = document.getElementById('labels-toggle');
@@ -195,39 +193,47 @@ renderer.setClearColor(0x000000, 0); // fully transparent
 // ── Scene & Camera ────────────────────────────────────────
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000);
-window.__cam = camera;
-window.__cam = camera;
-window.__cam = camera;
 
 // ── Lighting ──────────────────────────────────────────────
-// Matched to overhead fluorescent lab lighting: bright cool-white from
-// above, high ambient to simulate the bounced light of a white-walled room,
-// and a soft low fill so undersides are still visible.
-const ambient = new THREE.AmbientLight(0xf0f4ff, 1.1); // cool, bright room
+// A fixed multi-directional rig lights the specimen from every side so no
+// orientation ever falls dark, plus a camera-following "headlamp" that keeps
+// whatever the student is looking at brightly lit. Only the headlamp is
+// adjustable (the Brightness slider); the rig is baked in.
+
+// Soft sky/ground ambient — gentle fill from all directions at once.
+const hemiLight = new THREE.HemisphereLight(0xf2f6ff, 0x4a4f60, 0.9);
+scene.add(hemiLight);
+
+// A low floor of flat ambient so nothing is ever pure black.
+const ambient = new THREE.AmbientLight(0xffffff, 0.22);
 scene.add(ambient);
 
-const keyLight = new THREE.DirectionalLight(0xffffff, 1.2); // overhead key
-keyLight.position.set(1, 5, 1); // roughly overhead — fine-tuned by sliders
-scene.add(keyLight);
+// Fixed directional accents from several directions give the surface form and
+// relief. They live in world space (added to the scene, not the model), so they
+// stay put as the model rotates — turning it always reveals a lit face.
+const RIG = [
+  { pos: [  3,  5,  3 ], color: 0xffffff, intensity: 0.45 }, // key: upper front-right
+  { pos: [ -4,  2, -1 ], color: 0xdde9ff, intensity: 0.30 }, // fill: upper back-left
+  { pos: [  4,  1, -2 ], color: 0xffffff, intensity: 0.22 }, // fill: right
+  { pos: [  0, -3,  1 ], color: 0xf0f4ff, intensity: 0.18 }, // subtle underside
+  { pos: [  0,  1.5,-5 ], color: 0xeaf2ff, intensity: 0.55 }, // back rim, lifts silhouette
+];
+RIG.forEach(l => {
+  const d = new THREE.DirectionalLight(l.color, l.intensity);
+  d.position.set(...l.pos);
+  scene.add(d);
+});
 
-const fillLight = new THREE.DirectionalLight(0xddeeff, 0.35); // soft side fill
-fillLight.position.set(-3, 1, -1);
-scene.add(fillLight);
-
-const backFill = new THREE.DirectionalLight(0xffffff, 0.2); // subtle under fill
-backFill.position.set(0, -2, -1);
-scene.add(backFill);
-
-// Fixed backlight: sits behind the model (−Z, slightly raised) to rim-light its
-// silhouette so it lifts off the dark background. Added to the scene (not the
-// model), so it stays put in world space and never rotates with the model.
-const backLight = new THREE.DirectionalLight(0xeaf2ff, 0.55);
-backLight.position.set(0, 1.5, -4);
-scene.add(backLight);
+// Headlamp: a directional light kept at the camera's position each frame (see
+// animate()), so it shines from the viewer toward the model — the facing
+// surface is always well-lit. Its intensity is the Brightness control. Target
+// defaults to the origin, where the model is kept centred.
+const HEADLAMP_DEFAULT = 0.9;
+const headlamp = new THREE.DirectionalLight(0xffffff, HEADLAMP_DEFAULT);
+scene.add(headlamp);
 
 // ── OrbitControls ─────────────────────────────────────────
 const controls = new OrbitControls(camera, renderer.domElement);
-window.__controls = controls;
 controls.enableDamping = true;
 controls.dampingFactor = 0.07;
 controls.autoRotate = false;
@@ -498,6 +504,9 @@ function animate() {
     camera.far  = dist * 200 + fitRadius * 4;
     camera.updateProjectionMatrix();
   }
+
+  // Keep the headlamp at the camera so the viewed face is always lit.
+  headlamp.position.copy(camera.position);
 
   renderer.render(scene, camera);
   labelRenderer.render(scene, camera);
@@ -2150,30 +2159,16 @@ function captureScreenshot() {
 
 screenshotBtn.addEventListener('click', captureScreenshot);
 
-// ── Lighting direction ────────────────────────────────────
-// The two sliders orbit the key light around the model. Azimuth spins it
-// horizontally; elevation raises/lowers it. The fill lights stay fixed so
-// there's always some ambient shape, but the dominant light follows the user.
-const LIGHT_DEFAULT = { azimuth: 0, elevation: 80 };
-
-function updateKeyLight() {
-  const az = THREE.MathUtils.degToRad(Number(lightAzimuth.value));
-  const el = THREE.MathUtils.degToRad(Number(lightElevation.value));
-  const r = 5;
-  keyLight.position.set(
-    r * Math.cos(el) * Math.sin(az),
-    r * Math.sin(el),
-    r * Math.cos(el) * Math.cos(az)
-  );
+// ── Brightness (headlamp intensity) ───────────────────────
+// The slider sets the camera headlamp's intensity — the one light students can
+// tune. The fixed rig keeps the specimen readable even at the minimum. Persisted
+// so the choice sticks across sessions.
+const storedBrightness = parseFloat(localStorage.getItem('brightness'));
+if (!Number.isNaN(storedBrightness)) {
+  headlamp.intensity = storedBrightness;
+  lightBrightness.value = storedBrightness;
 }
-
-lightAzimuth.addEventListener('input', updateKeyLight);
-lightElevation.addEventListener('input', updateKeyLight);
-
-lightReset.addEventListener('click', () => {
-  lightAzimuth.value = LIGHT_DEFAULT.azimuth;
-  lightElevation.value = LIGHT_DEFAULT.elevation;
-  updateKeyLight();
+lightBrightness.addEventListener('input', () => {
+  headlamp.intensity = Number(lightBrightness.value);
+  localStorage.setItem('brightness', lightBrightness.value);
 });
-
-updateKeyLight(); // sync key light to the slider defaults on startup
