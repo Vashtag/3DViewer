@@ -22,7 +22,6 @@ const displayControls = document.getElementById('display-controls');
 const regionSelector  = document.getElementById('region-selector');
 const bgSwatches      = document.querySelectorAll('.bg-swatch');
 const viewButtons     = document.getElementById('view-buttons');
-const lightBrightness = document.getElementById('light-brightness');
 const navBtns         = document.querySelectorAll('.nav-btn');
 const labelsSection    = document.getElementById('labels-section');
 const labelsToggle     = document.getElementById('labels-toggle');
@@ -2158,17 +2157,3 @@ function captureScreenshot() {
 }
 
 screenshotBtn.addEventListener('click', captureScreenshot);
-
-// ── Brightness (headlamp intensity) ───────────────────────
-// The slider sets the camera headlamp's intensity — the one light students can
-// tune. The fixed rig keeps the specimen readable even at the minimum. Persisted
-// so the choice sticks across sessions.
-const storedBrightness = parseFloat(localStorage.getItem('brightness'));
-if (!Number.isNaN(storedBrightness)) {
-  headlamp.intensity = storedBrightness;
-  lightBrightness.value = storedBrightness;
-}
-lightBrightness.addEventListener('input', () => {
-  headlamp.intensity = Number(lightBrightness.value);
-  localStorage.setItem('brightness', lightBrightness.value);
-});
