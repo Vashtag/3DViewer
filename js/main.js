@@ -188,6 +188,9 @@ controls.dampingFactor = 0.07;
 controls.autoRotate = false;
 controls.autoRotateSpeed = 1.2;
 // min/max distance are set per-model in fitCameraToModel.
+// If the user grabs the view mid-transition (drag / scroll), hand control back
+// immediately by cancelling any in-progress preset-view tween.
+controls.addEventListener('start', () => { _viewTween = null; });
 
 autorotateToggle.checked = false;
 autorotateToggle.addEventListener('change', () => {
@@ -391,6 +394,10 @@ const _ndc = new THREE.Vector2();
 // ── Render loop ───────────────────────────────────────────
 let fitRadius = 0; // bounding-sphere radius of current model
 
+// Active preset-view transition (see setView / _stepViewTween). Declared here,
+// before animate() first runs, so the render loop can read it safely.
+let _viewTween = null;
+
 const _gizmoDir = new THREE.Vector3();
 const _flyFwd   = new THREE.Vector3();
 const _flyRight = new THREE.Vector3();
@@ -432,6 +439,7 @@ function animate() {
         camera.up.applyAxisAngle(_flyFwd, rollAng);
       }
     }
+    _stepViewTween(dt); // glide toward a preset view, if one is in progress
     controls.update();
   }
 
@@ -568,39 +576,116 @@ const VIEW_DIRS = {
 // model orientation and zoom.
 let savedViews = {};
 
-function setView(name) {
-  if (!currentModel || !fitRadius) return;
+// A preset view transition (_viewTween, declared up by the render loop) is
+// advanced each frame by animate(), letting a view glide into place (model
+// orientation + camera arc) instead of snapping. See setView(name, animate=true).
+const _prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const VIEW_TWEEN_DUR = 0.6; // seconds
+
+// Computes the target camera/model state for a named view without applying it.
+function _computeViewTarget(name) {
   const d = VIEW_DIRS[name];
-  if (!d) return;
-
-  // Apply this view's saved model orientation + pan offset, if authored.
+  if (!d) return null;
   const saved = savedViews[name];
-  _orientOffset.set(...(Array.isArray(saved?.offset) ? saved.offset : [0, 0, 0]));
-  if (saved && Array.isArray(saved.rotation)) {
-    currentModel.rotation.set(
-      THREE.MathUtils.degToRad(saved.rotation[0]),
-      THREE.MathUtils.degToRad(saved.rotation[1]),
-      THREE.MathUtils.degToRad(saved.rotation[2])
-    );
-  }
-  recenterModel();
 
-  if (saved?.cameraUp) {
-    camera.up.set(...saved.cameraUp);
-  } else if (name === 'top') {
-    camera.up.set(0, 0, -1);
-  } else if (name === 'bottom') {
-    camera.up.set(0, 0,  1);
-  } else {
-    camera.up.set(0, 1,  0);
-  }
+  const offset = new THREE.Vector3(
+    ...(Array.isArray(saved?.offset) ? saved.offset : [0, 0, 0])
+  );
+
+  // Model orientation: the view's saved rotation, or unchanged if none authored.
+  const quat = (saved && Array.isArray(saved.rotation))
+    ? new THREE.Quaternion().setFromEuler(new THREE.Euler(
+        THREE.MathUtils.degToRad(saved.rotation[0]),
+        THREE.MathUtils.degToRad(saved.rotation[1]),
+        THREE.MathUtils.degToRad(saved.rotation[2])
+      ))
+    : currentModel.quaternion.clone();
+
+  const up = new THREE.Vector3();
+  if (saved?.cameraUp)          up.set(...saved.cameraUp);
+  else if (name === 'top')      up.set(0, 0, -1);
+  else if (name === 'bottom')   up.set(0, 0,  1);
+  else                          up.set(0, 1,  0);
 
   const dist = saved?.zoom
             ?? (camera._defaultPos ? camera._defaultPos.length()
                                     : fitRadius / Math.sin((camera.fov * Math.PI / 180) / 2) * 1.15);
-  camera.position.set(d[0] * dist, d[1] * dist, d[2] * dist);
+  const pos = new THREE.Vector3(d[0] * dist, d[1] * dist, d[2] * dist);
+
+  return { quat, up, pos, offset };
+}
+
+// Applies a target state to the model + camera immediately.
+function _applyViewTarget(t) {
+  currentModel.quaternion.copy(t.quat);
+  _orientOffset.copy(t.offset);
+  recenterModel();
+  camera.up.copy(t.up);
+  camera.position.copy(t.pos);
   controls.target.set(0, 0, 0);
   controls.update();
+}
+
+function setView(name, animate = false) {
+  if (!currentModel || !fitRadius) return;
+  const target = _computeViewTarget(name);
+  if (!target) return;
+
+  if (animate && !_prefersReducedMotion) {
+    _viewTween = {
+      t: 0,
+      from: {
+        quat: currentModel.quaternion.clone(),
+        up:   camera.up.clone(),
+        pos:  camera.position.clone(),
+        offset: _orientOffset.clone(),
+      },
+      to: target,
+    };
+    controls.target.set(0, 0, 0); // camera arcs around the origin during the tween
+  } else {
+    _viewTween = null;
+    _applyViewTarget(target);
+  }
+}
+
+// Advances the active view transition. Called from animate() once per frame.
+// The camera direction is slerped along a spherical arc (so front↔back doesn't
+// pass through the model centre) while its distance lerps; the model orientation
+// slerps as a quaternion, and the pan offset + up vector interpolate linearly.
+const _twFromDir = new THREE.Vector3();
+const _twToDir   = new THREE.Vector3();
+const _twArc     = new THREE.Quaternion();
+function _stepViewTween(dt) {
+  if (!_viewTween || !currentModel) return;
+  _viewTween.t += dt / VIEW_TWEEN_DUR;
+  const k = Math.min(_viewTween.t, 1);
+  // easeInOutCubic
+  const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+  const { from, to } = _viewTween;
+
+  // Model orientation + pan offset.
+  currentModel.quaternion.copy(from.quat).slerp(to.quat, e);
+  _orientOffset.copy(from.offset).lerp(to.offset, e);
+  recenterModel();
+
+  // Camera up (linear is fine — view-to-view up changes are ≤90°). If two views
+  // are ~180° rolled apart the midpoint lerps toward zero, so fall back to the
+  // target up rather than normalising a near-zero vector into NaN.
+  camera.up.copy(from.up).lerp(to.up, e);
+  if (camera.up.lengthSq() < 1e-6) camera.up.copy(to.up);
+  camera.up.normalize();
+
+  // Camera position: slerp the direction, lerp the radius. setFromUnitVectors
+  // gives a well-defined axis even for the 180° front↔back case.
+  _twFromDir.copy(from.pos).normalize();
+  _twToDir.copy(to.pos).normalize();
+  _twArc.identity().slerp(new THREE.Quaternion().setFromUnitVectors(_twFromDir, _twToDir), e);
+  const radius = THREE.MathUtils.lerp(from.pos.length(), to.pos.length(), e);
+  camera.position.copy(_twFromDir).applyQuaternion(_twArc).multiplyScalar(radius);
+
+  controls.target.set(0, 0, 0);
+  if (k >= 1) _viewTween = null;
 }
 
 // ── Model loading (Draco-compressed GLB) ─────────────────
@@ -650,6 +735,7 @@ async function loadRegion(region) {
     });
     currentModel = null;
     fitRadius = 0;
+    _viewTween = null; // drop any in-progress transition from the old model
   }
 
   gltfLoader.load(
@@ -786,7 +872,7 @@ function buildViewButtons(model) {
     btn.textContent = v.label;
     btn.addEventListener('click', () => {
       if (navMode === 'fly') setNavMode('orbit');
-      setView(v.dir);
+      setView(v.dir, true); // animate the transition into the preset view
     });
     viewButtons.appendChild(btn);
   });
