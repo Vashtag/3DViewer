@@ -84,11 +84,28 @@ body {
   border: 1.5px solid var(--border);
   border-radius: var(--radius);
   padding: 20px 22px;
-  width: 280px;
+  width: 300px;
+  max-height: 85vh;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* Grouped sections (Display / Accessibility / Performance) */
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.settings-section-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
 }
 
 .settings-row {
@@ -106,10 +123,46 @@ body {
   accent-color: var(--accent);
 }
 
+/* A labelled control that isn't a checkbox (swatches, segmented buttons) */
+.settings-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.settings-field-label {
+  font-size: 0.82rem;
+  color: var(--text);
+}
+.bg-swatches { display: flex; gap: 10px; }
+
+/* Segmented control (e.g. label text size S / M / L) */
+.settings-seg {
+  display: inline-flex;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.settings-seg button {
+  min-width: 30px;
+  padding: 5px 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.settings-seg button + button { border-left: 1.5px solid var(--border); }
+.settings-seg button:hover { color: var(--text); }
+.settings-seg button.active { background: var(--accent); color: #fff; }
+
 #settings-modal-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
 }
+#settings-reset,
 #settings-modal-close {
   padding: 7px 14px;
   border-radius: 8px;
@@ -120,6 +173,7 @@ body {
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s;
 }
+#settings-reset:hover,
 #settings-modal-close:hover { border-color: var(--accent); color: var(--text); }
 
 /* ── Body layout (sidebar + viewer) ── */
@@ -637,7 +691,7 @@ body {
 
 .anno-text {
   color: #fff;
-  font-size: 0.78rem;
+  font-size: var(--label-font-size, 0.78rem);
   font-weight: 500;
   background: rgba(15, 17, 23, 0.78);
   padding: 2px 8px;
