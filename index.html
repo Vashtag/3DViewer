@@ -20,17 +20,63 @@
 
     <!-- Settings modal -->
     <div id="settings-modal" class="hidden">
-      <div id="settings-modal-box">
-        <p class="modal-title">Settings</p>
-        <label class="settings-row">
-          <input type="checkbox" id="colorblind-toggle">
-          Colour-blind safe mode
-        </label>
-        <label class="settings-row">
-          <input type="checkbox" id="autorotate-toggle">
-          Auto-rotate model
-        </label>
+      <div id="settings-modal-box" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <p class="modal-title" id="settings-title">Settings</p>
+
+        <div class="settings-section">
+          <p class="settings-section-label">Display</p>
+          <div class="settings-field">
+            <span class="settings-field-label">Default background</span>
+            <div class="bg-swatches">
+              <button class="bg-swatch" data-bg="dark"  title="Black"></button>
+              <button class="bg-swatch" data-bg="light" title="White"></button>
+              <button class="bg-swatch" data-bg="lab"   title="Lab photo"></button>
+            </div>
+          </div>
+          <label class="settings-row">
+            <input type="checkbox" id="autorotate-toggle">
+            Auto-rotate model
+          </label>
+          <label class="settings-row">
+            <input type="checkbox" id="labels-default-toggle">
+            Show labels by default
+          </label>
+          <label class="settings-row">
+            <input type="checkbox" id="hint-toggle" checked>
+            Show controls hint
+          </label>
+        </div>
+
+        <div class="settings-section">
+          <p class="settings-section-label">Accessibility</p>
+          <label class="settings-row">
+            <input type="checkbox" id="colorblind-toggle">
+            Colour-blind safe mode
+          </label>
+          <label class="settings-row">
+            <input type="checkbox" id="reduced-motion-toggle">
+            Reduce motion
+          </label>
+          <div class="settings-field">
+            <span class="settings-field-label">Label text size</span>
+            <div id="label-size-seg" class="settings-seg">
+              <button type="button" data-size="s">S</button>
+              <button type="button" data-size="m" class="active">M</button>
+              <button type="button" data-size="l">L</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <p class="settings-section-label">Performance</p>
+          <label class="settings-row">
+            <input type="checkbox" id="performance-toggle">
+            Performance mode (lower resolution)
+          </label>
+        </div>
+
         <div id="settings-modal-actions">
+          <button id="settings-reset" type="button">Reset to defaults</button>
           <button id="settings-modal-close" type="button">Close</button>
         </div>
       </div>
@@ -40,7 +86,10 @@
     <div id="body">
       <!-- Left sidebar: model list -->
       <aside id="sidebar">
-        <p class="sidebar-label">Regions</p>
+        <div class="sidebar-header">
+          <p class="sidebar-label">Regions</p>
+          <button id="sidebar-collapse-btn" type="button" aria-label="Hide sidebar" title="Hide sidebar">&#10094;</button>
+        </div>
         <!-- Region buttons are generated from the MODELS list in js/main.js -->
         <nav id="region-selector"></nav>
 
@@ -188,6 +237,9 @@
 
         <!-- Mobile menu button (shown only on small screens) -->
         <button id="mobile-menu-btn" aria-label="Menu">&#9776;</button>
+
+        <!-- Re-open the sidebar after it's been hidden (desktop only) -->
+        <button id="sidebar-open-btn" type="button" aria-label="Show sidebar" title="Show sidebar">&#10095;</button>
 
         <!-- Top-right toolbar: reset button + orientation gizmo + view shortcuts -->
         <div id="viewer-toolbar" class="hidden">

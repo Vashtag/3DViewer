@@ -46,6 +46,9 @@ const orientViewSel   = document.getElementById('orient-view-select');
 const mobileMenuBtn   = document.getElementById('mobile-menu-btn');
 const sidebarEl       = document.getElementById('sidebar');
 const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+const bodyEl              = document.getElementById('body');
+const sidebarCollapseBtn  = document.getElementById('sidebar-collapse-btn');
+const sidebarOpenBtn      = document.getElementById('sidebar-open-btn');
 
 // ── Mobile drawer ─────────────────────────────────────────
 function openDrawer()  {
@@ -61,17 +64,55 @@ mobileMenuBtn.addEventListener('click', () =>
 );
 sidebarBackdrop.addEventListener('click', closeDrawer);
 
+// ── Sidebar collapse (desktop) ────────────────────────────
+// Hide the whole sidebar to give the model more room; a floating button on the
+// viewer brings it back. The choice sticks across sessions. The viewer's
+// ResizeObserver re-fits the canvas automatically when the column width changes.
+function setSidebarCollapsed(collapsed) {
+  bodyEl.classList.toggle('sidebar-collapsed', collapsed);
+  localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0');
+}
+sidebarCollapseBtn.addEventListener('click', () => setSidebarCollapsed(true));
+sidebarOpenBtn.addEventListener('click', () => setSidebarCollapsed(false));
+if (localStorage.getItem('sidebarCollapsed') === '1') setSidebarCollapsed(true);
+
 // ── Settings modal (top-right gear) ───────────────────────
 const settingsBtn        = document.getElementById('settings-btn');
 const settingsModal      = document.getElementById('settings-modal');
+const settingsModalBox   = document.getElementById('settings-modal-box');
 const settingsModalClose = document.getElementById('settings-modal-close');
 const colorblindToggle    = document.getElementById('colorblind-toggle');
 const autorotateToggle    = document.getElementById('autorotate-toggle');
 
-settingsBtn.addEventListener('click', () => settingsModal.classList.remove('hidden'));
-settingsModalClose.addEventListener('click', () => settingsModal.classList.add('hidden'));
+let _settingsLastFocus = null;
+function openSettings() {
+  _settingsLastFocus = document.activeElement;
+  settingsModal.classList.remove('hidden');
+  settingsModalClose.focus();
+}
+function closeSettings() {
+  settingsModal.classList.add('hidden');
+  // Return focus to whatever opened the modal (usually the gear button).
+  if (_settingsLastFocus && document.contains(_settingsLastFocus)) _settingsLastFocus.focus();
+}
+function settingsOpen() { return !settingsModal.classList.contains('hidden'); }
+
+settingsBtn.addEventListener('click', openSettings);
+settingsModalClose.addEventListener('click', closeSettings);
 settingsModal.addEventListener('click', e => {
-  if (e.target === settingsModal) settingsModal.classList.add('hidden');
+  if (e.target === settingsModal) closeSettings();
+});
+// Esc closes; Tab is trapped inside the dialog while it's open.
+settingsModal.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { e.stopPropagation(); closeSettings(); return; }
+  if (e.key !== 'Tab') return;
+  const focusable = settingsModalBox.querySelectorAll(
+    'button, input, [href], select, [tabindex]:not([tabindex="-1"])'
+  );
+  if (!focusable.length) return;
+  const first = focusable[0], last = focusable[focusable.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
 });
 // Colour-blind toggle behaviour is wired up further down, once the
 // category colour schemes are defined.
@@ -192,9 +233,11 @@ controls.autoRotateSpeed = 1.2;
 // immediately by cancelling any in-progress preset-view tween.
 controls.addEventListener('start', () => { _viewTween = null; });
 
-autorotateToggle.checked = false;
+autorotateToggle.checked = localStorage.getItem('autorotate') === '1';
+controls.autoRotate = autorotateToggle.checked;
 autorotateToggle.addEventListener('change', () => {
   controls.autoRotate = autorotateToggle.checked;
+  localStorage.setItem('autorotate', autorotateToggle.checked ? '1' : '0');
 });
 
 // ── Fly mode (first-person WASD navigation) ──────────────
@@ -485,9 +528,9 @@ function showViewerUI() {
   viewerToolbar.classList.remove('hidden');
   displayControls.classList.remove('hidden');
   setNavMode('orbit'); // always start a freshly-loaded model in orbit mode
-  // Default to a black background on first load
+  // Apply the saved background on first load (defaults to black).
   if (!container.dataset.bgSet) {
-    setBackground('dark');
+    setBackground(localStorage.getItem('background') || 'dark');
     container.dataset.bgSet = '1';
   }
 }
@@ -579,7 +622,10 @@ let savedViews = {};
 // A preset view transition (_viewTween, declared up by the render loop) is
 // advanced each frame by animate(), letting a view glide into place (model
 // orientation + camera arc) instead of snapping. See setView(name, animate=true).
-const _prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Motion is reduced when either the OS asks for it or the in-app setting is on.
+const _mediaReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+let reducedMotionSetting = localStorage.getItem('reducedMotion') === '1';
+function reducedMotionActive() { return reducedMotionSetting || _mediaReducedMotion.matches; }
 const VIEW_TWEEN_DUR = 0.6; // seconds
 
 // Computes the target camera/model state for a named view without applying it.
@@ -631,7 +677,7 @@ function setView(name, animate = false) {
   const target = _computeViewTarget(name);
   if (!target) return;
 
-  if (animate && !_prefersReducedMotion) {
+  if (animate && !reducedMotionActive()) {
     _viewTween = {
       t: 0,
       from: {
@@ -934,6 +980,110 @@ colorblindToggle.addEventListener('change', () => {
 });
 applyCategoryColorScheme();
 
+// ── Settings: accessibility / display / performance ───────
+// Each setting reads its saved value at startup, applies it, and persists on
+// change so choices stick across sessions.
+const reducedMotionToggle = document.getElementById('reduced-motion-toggle');
+const labelsDefaultToggle = document.getElementById('labels-default-toggle');
+const hintToggle          = document.getElementById('hint-toggle');
+const performanceToggle   = document.getElementById('performance-toggle');
+const labelSizeSeg        = document.getElementById('label-size-seg');
+const settingsReset       = document.getElementById('settings-reset');
+
+let labelsDefaultOn = localStorage.getItem('labelsDefault') === '1';
+let showHint        = localStorage.getItem('showHint') !== '0'; // default on
+let labelSize       = localStorage.getItem('labelSize') || 'm';
+let performanceMode = localStorage.getItem('performance') === '1';
+
+const LABEL_SIZES = { s: '0.66rem', m: '0.78rem', l: '0.94rem' };
+
+// Reduced motion drops orbit damping (and, via reducedMotionActive(), skips the
+// preset-view tween). It also tracks live OS changes.
+function applyReducedMotion() { controls.enableDamping = !reducedMotionActive(); }
+function applyLabelSize(size) {
+  document.documentElement.style.setProperty('--label-font-size', LABEL_SIZES[size] || LABEL_SIZES.m);
+  labelSizeSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.size === size));
+}
+function applyControlsHint(show) { controlsHint.classList.toggle('hidden', !show); }
+function applyPerformanceMode(on) {
+  renderer.setPixelRatio(on ? 1 : Math.min(window.devicePixelRatio, 2));
+  resize(); // apply the new pixel ratio to the drawing buffer
+}
+
+// Reduce motion
+reducedMotionToggle.checked = reducedMotionSetting;
+reducedMotionToggle.addEventListener('change', () => {
+  reducedMotionSetting = reducedMotionToggle.checked;
+  localStorage.setItem('reducedMotion', reducedMotionSetting ? '1' : '0');
+  applyReducedMotion();
+});
+_mediaReducedMotion.addEventListener('change', applyReducedMotion);
+applyReducedMotion();
+
+// Show labels by default
+labelsDefaultToggle.checked = labelsDefaultOn;
+labelsDefaultToggle.addEventListener('change', () => {
+  labelsDefaultOn = labelsDefaultToggle.checked;
+  localStorage.setItem('labelsDefault', labelsDefaultOn ? '1' : '0');
+  if (currentModel) setLabelsVisible(EDIT_MODE || (labelsDefaultOn && labelData.length > 0));
+});
+
+// Controls hint
+hintToggle.checked = showHint;
+hintToggle.addEventListener('change', () => {
+  showHint = hintToggle.checked;
+  localStorage.setItem('showHint', showHint ? '1' : '0');
+  applyControlsHint(showHint);
+});
+applyControlsHint(showHint);
+
+// Label text size (segmented S / M / L)
+applyLabelSize(labelSize);
+labelSizeSeg.addEventListener('click', e => {
+  const btn = e.target.closest('button[data-size]');
+  if (!btn) return;
+  labelSize = btn.dataset.size;
+  localStorage.setItem('labelSize', labelSize);
+  applyLabelSize(labelSize);
+});
+
+// Performance mode
+performanceToggle.checked = performanceMode;
+performanceToggle.addEventListener('change', () => {
+  performanceMode = performanceToggle.checked;
+  localStorage.setItem('performance', performanceMode ? '1' : '0');
+  applyPerformanceMode(performanceMode);
+});
+if (performanceMode) applyPerformanceMode(true);
+
+// Reset every setting to its default and apply immediately.
+settingsReset.addEventListener('click', () => {
+  colorblindMode = false; colorblindToggle.checked = false;
+  localStorage.setItem('colorblindMode', '0'); applyCategoryColorScheme();
+
+  autorotateToggle.checked = false; controls.autoRotate = false;
+  localStorage.setItem('autorotate', '0');
+
+  reducedMotionSetting = false; reducedMotionToggle.checked = false;
+  localStorage.setItem('reducedMotion', '0'); applyReducedMotion();
+
+  labelsDefaultOn = false; labelsDefaultToggle.checked = false;
+  localStorage.setItem('labelsDefault', '0');
+
+  showHint = true; hintToggle.checked = true;
+  localStorage.setItem('showHint', '1'); applyControlsHint(true);
+
+  performanceMode = false; performanceToggle.checked = false;
+  localStorage.setItem('performance', '0'); applyPerformanceMode(false);
+
+  labelSize = 'm'; localStorage.setItem('labelSize', 'm'); applyLabelSize('m');
+
+  setBackground('dark');
+  setSidebarCollapsed(false);
+
+  if (currentModel) setLabelsVisible(EDIT_MODE);
+});
+
 function addLabel(name, localPos, category = '', record = true) {
   if (!labelLayer) return;
   const entry = { name, position: [localPos.x, localPos.y, localPos.z], category };
@@ -1102,7 +1252,9 @@ async function loadLabels(model) {
   labelsSection.classList.toggle('hidden', !(labelData.length || lines.length || EDIT_MODE));
   editSection.classList.toggle('hidden', !EDIT_MODE);
   updateCategoryFilterVisibility();
-  setLabelsVisible(EDIT_MODE);
+  // Show labels up front in edit mode, or when the student has opted into the
+  // "Show labels by default" setting (and this model actually has some).
+  setLabelsVisible(EDIT_MODE || (labelsDefaultOn && labelData.length > 0));
 }
 
 // Models that should open straight into dots-only mode when labels are shown.
@@ -1872,13 +2024,15 @@ const BG_STYLES = {
 };
 let currentBg = 'dark';
 
-function setBackground(bg) {
+function setBackground(bg, persist = true) {
   currentBg = bg;
-  bgSwatches.forEach(s => s.classList.remove('active'));
-  document.querySelector(`.bg-swatch[data-bg="${bg}"]`)?.classList.add('active');
+  // Mark every swatch with this value active — the control is mirrored in both
+  // the sidebar and the settings modal.
+  bgSwatches.forEach(s => s.classList.toggle('active', s.dataset.bg === bg));
   const s = BG_STYLES[bg] || BG_STYLES.dark;
   container.style.backgroundImage = s.image;
   container.style.backgroundColor = s.color;
+  if (persist) localStorage.setItem('background', bg);
 }
 
 bgSwatches.forEach(swatch => {
