@@ -4,6 +4,7 @@ import { DRACOLoader } from './DRACOLoader.js';
 import { OrbitControls } from './OrbitControls.js';
 import { PointerLockControls } from './PointerLockControls.js';
 import { CSS2DRenderer, CSS2DObject } from './CSS2DRenderer.js';
+import { scormModelOpened } from './scorm.js';
 
 // ── DOM refs ──────────────────────────────────────────────
 const canvas          = document.getElementById('viewer-canvas');
@@ -829,6 +830,7 @@ async function loadRegion(region) {
       // zoom and pan offset.
       if (savedViews[firstDir]) setView(firstDir);
       showViewerUI();
+      scormModelOpened(); // count toward SCORM completion (no-op outside an LMS)
       loadLabels(model);
       initLineLayer();
       loadLines(model);
