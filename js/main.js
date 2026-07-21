@@ -2277,11 +2277,16 @@ function buildQuiz() {
 // current zoom. The model stays put; only the camera moves.
 function focusLocalPoint(localPos) {
   const world = currentModel.localToWorld(localPos.clone());
-  if (world.lengthSq() < 1e-6) world.set(0, 0, 1);
-  world.normalize();
+  // Use only the structure's horizontal bearing so the camera swings around to
+  // face it at a level, upright angle (like a standard anterior/lateral view)
+  // instead of tipping into a steep top-down or bottom-up tilt. Points that sit
+  // almost directly above/below the centre fall back to the front.
+  const dir = new THREE.Vector3(world.x, 0, world.z);
+  if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1);
+  dir.normalize();
   const dist = camera.position.length() || fitRadius * 3;
   camera.up.set(0, 1, 0);
-  camera.position.copy(world.multiplyScalar(dist));
+  camera.position.copy(dir.multiplyScalar(dist));
   controls.target.set(0, 0, 0);
   controls.update();
 }
