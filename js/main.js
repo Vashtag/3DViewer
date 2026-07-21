@@ -2190,6 +2190,8 @@ const quizBtn      = document.getElementById('quiz-btn');
 const quizPanel    = document.getElementById('quiz-panel');
 const quizClose    = document.getElementById('quiz-close');
 const quizProgress = document.getElementById('quiz-progress');
+const quizTime      = document.getElementById('quiz-time');
+const quizTimerFill = document.getElementById('quiz-timer-fill');
 const quizQuestion = document.getElementById('quiz-question');
 const quizOptions  = document.getElementById('quiz-options');
 const quizFeedback = document.getElementById('quiz-feedback');
@@ -2197,6 +2199,7 @@ const quizNextBtn  = document.getElementById('quiz-next');
 const quizResult   = document.getElementById('quiz-result');
 
 const QUIZ_MAX = 10;
+const QUIZ_SECONDS = 30; // per-question limit, like a bell-ringer station
 let quizList = [];
 let quizIdx = 0;
 let quizScore = 0;
@@ -2204,6 +2207,52 @@ let quizAnswered = false;
 let quizQStart = 0;
 let quizMarker = null;
 let quizPrevLabels = false;
+let quizTimer = null;
+let quizTimeLeft = 0;
+
+function stopQuizTimer() { if (quizTimer) { clearInterval(quizTimer); quizTimer = null; } }
+
+function renderQuizTime() {
+  const s = Math.max(0, quizTimeLeft);
+  quizTime.textContent = `0:${String(s).padStart(2, '0')}`;
+  quizTimerFill.style.width = (s / QUIZ_SECONDS) * 100 + '%';
+  const low = s <= 5;
+  quizTimerFill.classList.toggle('low', low);
+  quizTime.classList.toggle('low', low);
+}
+
+function startQuizTimer() {
+  stopQuizTimer();
+  quizTimeLeft = QUIZ_SECONDS;
+  renderQuizTime();
+  quizTimer = setInterval(() => {
+    quizTimeLeft--;
+    renderQuizTime();
+    if (quizTimeLeft <= 0) { stopQuizTimer(); timeoutQuiz(); }
+  }, 1000);
+}
+
+// Buzzer: no answer in time counts as a miss, then the quiz auto-advances to the
+// next "station" after a brief glimpse of the correct answer.
+function timeoutQuiz() {
+  if (quizAnswered) return;
+  quizAnswered = true;
+  const q = quizList[quizIdx];
+  [...quizOptions.children].forEach(b => {
+    b.disabled = true;
+    if (b.textContent === q.answer) b.classList.add('correct');
+  });
+  quizFeedback.className = 'wrong';
+  quizFeedback.textContent = `Time's up — Answer: ${q.answer}`;
+  quizNextBtn.classList.add('hidden');
+  scormReportInteraction({
+    id: q.answer, response: '(no answer)', answer: q.answer,
+    correct: false, latencyMs: QUIZ_SECONDS * 1000,
+  });
+  setTimeout(() => {
+    if (!quizPanel.classList.contains('hidden') && quizAnswered) nextQuiz();
+  }, 1800);
+}
 
 function _shuffle(a) {
   a = a.slice();
@@ -2298,11 +2347,13 @@ function showQuizQuestion() {
   quizMarker.visible = true;
   focusLocalPoint(pos);
   applyQuizViewOffset();
+  startQuizTimer();
 }
 
 function answerQuiz(btn, chosen) {
   if (quizAnswered) return;
   quizAnswered = true;
+  stopQuizTimer();
   const q = quizList[quizIdx];
   const correct = chosen === q.answer;
   if (correct) quizScore++;
@@ -2331,6 +2382,7 @@ function nextQuiz() {
 }
 
 function showQuizResult() {
+  stopQuizTimer();
   if (quizMarker) quizMarker.visible = false;
   const n = quizList.length;
   const pct = Math.round((quizScore / n) * 100);
@@ -2352,6 +2404,7 @@ function showQuizResult() {
 }
 
 function endQuiz() {
+  stopQuizTimer();
   quizPanel.classList.add('hidden');
   container.classList.remove('quiz-active');
   camera.clearViewOffset();
