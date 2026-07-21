@@ -1349,15 +1349,35 @@ body {
 #quiz-btn:hover { background: rgba(79, 124, 255, 0.26); }
 #quiz-btn.hidden { display: none; }
 
+/* Docked to the right so the model (shifted left via a camera view-offset while
+   the quiz is active) stays visible. Becomes a bottom sheet on narrow screens. */
 #quiz-panel {
   position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(360px, 92%);
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
+  width: 300px;
+  max-height: calc(100% - 32px);
+  overflow-y: auto;
   z-index: 8;
 }
 #quiz-panel.hidden { display: none; }
+
+/* Hide the view-preset buttons while a quiz is running so they don't sit under
+   the panel; drag-to-rotate and the gizmo/reset still work. */
+#viewer-container.quiz-active #view-buttons { display: none; }
+
+@media (max-width: 600px) {
+  #quiz-panel {
+    top: auto;
+    bottom: 0;
+    right: 0;
+    left: 0;
+    transform: none;
+    width: 100%;
+    max-height: 55%;
+  }
+}
 
 #quiz-card {
   position: relative;
