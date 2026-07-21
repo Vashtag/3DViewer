@@ -1197,31 +1197,41 @@ body {
 }
 
 #controls-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  pointer-events: none;
   font-size: 0.75rem;
   color: var(--text-muted);
-  background: rgba(26, 29, 39, 0.7);
-  padding: 6px 14px;
-  border-radius: 20px;
-  pointer-events: none;
-  white-space: nowrap;
-  backdrop-filter: blur(6px);
 }
 
 #controls-hint.hidden { display: none; }
 
-/* The extra tips (everything after "Q / E to roll") collapse away a few seconds
-   after the orbit hint appears, leaving just the roll tip. */
-.hint-fade {
-  display: inline-block;
-  vertical-align: bottom;
-  overflow: hidden;
-  max-width: 60ch; /* comfortably fits the full tip list; collapses to 0 on fade */
+/* Two stacked pills: the upper .hint-fade (scroll / right-drag) sits above the
+   lower .hint-keep essentials (Q/E to roll, drag to rotate). */
+.hint-fade, .hint-keep {
+  background: rgba(26, 29, 39, 0.7);
+  padding: 6px 14px;
+  border-radius: 20px;
   white-space: nowrap;
-  transition: opacity 0.6s ease, max-width 0.6s ease;
+  backdrop-filter: blur(6px);
+}
+
+/* The upper tips collapse away a few seconds after the orbit hint appears,
+   leaving just the essentials line. */
+.hint-fade {
+  margin-bottom: 6px;
+  overflow: hidden;
+  max-height: 2.4em;
+  transition: opacity 0.5s ease, max-height 0.5s ease,
+              padding 0.5s ease, margin 0.5s ease;
 }
 #controls-hint.hint-faded .hint-fade {
   opacity: 0;
-  max-width: 0;
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-bottom: 0;
 }
 
 .divider { margin: 0 6px; opacity: 0.4; }
@@ -1320,4 +1330,138 @@ body {
   .cat-filter-row, .lcat-option { padding: 4px 0; }
   .settings-row input[type="checkbox"] { width: 18px; height: 18px; }
   .settings-seg button { padding: 9px 0; min-width: 38px; }
+}
+
+/* ── Quiz / Identify mode ── */
+#quiz-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1.5px solid var(--accent);
+  background: rgba(79, 124, 255, 0.14);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+#quiz-btn:hover { background: rgba(79, 124, 255, 0.26); }
+#quiz-btn.hidden { display: none; }
+
+#quiz-panel {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(360px, 92%);
+  z-index: 8;
+}
+#quiz-panel.hidden { display: none; }
+
+#quiz-card {
+  position: relative;
+  background: rgba(20, 23, 33, 0.94);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 18px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+}
+
+#quiz-close {
+  position: absolute;
+  top: 8px; right: 10px;
+  width: 24px; height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 6px;
+}
+#quiz-close:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+
+#quiz-progress {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+}
+#quiz-question {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 5px 0 12px;
+}
+
+#quiz-options { display: flex; flex-direction: column; gap: 8px; }
+.quiz-option {
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1.5px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.quiz-option:hover:not(:disabled) { border-color: var(--accent); }
+.quiz-option:disabled { cursor: default; }
+.quiz-option.correct { border-color: #33c06a; background: rgba(51, 192, 106, 0.20); }
+.quiz-option.wrong   { border-color: #e0555f; background: rgba(224, 85, 95, 0.20); }
+
+#quiz-feedback { margin-top: 11px; font-size: 0.85rem; font-weight: 600; }
+#quiz-feedback.hidden { display: none; }
+#quiz-feedback.correct { color: #4fd18b; }
+#quiz-feedback.wrong   { color: #f2868f; }
+
+#quiz-next {
+  margin-top: 12px;
+  width: 100%;
+  padding: 10px;
+  border-radius: 9px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+#quiz-next:hover { background: var(--accent-hover); }
+#quiz-next.hidden { display: none; }
+
+#quiz-result.hidden { display: none; }
+.quiz-score { font-size: 1.5rem; font-weight: 700; text-align: center; color: var(--text); margin-bottom: 12px; }
+.quiz-score span { color: var(--text-muted); font-size: 1rem; font-weight: 500; }
+.quiz-result-actions { display: flex; gap: 8px; }
+.quiz-result-actions button {
+  flex: 1;
+  padding: 10px;
+  border-radius: 9px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.quiz-primary { border: none; background: var(--accent); color: #fff; }
+.quiz-primary:hover { background: var(--accent-hover); }
+.quiz-secondary { border: 1.5px solid var(--border); background: transparent; color: var(--text-muted); }
+.quiz-secondary:hover { border-color: var(--accent); color: var(--text); }
+
+/* Pulsing ring marking the structure to identify */
+.quiz-marker { pointer-events: none; }
+.quiz-ring {
+  display: block;
+  width: 22px; height: 22px;
+  margin: -11px;
+  border: 3px solid #ffd23f;
+  border-radius: 50%;
+  box-shadow: 0 0 12px #ffd23f;
+  animation: quizpulse 1.1s ease-out infinite;
+}
+@keyframes quizpulse {
+  0%   { transform: scale(0.6); opacity: 1; }
+  100% { transform: scale(1.7); opacity: 0.15; }
 }

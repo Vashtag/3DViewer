@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest identifier="ANATOMY_3D_VIEWER" version="1.0"
+    xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2"
+    xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2">
+
+  <metadata>
+    <schema>ADL SCORM</schema>
+    <schemaversion>1.2</schemaversion>
+  </metadata>
+
+  <organizations default="ANATOMY_ORG">
+    <organization identifier="ANATOMY_ORG">
+      <title>Anatomy 3D</title>
+      <item identifier="ANATOMY_ITEM"
+            identifierref="ANATOMY_RESOURCE">
+        <title>Anatomy 3D</title>
+      </item>
+    </organization>
+  </organizations>
+
+  <resources>
+    <resource identifier="ANATOMY_RESOURCE"
+              type="webcontent"
+              adlcp:scormtype="sco"
+              href="index.html">
+      <file href="index.html"/>
+    </resource>
+  </resources>
+</manifest>
