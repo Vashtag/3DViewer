@@ -2245,6 +2245,19 @@ function ensureMarker() {
   quizMarker = new CSS2DObject(el);
 }
 
+// Shift the rendered image left (via the camera's view offset) so the model
+// clears the right-docked quiz panel. On narrow screens the panel is a bottom
+// sheet, so no horizontal shift is applied. Re-applied per question and on
+// resize; cleared in endQuiz.
+const QUIZ_PANEL_W = 300;
+function applyQuizViewOffset() {
+  if (quizPanel.classList.contains('hidden')) return;
+  const w = renderer.domElement.clientWidth;
+  const h = renderer.domElement.clientHeight;
+  if (window.matchMedia('(max-width: 600px)').matches) { camera.clearViewOffset(); return; }
+  camera.setViewOffset(w, h, (QUIZ_PANEL_W + 32) / 2, 0, w, h);
+}
+
 function startQuiz() {
   if (!currentModel) return;
   buildQuiz();
@@ -2255,6 +2268,7 @@ function startQuiz() {
   setLabelsVisible(false); // hide the answers while testing
   quizResult.classList.add('hidden');
   quizPanel.classList.remove('hidden');
+  container.classList.add('quiz-active');
   showQuizQuestion();
 }
 
@@ -2283,6 +2297,7 @@ function showQuizQuestion() {
   quizMarker.position.copy(pos);
   quizMarker.visible = true;
   focusLocalPoint(pos);
+  applyQuizViewOffset();
 }
 
 function answerQuiz(btn, chosen) {
@@ -2338,6 +2353,8 @@ function showQuizResult() {
 
 function endQuiz() {
   quizPanel.classList.add('hidden');
+  container.classList.remove('quiz-active');
+  camera.clearViewOffset();
   if (quizMarker) {
     quizMarker.visible = false;
     if (quizMarker.parent) quizMarker.parent.remove(quizMarker);
