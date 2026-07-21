@@ -4,7 +4,7 @@ import { DRACOLoader } from './DRACOLoader.js';
 import { OrbitControls } from './OrbitControls.js';
 import { PointerLockControls } from './PointerLockControls.js';
 import { CSS2DRenderer, CSS2DObject } from './CSS2DRenderer.js';
-import { scormModelOpened } from './scorm.js';
+import { scormModelOpened, scormReportInteraction, scormReportScore } from './scorm.js';
 
 // ── DOM refs ──────────────────────────────────────────────
 const canvas          = document.getElementById('viewer-canvas');
@@ -783,6 +783,7 @@ async function loadRegion(region) {
   const savedRotation = savedViews[firstDir]?.rotation ?? null;
 
   if (currentModel) {
+    if (!quizPanel.classList.contains('hidden')) endQuiz(); // close any open quiz
     clearLabels();
     clearLines();
     setLineDrawing(false);
@@ -1281,6 +1282,9 @@ async function loadLabels(model) {
   labelsSection.classList.toggle('hidden', !(labelData.length || lines.length || EDIT_MODE));
   editSection.classList.toggle('hidden', !EDIT_MODE);
   updateCategoryFilterVisibility();
+  // The quiz needs at least a correct answer plus a few distractors to be worth
+  // offering; show "Test me" only when the model has enough named labels.
+  quizBtn.classList.toggle('hidden', labelData.filter(l => l.name && l.name.trim()).length < 4);
   // Show labels up front in edit mode, or when the student has opted into the
   // "Show labels by default" setting (and this model actually has some).
   setLabelsVisible(EDIT_MODE || (labelsDefaultOn && labelData.length > 0));
@@ -2177,3 +2181,170 @@ function captureScreenshot() {
 }
 
 screenshotBtn.addEventListener('click', captureScreenshot);
+
+// ── Quiz / Identify mode ──────────────────────────────────
+// A self-test built from the current model's labels: highlight a structure and
+// ask the student to name it from four options. Each answer is reported to the
+// LMS as a SCORM interaction, and the final score sets cmi.core.score.
+const quizBtn      = document.getElementById('quiz-btn');
+const quizPanel    = document.getElementById('quiz-panel');
+const quizClose    = document.getElementById('quiz-close');
+const quizProgress = document.getElementById('quiz-progress');
+const quizQuestion = document.getElementById('quiz-question');
+const quizOptions  = document.getElementById('quiz-options');
+const quizFeedback = document.getElementById('quiz-feedback');
+const quizNextBtn  = document.getElementById('quiz-next');
+const quizResult   = document.getElementById('quiz-result');
+
+const QUIZ_MAX = 10;
+let quizList = [];
+let quizIdx = 0;
+let quizScore = 0;
+let quizAnswered = false;
+let quizQStart = 0;
+let quizMarker = null;
+let quizPrevLabels = false;
+
+function _shuffle(a) {
+  a = a.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function buildQuiz() {
+  const named = labelData.filter(l => l.name && l.name.trim());
+  const names = [...new Set(named.map(l => l.name))];
+  const picks = _shuffle(named).slice(0, Math.min(QUIZ_MAX, named.length));
+  quizList = picks.map(entry => {
+    const distractors = _shuffle(names.filter(n => n !== entry.name)).slice(0, 3);
+    return { entry, answer: entry.name, options: _shuffle([entry.name, ...distractors]) };
+  });
+}
+
+// Frame the camera so the highlighted structure faces the viewer, keeping the
+// current zoom. The model stays put; only the camera moves.
+function focusLocalPoint(localPos) {
+  const world = currentModel.localToWorld(localPos.clone());
+  if (world.lengthSq() < 1e-6) world.set(0, 0, 1);
+  world.normalize();
+  const dist = camera.position.length() || fitRadius * 3;
+  camera.up.set(0, 1, 0);
+  camera.position.copy(world.multiplyScalar(dist));
+  controls.target.set(0, 0, 0);
+  controls.update();
+}
+
+function ensureMarker() {
+  if (quizMarker) return;
+  const el = document.createElement('div');
+  el.className = 'quiz-marker';
+  el.innerHTML = '<span class="quiz-ring"></span>';
+  quizMarker = new CSS2DObject(el);
+}
+
+function startQuiz() {
+  if (!currentModel) return;
+  buildQuiz();
+  if (!quizList.length) return;
+  quizIdx = 0;
+  quizScore = 0;
+  quizPrevLabels = labelsVisible;
+  setLabelsVisible(false); // hide the answers while testing
+  quizResult.classList.add('hidden');
+  quizPanel.classList.remove('hidden');
+  showQuizQuestion();
+}
+
+function showQuizQuestion() {
+  const q = quizList[quizIdx];
+  quizAnswered = false;
+  quizQStart = performance.now();
+  quizProgress.textContent = `Question ${quizIdx + 1} of ${quizList.length}`;
+  quizQuestion.textContent = 'What is this structure?';
+  quizFeedback.className = 'hidden';
+  quizFeedback.textContent = '';
+  quizNextBtn.classList.add('hidden');
+  quizResult.classList.add('hidden');
+  quizOptions.innerHTML = '';
+  q.options.forEach(name => {
+    const b = document.createElement('button');
+    b.className = 'quiz-option';
+    b.textContent = name;
+    b.addEventListener('click', () => answerQuiz(b, name));
+    quizOptions.appendChild(b);
+  });
+
+  ensureMarker();
+  const pos = new THREE.Vector3(...q.entry.position);
+  if (quizMarker.parent !== currentModel) currentModel.add(quizMarker);
+  quizMarker.position.copy(pos);
+  quizMarker.visible = true;
+  focusLocalPoint(pos);
+}
+
+function answerQuiz(btn, chosen) {
+  if (quizAnswered) return;
+  quizAnswered = true;
+  const q = quizList[quizIdx];
+  const correct = chosen === q.answer;
+  if (correct) quizScore++;
+  [...quizOptions.children].forEach(b => {
+    b.disabled = true;
+    if (b.textContent === q.answer) b.classList.add('correct');
+    else if (b === btn) b.classList.add('wrong');
+  });
+  quizFeedback.className = correct ? 'correct' : 'wrong';
+  quizFeedback.textContent = correct ? 'Correct!' : `Answer: ${q.answer}`;
+  quizNextBtn.textContent = quizIdx + 1 < quizList.length ? 'Next' : 'See results';
+  quizNextBtn.classList.remove('hidden');
+
+  scormReportInteraction({
+    id: q.answer,
+    response: chosen,
+    answer: q.answer,
+    correct,
+    latencyMs: performance.now() - quizQStart,
+  });
+}
+
+function nextQuiz() {
+  if (quizIdx + 1 < quizList.length) { quizIdx++; showQuizQuestion(); }
+  else showQuizResult();
+}
+
+function showQuizResult() {
+  if (quizMarker) quizMarker.visible = false;
+  const n = quizList.length;
+  const pct = Math.round((quizScore / n) * 100);
+  quizProgress.textContent = 'Results';
+  quizQuestion.textContent = '';
+  quizOptions.innerHTML = '';
+  quizFeedback.className = 'hidden';
+  quizNextBtn.classList.add('hidden');
+  quizResult.classList.remove('hidden');
+  quizResult.innerHTML =
+    `<p class="quiz-score">${quizScore} / ${n} <span>(${pct}%)</span></p>` +
+    '<div class="quiz-result-actions">' +
+      '<button type="button" class="quiz-primary" id="quiz-retry">Try again</button>' +
+      '<button type="button" class="quiz-secondary" id="quiz-done">Done</button>' +
+    '</div>';
+  document.getElementById('quiz-retry').addEventListener('click', startQuiz);
+  document.getElementById('quiz-done').addEventListener('click', endQuiz);
+  scormReportScore(pct);
+}
+
+function endQuiz() {
+  quizPanel.classList.add('hidden');
+  if (quizMarker) {
+    quizMarker.visible = false;
+    if (quizMarker.parent) quizMarker.parent.remove(quizMarker);
+  }
+  setLabelsVisible(quizPrevLabels);
+}
+
+quizBtn.addEventListener('click', startQuiz);
+quizClose.addEventListener('click', endQuiz);
+quizNextBtn.addEventListener('click', nextQuiz);

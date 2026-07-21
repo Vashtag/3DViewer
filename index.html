@@ -114,6 +114,7 @@
           <div id="labels-section" class="hidden">
             <p class="sidebar-label">Labels</p>
             <button id="labels-toggle" type="button">Show labels</button>
+            <button id="quiz-btn" type="button" class="hidden">Test me</button>
             <div id="category-filters" class="hidden">
               <label class="cat-filter-row" data-filter-cat="">
                 <input type="checkbox" data-cat="" checked>
@@ -265,6 +266,20 @@
             <button class="nav-btn" data-mode="fly">Fly</button>
           </div>
         </div>
+
+        <!-- Quiz / Identify panel (populated by js/main.js) -->
+        <div id="quiz-panel" class="hidden">
+          <div id="quiz-card">
+            <button id="quiz-close" type="button" aria-label="Close quiz">&times;</button>
+            <p id="quiz-progress"></p>
+            <p id="quiz-question"></p>
+            <div id="quiz-options"></div>
+            <p id="quiz-feedback" class="hidden"></p>
+            <button id="quiz-next" type="button" class="hidden">Next</button>
+            <div id="quiz-result" class="hidden"></div>
+          </div>
+        </div>
+
         <!-- Label creation modal (edit mode only) -->
         <div id="label-modal" class="hidden">
           <div id="label-modal-box">

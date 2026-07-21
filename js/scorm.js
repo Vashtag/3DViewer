@@ -106,4 +106,44 @@ export function scormModelOpened() {
   maybeComplete();
 }
 
+// ── Quiz reporting ────────────────────────────────────────
+let interactionN = 0;
+
+function timeOfDay() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+// SCORM 1.2 interaction ids must be alphanumeric identifiers (no spaces).
+function slug(s) {
+  return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 255)
+      || ('q' + interactionN);
+}
+
+// Records one answered quiz question as a cmi.interactions entry, so the LMS can
+// show per-structure item analysis (which structures the cohort misses).
+export function scormReportInteraction({ id, response, answer, correct, latencyMs }) {
+  if (!initialized) return;
+  const p = `cmi.interactions.${interactionN++}.`;
+  set(p + 'id', slug(id));
+  set(p + 'type', 'fill-in');
+  if (latencyMs != null) set(p + 'latency', toTimespan(latencyMs));
+  set(p + 'time', timeOfDay());
+  set(p + 'correct_responses.0.pattern', String(answer).slice(0, 255));
+  set(p + 'student_response', String(response).slice(0, 255));
+  set(p + 'result', correct ? 'correct' : 'wrong');
+  commit();
+}
+
+// Records the quiz score (0–100) and marks the SCO completed.
+export function scormReportScore(raw, min = 0, max = 100) {
+  if (!initialized) return;
+  set('cmi.core.score.raw', Math.round(raw));
+  set('cmi.core.score.min', min);
+  set('cmi.core.score.max', max);
+  if (!completed) { set('cmi.core.lesson_status', 'completed'); completed = true; }
+  commit();
+}
+
 init();
