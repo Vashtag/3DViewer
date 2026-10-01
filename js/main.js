@@ -270,6 +270,8 @@ document.addEventListener('keydown', e => {
     if (labelPlacementMode) { setLabelPlacementMode(false); return; }
     if (pinMode) { setPinMode(false); return; }
   }
+  // Don't hijack keys while the user is typing (quiz answers, label names…).
+  if (e.target.closest?.('input, textarea, [contenteditable="true"]')) return;
   // Q/E roll works in orbit mode.
   if (navMode === 'orbit') {
     if (e.code === 'KeyQ') rollKeys.ccw = true;
@@ -2209,6 +2211,7 @@ let quizMarker = null;
 let quizPrevLabels = false;
 let quizTimer = null;
 let quizTimeLeft = 0;
+let quizRun = 0; // bumped per quiz so a stale auto-advance can't fire into a new one
 
 function stopQuizTimer() { if (quizTimer) { clearInterval(quizTimer); quizTimer = null; } }
 
@@ -2232,26 +2235,86 @@ function startQuizTimer() {
   }, 1000);
 }
 
-// Buzzer: no answer in time counts as a miss, then the quiz auto-advances to the
-// next "station" after a brief glimpse of the correct answer.
+// Buzzer. A typed answer is graded on whatever has been written so far (like
+// putting the pen down at a station); an unanswered multiple-choice question
+// counts as a miss. Either way the quiz then auto-advances.
 function timeoutQuiz() {
   if (quizAnswered) return;
-  quizAnswered = true;
   const q = quizList[quizIdx];
+  if (q.type === 'typed') { answerTyped(true); return; }
   [...quizOptions.children].forEach(b => {
     b.disabled = true;
     if (b.textContent === q.answer) b.classList.add('correct');
   });
-  quizFeedback.className = 'wrong';
-  quizFeedback.textContent = `Time's up — Answer: ${q.answer}`;
-  quizNextBtn.classList.add('hidden');
+  finishQuestion(false, '(no answer)', true);
+}
+
+// Shared end-of-question handling for both formats: score, feedback, SCORM
+// interaction, then either a Next button or (after a timeout) auto-advance.
+function finishQuestion(correct, response, timedOut) {
+  quizAnswered = true;
+  stopQuizTimer();
+  const q = quizList[quizIdx];
+  if (correct) quizScore++;
+  quizFeedback.className = correct ? 'correct' : 'wrong';
+  quizFeedback.textContent = correct
+    ? 'Correct!'
+    : `${timedOut ? "Time's up — " : ''}Answer: ${q.answer}`;
+
   scormReportInteraction({
-    id: q.answer, response: '(no answer)', answer: q.answer,
-    correct: false, latencyMs: QUIZ_SECONDS * 1000,
+    id: q.answer,
+    response,
+    answer: q.answer,
+    correct,
+    latencyMs: timedOut ? QUIZ_SECONDS * 1000 : performance.now() - quizQStart,
   });
-  setTimeout(() => {
-    if (!quizPanel.classList.contains('hidden') && quizAnswered) nextQuiz();
-  }, 1800);
+
+  if (timedOut) {
+    quizNextBtn.classList.add('hidden');
+    const run = quizRun, idx = quizIdx;
+    setTimeout(() => {
+      if (run === quizRun && idx === quizIdx && !quizPanel.classList.contains('hidden')) nextQuiz();
+    }, 1800);
+  } else {
+    quizNextBtn.textContent = quizIdx + 1 < quizList.length ? 'Next' : 'See results';
+    quizNextBtn.classList.remove('hidden');
+    quizNextBtn.focus(); // Enter moves on
+  }
+}
+
+// Typed answers are compared ignoring case, accents, spacing and punctuation —
+// only the words themselves have to be right.
+function _normAnswer(s) {
+  return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function renderTypedAnswer() {
+  const form = document.createElement('form');
+  form.className = 'quiz-typed';
+  form.innerHTML =
+    '<input type="text" class="quiz-input" placeholder="Structure name…" aria-label="Your answer"' +
+    ' autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />' +
+    '<button type="submit" class="quiz-submit">Submit</button>';
+  form.addEventListener('submit', e => { e.preventDefault(); answerTyped(false); });
+  quizOptions.appendChild(form);
+  setTimeout(() => form.querySelector('input').focus(), 30);
+}
+
+function answerTyped(timedOut) {
+  if (quizAnswered) return;
+  const input = quizOptions.querySelector('.quiz-input');
+  const text = input ? input.value.trim() : '';
+  if (!text && !timedOut) { input?.focus(); return; } // ignore an empty Submit
+  const q = quizList[quizIdx];
+  const correct = !!text && _normAnswer(text) === _normAnswer(q.answer);
+  if (input) {
+    input.disabled = true;
+    input.classList.add(correct ? 'correct' : 'wrong');
+  }
+  const submit = quizOptions.querySelector('.quiz-submit');
+  if (submit) submit.disabled = true;
+  finishQuestion(correct, text || '(no answer)', timedOut);
 }
 
 function _shuffle(a) {
@@ -2267,9 +2330,16 @@ function buildQuiz() {
   const named = labelData.filter(l => l.name && l.name.trim());
   const names = [...new Set(named.map(l => l.name))];
   const picks = _shuffle(named).slice(0, Math.min(QUIZ_MAX, named.length));
-  quizList = picks.map(entry => {
+  // Half multiple choice, half typed recall, in a shuffled order.
+  const types = _shuffle(picks.map((_, i) => (i % 2 ? 'typed' : 'mc')));
+  quizList = picks.map((entry, i) => {
     const distractors = _shuffle(names.filter(n => n !== entry.name)).slice(0, 3);
-    return { entry, answer: entry.name, options: _shuffle([entry.name, ...distractors]) };
+    return {
+      entry,
+      answer: entry.name,
+      type: types[i],
+      options: _shuffle([entry.name, ...distractors]),
+    };
   });
 }
 
@@ -2316,6 +2386,7 @@ function startQuiz() {
   if (!currentModel) return;
   buildQuiz();
   if (!quizList.length) return;
+  quizRun++;
   quizIdx = 0;
   quizScore = 0;
   quizPrevLabels = labelsVisible;
@@ -2331,19 +2402,25 @@ function showQuizQuestion() {
   quizAnswered = false;
   quizQStart = performance.now();
   quizProgress.textContent = `Question ${quizIdx + 1} of ${quizList.length}`;
-  quizQuestion.textContent = 'What is this structure?';
+  quizQuestion.textContent = q.type === 'typed'
+    ? 'Type the name of this structure:'
+    : 'What is this structure?';
   quizFeedback.className = 'hidden';
   quizFeedback.textContent = '';
   quizNextBtn.classList.add('hidden');
   quizResult.classList.add('hidden');
   quizOptions.innerHTML = '';
-  q.options.forEach(name => {
-    const b = document.createElement('button');
-    b.className = 'quiz-option';
-    b.textContent = name;
-    b.addEventListener('click', () => answerQuiz(b, name));
-    quizOptions.appendChild(b);
-  });
+  if (q.type === 'typed') {
+    renderTypedAnswer();
+  } else {
+    q.options.forEach(name => {
+      const b = document.createElement('button');
+      b.className = 'quiz-option';
+      b.textContent = name;
+      b.addEventListener('click', () => answerQuiz(b, name));
+      quizOptions.appendChild(b);
+    });
+  }
 
   ensureMarker();
   const pos = new THREE.Vector3(...q.entry.position);
@@ -2357,28 +2434,14 @@ function showQuizQuestion() {
 
 function answerQuiz(btn, chosen) {
   if (quizAnswered) return;
-  quizAnswered = true;
-  stopQuizTimer();
   const q = quizList[quizIdx];
   const correct = chosen === q.answer;
-  if (correct) quizScore++;
   [...quizOptions.children].forEach(b => {
     b.disabled = true;
     if (b.textContent === q.answer) b.classList.add('correct');
     else if (b === btn) b.classList.add('wrong');
   });
-  quizFeedback.className = correct ? 'correct' : 'wrong';
-  quizFeedback.textContent = correct ? 'Correct!' : `Answer: ${q.answer}`;
-  quizNextBtn.textContent = quizIdx + 1 < quizList.length ? 'Next' : 'See results';
-  quizNextBtn.classList.remove('hidden');
-
-  scormReportInteraction({
-    id: q.answer,
-    response: chosen,
-    answer: q.answer,
-    correct,
-    latencyMs: performance.now() - quizQStart,
-  });
+  finishQuestion(correct, chosen, false);
 }
 
 function nextQuiz() {
