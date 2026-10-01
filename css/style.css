@@ -1408,6 +1408,7 @@ body {
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
+  padding-right: 24px; /* keep the countdown clear of the close (×) button */
 }
 #quiz-time {
   font-size: 0.8rem;
@@ -1461,6 +1462,36 @@ body {
 .quiz-option:disabled { cursor: default; }
 .quiz-option.correct { border-color: #33c06a; background: rgba(51, 192, 106, 0.20); }
 .quiz-option.wrong   { border-color: #e0555f; background: rgba(224, 85, 95, 0.20); }
+
+/* Typed-answer questions: text box + Submit */
+.quiz-typed { display: flex; gap: 8px; }
+.quiz-input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1.5px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.quiz-input:focus { border-color: var(--accent); }
+.quiz-input.correct { border-color: #33c06a; background: rgba(51, 192, 106, 0.20); }
+.quiz-input.wrong   { border-color: #e0555f; background: rgba(224, 85, 95, 0.20); }
+.quiz-submit {
+  padding: 0 14px;
+  border-radius: 9px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.quiz-submit:hover:not(:disabled) { background: var(--accent-hover); }
+.quiz-submit:disabled { opacity: 0.5; cursor: default; }
 
 #quiz-feedback { margin-top: 11px; font-size: 0.85rem; font-weight: 600; }
 #quiz-feedback.hidden { display: none; }
