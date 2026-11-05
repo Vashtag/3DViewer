@@ -1044,14 +1044,17 @@ body {
 }
 
 /* ── Loading overlay ──
-   A still image of the model ("poster") sits where the model will appear,
-   with a thin progress bar along the top of the viewer and a small status
-   pill. Without a poster the overlay dims the viewer instead. */
+   A faint still image of the model ("poster") sits where the model will
+   appear; the spinner, status and progress bar sit on top of it. Without a
+   poster the overlay simply dims the viewer. */
 #loading-overlay {
   position: absolute;
   inset: 0;
   z-index: 10;
-  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 17, 23, 0.55);
   transition: opacity 0.3s;
 }
 #loading-overlay.no-poster { background: rgba(15, 17, 23, 0.88); }
@@ -1067,51 +1070,43 @@ body {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  opacity: 0.55;
-  filter: blur(2px) saturate(0.7);
+  opacity: 0.22;
+  filter: blur(3px) saturate(0.6);
 }
 #loading-overlay.no-poster #loading-poster { display: none; }
 
 #loading-box {
-  position: absolute;
-  left: 50%;
-  bottom: 22px;
-  transform: translateX(-50%);
+  position: relative; /* above the poster */
+  text-align: center;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  background: rgba(26, 29, 39, 0.85);
-  border: 1px solid var(--border);
-  backdrop-filter: blur(6px);
-  white-space: nowrap;
+  gap: 14px;
 }
-#loading-overlay.no-poster #loading-box { bottom: 50%; transform: translate(-50%, 50%); }
 
 #loading-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--border);
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
-  flex-shrink: 0;
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
 #loading-text {
-  font-size: 0.82rem;
+  font-size: 0.9rem;
   color: var(--text);
   font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 
 #progress-bar-track {
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.06);
+  width: 180px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
   overflow: hidden;
 }
 
@@ -1119,7 +1114,7 @@ body {
   height: 100%;
   width: 0%;
   background: var(--accent);
-  box-shadow: 0 0 8px var(--accent);
+  border-radius: 2px;
   transition: width 0.15s ease;
 }
 
@@ -1488,7 +1483,6 @@ body {
   #sidebar-open-btn     { display: none; }
   #view-buttons    { display: none; }
   #gizmo-canvas   { display: none; }
-  #screenshot-btn { display: none; }
   #controls-hint  { display: none; }
   .nav-btn[data-mode="fly"] { display: none; }
 
@@ -1728,4 +1722,244 @@ body {
 @keyframes quizpulse {
   0%   { transform: scale(0.6); opacity: 1; }
   100% { transform: scale(1.7); opacity: 0.15; }
+}
+
+/* ── Cross-sections ── */
+#sections-section.hidden, #sections-edit-group.hidden, #sec-editor.hidden { display: none; }
+#sections-btn, #sec-add, #sec-place, #sec-delete, #sec-download {
+  width: 100%;
+  padding: 8px 8px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+#sections-btn:hover, #sec-add:hover, #sec-place:hover, #sec-delete:hover, #sec-download:hover {
+  border-color: var(--accent); color: var(--text); background: #1e2540;
+}
+#sections-btn.active, #sec-place.active {
+  border-color: var(--accent); background: #1e2540; color: var(--text);
+}
+#sec-add:disabled { opacity: 0.5; cursor: default; }
+#sec-delete { color: #f2868f; }
+#sec-delete:hover { border-color: #e0555f; background: rgba(224, 85, 95, 0.12); color: #f2868f; }
+#sec-add, #sec-download { margin-top: 8px; }
+
+#sec-list { display: flex; flex-direction: column; gap: 4px; }
+.sec-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 7px;
+  border: 1.5px solid transparent;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-align: left;
+  cursor: pointer;
+}
+.sec-item:hover { color: var(--text); }
+.sec-item.active { border-color: var(--accent); background: #1e2540; color: var(--text); }
+.sec-item .sec-num { font-variant-numeric: tabular-nums; color: var(--text-muted); width: 1.2em; }
+.sec-item .sec-img-flag { margin-left: auto; font-size: 0.7rem; }
+
+#sec-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+.sec-field { display: flex; flex-direction: column; gap: 5px; font-size: 0.75rem; color: var(--text); }
+.sec-hint, .sec-val { color: var(--text-muted); font-size: 0.7rem; }
+.sec-field .sec-val { float: right; }
+.sec-field input[type="text"], .sec-field textarea {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.78rem;
+  resize: vertical;
+}
+.sec-field input[type="range"] { width: 100%; accent-color: var(--accent); }
+.sec-field input[type="file"] { font-size: 0.7rem; color: var(--text-muted); max-width: 100%; }
+
+/* Panel beside the model */
+#section-panel {
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
+  width: 320px;
+  max-height: calc(100% - 32px);
+  overflow-y: auto;
+  z-index: 8;
+}
+#section-panel.hidden { display: none; }
+#viewer-container.section-active #view-buttons { display: none; }
+
+#section-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(20, 23, 33, 0.95);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px 16px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+}
+#section-close {
+  position: absolute;
+  top: 6px; right: 8px;
+  width: 32px; height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1.15rem;
+  cursor: pointer;
+  border-radius: 6px;
+}
+#section-close:hover { color: var(--text); background: rgba(255, 255, 255, 0.06); }
+#section-progress {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  padding-right: 32px;
+}
+#section-name { font-size: 0.98rem; font-weight: 600; color: var(--text); margin-top: -4px; }
+#section-figure {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #000;
+  cursor: zoom-in;
+  aspect-ratio: 4 / 3;
+}
+#section-figure.no-image { cursor: default; background: var(--bg); }
+#section-img { display: block; width: 100%; height: 100%; object-fit: contain; }
+#section-figure.no-image #section-img { display: none; }
+#section-noimg {
+  display: none;
+  position: absolute;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+#section-figure.no-image #section-noimg { display: flex; }
+#section-note { font-size: 0.8rem; color: var(--text-muted); line-height: 1.45; }
+#section-note:empty { display: none; }
+#section-nav { display: flex; gap: 8px; }
+#section-nav button {
+  flex: 1;
+  padding: 8px;
+  border-radius: 9px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+#section-nav button:hover:not(:disabled) { border-color: var(--accent); }
+#section-nav button:disabled { opacity: 0.4; cursor: default; }
+
+/* The stack of cuts, rostral (top) to caudal (bottom), on a vertical rail */
+#section-ladder {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 14px;
+  border-left: 2px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+#section-ladder button {
+  position: relative;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-align: left;
+  cursor: pointer;
+}
+#section-ladder button::before {
+  content: "";
+  position: absolute;
+  left: -20px;
+  top: 50%;
+  width: 10px; height: 10px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--border);
+}
+#section-ladder button:hover { color: var(--text); background: rgba(255, 255, 255, 0.04); }
+#section-ladder button[aria-current="true"] { color: var(--text); background: #1e2540; }
+#section-ladder button[aria-current="true"]::before { background: #ffd23f; border-color: #ffd23f; }
+#section-cut-seg button { padding: 6px 10px; min-width: 0; }
+.section-cut-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.8rem; color: var(--text); }
+
+@media (max-width: 600px) {
+  #section-panel {
+    top: auto; bottom: 0; left: 0; right: 0;
+    transform: none;
+    width: 100%;
+    max-height: 60%;
+  }
+  #section-card { border-radius: 14px 14px 0 0; }
+  #section-figure { aspect-ratio: auto; height: 28vh; }
+  #section-ladder { display: none; } /* Rostral / Caudal buttons are enough on a phone */
+}
+
+/* Full-size slide */
+#slide-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  background: rgba(5, 6, 9, 0.92);
+  cursor: zoom-out;
+}
+#slide-lightbox.hidden { display: none; }
+#slide-lightbox-img { max-width: 100%; max-height: calc(100% - 40px); object-fit: contain; border-radius: 6px; }
+#slide-lightbox-cap { color: var(--text); font-size: 0.9rem; }
+#slide-lightbox-close {
+  position: absolute;
+  top: 12px; right: 12px;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: rgba(26, 29, 39, 0.85);
+  color: var(--text);
+  font-size: 1.3rem;
+  cursor: pointer;
 }

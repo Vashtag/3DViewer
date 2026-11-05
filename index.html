@@ -197,6 +197,12 @@
             </div>
           </div>
 
+          <!-- Cross-sections (shown only when the model has a <id>_sections.json) -->
+          <div id="sections-section" class="hidden">
+            <p class="sidebar-label">Cross-sections</p>
+            <button id="sections-btn" type="button" aria-pressed="false">Show cross-sections</button>
+          </div>
+
           <!-- Author tools (only when the page URL contains ?edit) -->
           <div id="edit-section" class="hidden">
             <div class="edit-group">
@@ -224,6 +230,41 @@
                 <button id="edit-load" type="button">Load</button>
                 <input type="file" id="label-file-input" accept=".json" style="display:none">
                 <button id="edit-download" type="button">Download</button>
+              </div>
+            </div>
+
+            <div class="edit-group hidden" id="sections-edit-group">
+              <button class="edit-group-toggle" type="button" data-group="sections">
+                <span>Cross-sections</span><span class="edit-group-caret">▸</span>
+              </button>
+              <div class="edit-group-body hidden">
+                <p class="edit-hint-small">Add up to 8 cuts. For each one, click the model at the level of the slide, fine-tune with the sliders, then attach the slide image. Download the file and put it, with the images, in <code>models/&lt;id&gt;/</code> (images in a <code>sections/</code> folder).</p>
+                <div id="sec-list" role="list"></div>
+                <button id="sec-add" type="button">Add cut</button>
+                <div id="sec-editor" class="hidden">
+                  <label class="sec-field">Name
+                    <input type="text" id="sec-name" placeholder="e.g. Rostral pons" autocomplete="off">
+                  </label>
+                  <button id="sec-place" type="button">Click the model to set the level</button>
+                  <label class="sec-field">Level <span class="sec-hint">caudal ↔ rostral</span>
+                    <input type="range" id="sec-level" min="0" max="1000" step="1">
+                  </label>
+                  <label class="sec-field">Tilt front / back <span class="sec-val" id="sec-tilt-a-val">0°</span>
+                    <input type="range" id="sec-tilt-a" min="-60" max="60" step="1" value="0">
+                  </label>
+                  <label class="sec-field">Tilt side to side <span class="sec-val" id="sec-tilt-b-val">0°</span>
+                    <input type="range" id="sec-tilt-b" min="-60" max="60" step="1" value="0">
+                  </label>
+                  <label class="sec-field">Slide image
+                    <input type="file" id="sec-image" accept="image/*">
+                    <span class="sec-hint" id="sec-image-name">No image yet</span>
+                  </label>
+                  <label class="sec-field">Notes <span class="sec-hint">optional</span>
+                    <textarea id="sec-note" rows="2" placeholder="Key structures at this level"></textarea>
+                  </label>
+                  <button id="sec-delete" type="button">Delete this cut</button>
+                </div>
+                <button id="sec-download" type="button">Download cross-sections file</button>
               </div>
             </div>
 
@@ -259,14 +300,17 @@
           <p id="empty-sub">Choose a model from the list on the left.</p>
         </div>
 
-        <!-- Loading overlay: a still "poster" of the model (models/<id>/<id>_poster.webp)
-             shows in place while the GLB downloads, with a thin progress bar on top. -->
+        <!-- Loading overlay: a faint still "poster" of the model
+             (models/<id>/<id>_poster.webp) sits where the model will appear,
+             with the spinner, status and progress bar on top of it. -->
         <div id="loading-overlay" class="hidden">
           <img id="loading-poster" alt="" aria-hidden="true">
-          <div id="progress-bar-track"><div id="progress-bar-fill"></div></div>
           <div id="loading-box">
             <div id="loading-spinner"></div>
             <p id="loading-text">Loading model…</p>
+            <div id="progress-bar-track">
+              <div id="progress-bar-fill"></div>
+            </div>
           </div>
         </div>
 
@@ -348,6 +392,34 @@
           </div>
         </div>
 
+        <!-- Cross-section panel: the slide image for the selected cut, docked
+             beside the model (bottom sheet on phones). Built by js/main.js. -->
+        <div id="section-panel" class="hidden" role="region" aria-label="Cross-sections">
+          <div id="section-card">
+            <button id="section-close" type="button" aria-label="Close cross-sections">&times;</button>
+            <p id="section-progress"></p>
+            <p id="section-name"></p>
+            <button id="section-figure" type="button" aria-label="Enlarge slide">
+              <img id="section-img" alt="">
+              <span id="section-noimg">No slide image attached yet.</span>
+            </button>
+            <p id="section-note"></p>
+            <div id="section-nav">
+              <button id="section-prev" type="button">&uarr; Rostral</button>
+              <button id="section-next" type="button">Caudal &darr;</button>
+            </div>
+            <ol id="section-ladder" aria-label="All cuts, rostral to caudal"></ol>
+            <div class="section-cut-row">
+              <span>Cut away</span>
+              <div id="section-cut-seg" class="settings-seg">
+                <button type="button" data-cut="none" aria-pressed="true" class="active">None</button>
+                <button type="button" data-cut="above" aria-pressed="false">Above</button>
+                <button type="button" data-cut="below" aria-pressed="false">Below</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Label creation modal (edit mode only) -->
         <div id="label-modal" class="hidden">
           <div id="label-modal-box">
@@ -393,6 +465,13 @@
         </div>
       </main>
     </div>
+  </div>
+
+  <!-- Full-size view of a cross-section slide -->
+  <div id="slide-lightbox" class="hidden" role="dialog" aria-modal="true" aria-label="Slide">
+    <img id="slide-lightbox-img" alt="">
+    <p id="slide-lightbox-cap"></p>
+    <button id="slide-lightbox-close" type="button" aria-label="Close">&times;</button>
   </div>
 
   <!-- Screen-reader announcements (view changes, screenshot saved…) -->

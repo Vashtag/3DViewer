@@ -68,6 +68,11 @@ let drawColor   = '#ffd23f';
 // (WCAG 2.1.4). Arrow keys and +/- only act while the 3D canvas has focus.
 let singleKeyShortcuts = localStorage.getItem('singleKeys') !== '0';
 
+// Cross-section state (see "Cross-sections" near the end). Declared up here
+// because the render loop and resize(), which run at startup, check it.
+let sectionState     = null;
+let sectionPlaceMode = false;
+
 // ── Mobile drawer ─────────────────────────────────────────
 function openDrawer()  {
   sidebarEl.classList.add('open');
@@ -223,6 +228,9 @@ const MODELS = [
   {
     id: 'brainstem', label: 'Brainstem', file: 'models/brainstem/brainstem.glb',
     category: 'CNS',
+    // Cross-section slides: cuts + images in brainstem_sections.json, authored
+    // with ?edit → Cross-sections. Only models with this flag get the tools.
+    crossSections: true,
     rotation: [0, 0, 0],
     brightness: 2.2,
     views: [
@@ -240,6 +248,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true,
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setClearColor(0x000000, 0); // fully transparent
+renderer.localClippingEnabled = true; // used by the cross-section "Cut away" option
 
 // ── Scene & Camera ────────────────────────────────────────
 const scene = new THREE.Scene();
@@ -317,6 +326,8 @@ function flySpeedPerSec() {
 
 document.addEventListener('keydown', e => {
   if (e.code === 'Escape') {
+    if (!slideLightbox.classList.contains('hidden')) { closeSlideLightbox(); return; }
+    if (sectionPlaceMode) { setSectionPlaceMode(false); return; }
     if (drawMode) { setDrawMode(false); return; }
     if (lineDrawing) { setLineDrawing(false); return; }
     if (labelPlacementMode) { setLabelPlacementMode(false); return; }
@@ -388,6 +399,7 @@ function resize() {
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   sizeDrawCanvas(w, h);
+  applySectionViewOffset();
 }
 new ResizeObserver(resize).observe(container);
 resize();
@@ -565,6 +577,7 @@ function animate() {
   // Keep the headlamp at the camera so the viewed face is always lit.
   headlamp.position.copy(camera.position);
 
+  updateSectionClip(); // keep the cut plane attached to the model as it turns
   renderer.render(scene, camera);
   labelRenderer.render(scene, camera);
   updateLabelLeaders();
@@ -862,6 +875,7 @@ async function loadRegion(region) {
 
   if (currentModel) {
     if (!quizPanel.classList.contains('hidden')) endQuiz(); // close any open quiz
+    clearSections();
     clearLabels();
     clearLines();
     setLineDrawing(false);
@@ -911,6 +925,7 @@ async function loadRegion(region) {
       showViewerUI();
       scormModelOpened(); // count toward SCORM completion (no-op outside an LMS)
       loadLabels(model);
+      loadSections(model);
       initLineLayer();
       loadLines(model);
       initPinLayer();
@@ -1445,7 +1460,7 @@ function updateLabelLeaders() {
 
 // Edit mode: label placement — only active when labelPlacementMode is on.
 function setLabelPlacementMode(on) {
-  if (on) { setOrientMode(false); setDrawMode(false); }
+  if (on) { setOrientMode(false); setDrawMode(false); setSectionPlaceMode(false); }
   labelPlacementMode = on;
   labelPlaceBtn.classList.toggle('active', on);
   container.classList.toggle('label-place-mode', on);
@@ -1589,6 +1604,9 @@ document.querySelectorAll('.edit-group-toggle').forEach(toggle => {
     }
     // Orienting is implicit: it's on whenever the Orient group is open.
     setOrientMode(nowOpen && toggle.dataset.group === 'orient');
+    // The cross-section editor previews in the slide panel.
+    if (toggle.dataset.group === 'sections' && nowOpen) openSectionPanel();
+    if (!(nowOpen && toggle.dataset.group === 'sections')) setSectionPlaceMode(false);
   });
 });
 
@@ -1741,7 +1759,7 @@ function setLinesVisible(v) {
 }
 
 function setLineDrawing(on) {
-  if (on) { setOrientMode(false); setDrawMode(false); }
+  if (on) { setOrientMode(false); setDrawMode(false); setSectionPlaceMode(false); }
   lineDrawing = on;
   lineDrawBtn.classList.toggle('active', on);
   container.classList.toggle('line-draw-mode', on);
@@ -2046,7 +2064,7 @@ let pinMode  = false;
 let pinCount = 0;
 
 function setPinMode(on) {
-  if (on) { setOrientMode(false); setDrawMode(false); }
+  if (on) { setOrientMode(false); setDrawMode(false); setSectionPlaceMode(false); }
   pinMode = on;
   pinBtn.classList.toggle('active', on);
   pinBtn.setAttribute('aria-pressed', String(on));
@@ -2505,6 +2523,7 @@ function applyQuizViewOffset() {
 
 function startQuiz() {
   setDrawMode(false);
+  closeSectionPanel();
   if (!currentModel) return;
   buildQuiz();
   if (!quizList.length) return;
@@ -2616,6 +2635,7 @@ const MODE_TEXT = {
   draw:  'Drag to draw. Done clears the drawing.',
   pin:   'Click the model to drop a pin. Click a pin to remove it.',
   label: 'Click the model to place a label.',
+  section: 'Click the model at the level of this cut.',
   line:  'Click the model to add points, then Finish line.',
 };
 function currentClickMode() {
@@ -2623,6 +2643,7 @@ function currentClickMode() {
   if (pinMode) return 'pin';
   if (labelPlacementMode) return 'label';
   if (lineDrawing) return 'line';
+  if (sectionPlaceMode) return 'section';
   return null;
 }
 function updateModeBanner() {
@@ -2637,6 +2658,7 @@ modeBannerDone.addEventListener('click', () => {
   if (pinMode) setPinMode(false);
   if (labelPlacementMode) setLabelPlacementMode(false);
   if (lineDrawing) setLineDrawing(false);
+  if (sectionPlaceMode) setSectionPlaceMode(false);
 });
 
 // ── Toast + screen-reader announcements ──────────────────
@@ -2709,6 +2731,7 @@ function setDrawMode(on) {
     if (navMode === 'fly') setNavMode('orbit');
     if (!quizPanel.classList.contains('hidden')) return; // not during a quiz
     setPinMode(false);
+    setSectionPlaceMode(false);
     if (EDIT_MODE) { setLabelPlacementMode(false); setLineDrawing(false); setOrientMode(false); }
   }
   drawMode = on;
@@ -2864,4 +2887,536 @@ document.addEventListener('keydown', e => {
 const _posterCache = [];
 (window.requestIdleCallback || (fn => setTimeout(fn, 1500)))(() => {
   MODELS.forEach(m => { const img = new Image(); img.src = posterUrl(m); _posterCache.push(img); });
+});
+
+// ── Cross-sections ───────────────────────────────────────
+// A model can carry up to 8 "cuts" (models/<id>/<id>_sections.json), each a
+// plane through the specimen with a histology slide image attached. Students
+// step through them in a panel beside the model: the cut's outline lights up
+// on the specimen and the slide image shows next to it. Authors add and
+// position cuts in edit mode (?edit → Cross-sections), attach images, and
+// download the file.
+//
+// File format:
+//   { "sections": [ { "name": "Rostral pons",
+//                     "image": "sections/rostral-pons.jpg",   // relative to models/<id>/
+//                     "note": "optional text",
+//                     "point": [x,y,z], "normal": [x,y,z],      // model-local
+//                     "tilt": [frontBackDeg, sideDeg] } ] }      // editor convenience
+const SECTION_MAX = 8;
+const sectionsSection   = document.getElementById('sections-section');
+const sectionsBtn       = document.getElementById('sections-btn');
+const sectionsEditGroup = document.getElementById('sections-edit-group');
+const sectionPanel      = document.getElementById('section-panel');
+const sectionProgress   = document.getElementById('section-progress');
+const sectionNameEl     = document.getElementById('section-name');
+const sectionFigure     = document.getElementById('section-figure');
+const sectionImg        = document.getElementById('section-img');
+const sectionNoImg      = document.getElementById('section-noimg');
+const sectionNoteEl     = document.getElementById('section-note');
+const sectionPrev       = document.getElementById('section-prev');
+const sectionNext       = document.getElementById('section-next');
+const sectionLadder     = document.getElementById('section-ladder');
+const sectionCutSeg     = document.getElementById('section-cut-seg');
+const slideLightbox     = document.getElementById('slide-lightbox');
+const slideLightboxImg  = document.getElementById('slide-lightbox-img');
+const slideLightboxCap  = document.getElementById('slide-lightbox-cap');
+const secList     = document.getElementById('sec-list');
+const secAdd      = document.getElementById('sec-add');
+const secEditor   = document.getElementById('sec-editor');
+const secName     = document.getElementById('sec-name');
+const secPlace    = document.getElementById('sec-place');
+const secLevel    = document.getElementById('sec-level');
+const secTiltA    = document.getElementById('sec-tilt-a');
+const secTiltB    = document.getElementById('sec-tilt-b');
+const secTiltAVal = document.getElementById('sec-tilt-a-val');
+const secTiltBVal = document.getElementById('sec-tilt-b-val');
+const secImage    = document.getElementById('sec-image');
+const secImageName = document.getElementById('sec-image-name');
+const secNote     = document.getElementById('sec-note');
+const secDelete   = document.getElementById('sec-delete');
+const secDownload = document.getElementById('sec-download');
+
+const SECTION_PANEL_W = 320;
+const _clipPlane = new THREE.Plane();
+
+// The specimen's long axis (longest bounding-box side, pointing up in the
+// default view) and two perpendicular axes for tilting, all model-local.
+function computeSectionBasis(model, object) {
+  let mesh = null;
+  object.traverse(c => { if (!mesh && c.isMesh) mesh = c; });
+  if (!mesh) return null;
+  object.updateMatrixWorld(true);
+  const rel = new THREE.Matrix4().copy(object.matrixWorld).invert().multiply(mesh.matrixWorld);
+  mesh.geometry.computeBoundingBox();
+  const box = mesh.geometry.boundingBox.clone().applyMatrix4(rel);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const dims = [size.x, size.y, size.z];
+  const ai = dims.indexOf(Math.max(...dims));
+  const unit = i => new THREE.Vector3(i === 0 ? 1 : 0, i === 1 ? 1 : 0, i === 2 ? 1 : 0);
+  const axis = unit(ai);
+  const others = [0, 1, 2].filter(i => i !== ai);
+  const rot = model.rotation ?? [0, 0, 0];
+  const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(...rot.map(THREE.MathUtils.degToRad)));
+  if (axis.clone().applyQuaternion(q).y < 0) axis.negate();
+  const half = dims[ai] / 2;
+  return {
+    mesh, rel, relInv: rel.clone().invert(),
+    center, axis, e1: unit(others[0]), e2: unit(others[1]),
+    tMin: -half, tMax: half,
+    discR: Math.max(dims[others[0]], dims[others[1]]) * 0.5,
+  };
+}
+
+function sectionNormal(b, tilt) {
+  return b.axis.clone()
+    .applyAxisAngle(b.e1, THREE.MathUtils.degToRad(tilt[0]))
+    .applyAxisAngle(b.e2, THREE.MathUtils.degToRad(tilt[1]))
+    .normalize();
+}
+
+// Model-local outline where the plane slices the scan's surface.
+function sectionContourGeometry(b, point, normal) {
+  const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, point).applyMatrix4(b.relInv);
+  const pos = b.mesh.geometry.attributes.position.array;
+  const idx = b.mesh.geometry.index ? b.mesh.geometry.index.array : null;
+  const triCount = idx ? idx.length / 3 : pos.length / 9;
+  const { x: nx, y: ny, z: nz } = plane.normal, c = plane.constant;
+  const out = [];
+  const v = [0, 0, 0], d = [0, 0, 0];
+  for (let t = 0; t < triCount; t++) {
+    for (let k = 0; k < 3; k++) {
+      const vi = idx ? idx[t * 3 + k] : t * 3 + k;
+      v[k] = vi * 3;
+      d[k] = nx * pos[vi * 3] + ny * pos[vi * 3 + 1] + nz * pos[vi * 3 + 2] + c;
+    }
+    if ((d[0] > 0 && d[1] > 0 && d[2] > 0) || (d[0] < 0 && d[1] < 0 && d[2] < 0)) continue;
+    let n = 0;
+    for (let k = 0; k < 3 && n < 2; k++) {
+      const k2 = (k + 1) % 3;
+      if ((d[k] > 0) === (d[k2] > 0)) continue;
+      const f = d[k] / (d[k] - d[k2]);
+      const a = v[k], bb = v[k2];
+      out.push(pos[a] + (pos[bb] - pos[a]) * f, pos[a + 1] + (pos[bb + 1] - pos[a + 1]) * f, pos[a + 2] + (pos[bb + 2] - pos[a + 2]) * f);
+      n++;
+    }
+    if (n === 1) out.length -= 3; // touched at a vertex only
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(out, 3));
+  geo.applyMatrix4(b.rel); // mesh-local → model-local
+  return geo;
+}
+
+const _discGeo = new THREE.CircleGeometry(1, 64);
+const _zAxis = new THREE.Vector3(0, 0, 1);
+
+function rebuildSection3D(sec) {
+  const st = sectionState;
+  if (sec._contour) { st.group.remove(sec._contour); sec._contour.geometry.dispose(); sec._contour.material.dispose(); }
+  if (sec._disc) { st.group.remove(sec._disc); sec._disc.material.dispose(); }
+  sec._contour = new THREE.LineSegments(
+    sectionContourGeometry(st.basis, sec.point, sec.normal),
+    new THREE.LineBasicMaterial({ color: 0x6fd3ff, transparent: true, opacity: 0.4, depthTest: false })
+  );
+  sec._contour.renderOrder = 20;
+  sec._disc = new THREE.Mesh(_discGeo, new THREE.MeshBasicMaterial({
+    color: 0x6fd3ff, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false,
+  }));
+  sec._disc.scale.setScalar(st.basis.discR);
+  sec._disc.position.copy(sec.point);
+  sec._disc.quaternion.setFromUnitVectors(_zAxis, sec.normal);
+  sec._disc.renderOrder = 19;
+  st.group.add(sec._contour, sec._disc);
+  styleSection3D();
+}
+
+// Active cut: bright yellow outline + translucent plane. Others: faint outline.
+function styleSection3D() {
+  const st = sectionState;
+  if (!st) return;
+  st.sections.forEach((sec, i) => {
+    const on = i === st.active;
+    if (sec._contour) {
+      sec._contour.material.color.set(on ? 0xffd23f : 0x6fd3ff);
+      sec._contour.material.opacity = on ? 1 : 0.35;
+    }
+    if (sec._disc) sec._disc.visible = on;
+  });
+}
+
+function sectionFromData(d, b) {
+  const tilt = Array.isArray(d.tilt) ? [d.tilt[0] || 0, d.tilt[1] || 0] : [0, 0];
+  const normal = Array.isArray(d.normal) ? new THREE.Vector3(...d.normal).normalize() : sectionNormal(b, tilt);
+  if (normal.dot(b.axis) < 0) normal.negate(); // "above" always means rostral
+  const point = Array.isArray(d.point) ? new THREE.Vector3(...d.point) : b.center.clone();
+  return {
+    name: d.name || '', image: d.image || '', note: d.note || '',
+    tilt, normal, point, t: point.clone().sub(b.center).dot(b.axis),
+  };
+}
+
+function sortSections() {
+  const st = sectionState;
+  const active = st.sections[st.active];
+  st.sections.sort((a, b) => b.t - a.t); // rostral (top) first
+  st.active = Math.max(0, st.sections.indexOf(active));
+}
+
+async function loadSections(model) {
+  clearSections();
+  if (!model.crossSections || !currentModel) return;
+  const basis = computeSectionBasis(model, currentModel);
+  if (!basis) return;
+  const group = new THREE.Group();
+  group.visible = false;
+  currentModel.add(group);
+  sectionState = { model, basis, group, sections: [], active: 0, cut: 'none', panelOpen: false };
+  try {
+    const res = await fetch(`models/${model.id}/${model.id}_sections.json`, { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : (data.sections || []);
+      if (sectionState?.model !== model) return; // switched models meanwhile
+      sectionState.sections = list.slice(0, SECTION_MAX).map(d => sectionFromData(d, basis));
+      sortSections();
+      sectionState.sections.forEach(rebuildSection3D);
+    }
+  } catch (e) { /* no sections file yet */ }
+  if (sectionState?.model !== model) return;
+  sectionsSection.classList.toggle('hidden', !sectionState.sections.length);
+  sectionsEditGroup.classList.toggle('hidden', !EDIT_MODE);
+  renderSectionEditor();
+}
+
+function clearSections() {
+  if (sectionState) {
+    closeSectionPanel();
+    sectionState.sections.forEach(sec => {
+      if (sec._contour) { sec._contour.geometry.dispose(); sec._contour.material.dispose(); }
+      if (sec._disc) sec._disc.material.dispose();
+      if (sec._url) URL.revokeObjectURL(sec._url);
+    });
+    sectionState.group.parent?.remove(sectionState.group);
+  }
+  sectionState = null;
+  setSectionPlaceMode(false);
+  sectionsSection.classList.add('hidden');
+  sectionsEditGroup.classList.add('hidden');
+}
+
+// ── Panel ──
+function openSectionPanel(index) {
+  const st = sectionState;
+  if (!st) return;
+  if (!quizPanel.classList.contains('hidden')) endQuiz();
+  if (typeof index === 'number') st.active = index;
+  st.active = Math.min(st.active, Math.max(0, st.sections.length - 1));
+  st.panelOpen = true;
+  st.group.visible = true;
+  sectionPanel.classList.remove('hidden');
+  container.classList.add('section-active');
+  sectionsBtn.classList.add('active');
+  sectionsBtn.setAttribute('aria-pressed', 'true');
+  sectionsBtn.textContent = 'Hide cross-sections';
+  applySectionViewOffset();
+  renderSectionPanel();
+}
+
+function closeSectionPanel() {
+  const st = sectionState;
+  if (!st || !st.panelOpen) return;
+  st.panelOpen = false;
+  st.group.visible = false;
+  setSectionCut('none');
+  sectionPanel.classList.add('hidden');
+  container.classList.remove('section-active');
+  sectionsBtn.classList.remove('active');
+  sectionsBtn.setAttribute('aria-pressed', 'false');
+  sectionsBtn.textContent = 'Show cross-sections';
+  if (quizPanel.classList.contains('hidden')) camera.clearViewOffset();
+}
+
+// Shift the model left so it clears the panel (not on phones: bottom sheet).
+function applySectionViewOffset() {
+  if (!sectionState || !sectionState.panelOpen) return;
+  const w = renderer.domElement.clientWidth, h = renderer.domElement.clientHeight;
+  if (window.matchMedia('(max-width: 600px)').matches) { camera.clearViewOffset(); return; }
+  camera.setViewOffset(w, h, (SECTION_PANEL_W + 32) / 2, 0, w, h);
+}
+
+function sectionImageUrl(sec) {
+  if (sec._url) return sec._url;
+  return sec.image ? `models/${sectionState.model.id}/${sec.image}` : '';
+}
+
+function renderSectionPanel() {
+  const st = sectionState;
+  if (!st) return;
+  const n = st.sections.length;
+  const sec = st.sections[st.active];
+  if (!sec) {
+    sectionProgress.textContent = 'No cuts yet';
+    sectionNameEl.textContent = EDIT_MODE ? 'Use "Add cut" in the sidebar to make the first one.' : '';
+    sectionFigure.classList.add('no-image');
+    sectionNoImg.textContent = 'No slide image attached yet.';
+    sectionNoteEl.textContent = '';
+    sectionPrev.disabled = sectionNext.disabled = true;
+    sectionLadder.replaceChildren();
+  } else {
+    sectionProgress.textContent = `Cut ${st.active + 1} of ${n}`;
+    sectionNameEl.textContent = sec.name || 'Untitled cut';
+    const url = sectionImageUrl(sec);
+    sectionFigure.classList.toggle('no-image', !url);
+    sectionNoImg.textContent = 'No slide image attached yet.';
+    if (url) {
+      sectionImg.src = url;
+      sectionImg.alt = `Slide: ${sec.name || 'cross-section'}`;
+      sectionImg.onerror = () => { sectionFigure.classList.add('no-image'); sectionNoImg.textContent = `Couldn't load ${sec.image}.`; };
+    }
+    sectionNoteEl.textContent = sec.note || '';
+    sectionPrev.disabled = st.active === 0;
+    sectionNext.disabled = st.active === n - 1;
+    sectionLadder.replaceChildren(...st.sections.map((s2, i) => {
+      const li = document.createElement('li');
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = s2.name || `Cut ${i + 1}`;
+      if (i === st.active) b.setAttribute('aria-current', 'true');
+      b.addEventListener('click', () => selectSection(i));
+      li.appendChild(b);
+      return li;
+    }));
+  }
+  styleSection3D();
+}
+
+function selectSection(i) {
+  const st = sectionState;
+  if (!st || i < 0 || i >= st.sections.length) return;
+  st.active = i;
+  renderSectionPanel();
+  renderSectionEditor();
+  const sec = st.sections[i];
+  announce(`Cut ${i + 1} of ${st.sections.length}: ${sec.name || 'untitled'}.`);
+}
+
+sectionsBtn.addEventListener('click', () => {
+  if (sectionState?.panelOpen) closeSectionPanel(); else openSectionPanel();
+  closeDrawer(); // on phones, get the drawer out of the way of the panel
+});
+document.getElementById('section-close').addEventListener('click', closeSectionPanel);
+sectionPrev.addEventListener('click', () => selectSection(sectionState.active - 1));
+sectionNext.addEventListener('click', () => selectSection(sectionState.active + 1));
+
+// "Cut away": clip the specimen on one side of the active plane.
+function setSectionCut(mode) {
+  const st = sectionState;
+  if (!st) return;
+  st.cut = mode;
+  sectionCutSeg.querySelectorAll('button').forEach(b => {
+    b.classList.toggle('active', b.dataset.cut === mode);
+    b.setAttribute('aria-pressed', String(b.dataset.cut === mode));
+  });
+  const planes = mode === 'none' ? [] : [_clipPlane];
+  const mats = Array.isArray(st.basis.mesh.material) ? st.basis.mesh.material : [st.basis.mesh.material];
+  mats.forEach(m => {
+    if (m.userData._origSide === undefined) m.userData._origSide = m.side;
+    m.clippingPlanes = planes;
+    m.side = planes.length ? THREE.DoubleSide : m.userData._origSide; // see inside the shell
+    m.needsUpdate = true;
+  });
+}
+sectionCutSeg.addEventListener('click', e => {
+  const b = e.target.closest('button[data-cut]');
+  if (b) setSectionCut(b.dataset.cut);
+});
+
+// Called every frame: re-derive the world-space clip plane from the model.
+function updateSectionClip() {
+  const st = sectionState;
+  if (!st || st.cut === 'none' || !currentModel) return;
+  const sec = st.sections[st.active];
+  if (!sec) return;
+  // Three.js clips where the signed distance is negative, so "above" (rostral,
+  // along the normal) uses the flipped normal.
+  const n = st.cut === 'above' ? sec.normal.clone().negate() : sec.normal;
+  _clipPlane.setFromNormalAndCoplanarPoint(n, sec.point).applyMatrix4(currentModel.matrixWorld);
+}
+
+// Full-size slide
+function openSlideLightbox() {
+  const sec = sectionState?.sections[sectionState.active];
+  const url = sec && sectionImageUrl(sec);
+  if (!url || sectionFigure.classList.contains('no-image')) return;
+  slideLightboxImg.src = url;
+  slideLightboxImg.alt = `Slide: ${sec.name || 'cross-section'}`;
+  slideLightboxCap.textContent = sec.name || '';
+  slideLightbox.classList.remove('hidden');
+  document.getElementById('slide-lightbox-close').focus();
+}
+function closeSlideLightbox() {
+  slideLightbox.classList.add('hidden');
+  sectionFigure.focus();
+}
+sectionFigure.addEventListener('click', openSlideLightbox);
+slideLightbox.addEventListener('click', closeSlideLightbox);
+
+// ── Edit mode: author the cuts ──
+function setSectionPlaceMode(on) {
+  if (on && !sectionState?.sections[sectionState.active]) on = false;
+  if (on) { setPinMode(false); setDrawMode(false); setLabelPlacementMode(false); setLineDrawing(false); }
+  sectionPlaceMode = on;
+  secPlace.classList.toggle('active', on);
+  container.classList.toggle('label-place-mode', on || labelPlacementMode); // crosshair cursor
+  updateModeBanner();
+}
+
+function renderSectionEditor() {
+  const st = sectionState;
+  if (!EDIT_MODE || !st) return;
+  secAdd.disabled = st.sections.length >= SECTION_MAX;
+  secAdd.textContent = st.sections.length >= SECTION_MAX ? `Add cut (max ${SECTION_MAX})` : 'Add cut';
+  secList.replaceChildren(...st.sections.map((sec, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sec-item' + (i === st.active ? ' active' : '');
+    b.setAttribute('role', 'listitem');
+    b.innerHTML = '<span class="sec-num"></span><span class="sec-label"></span><span class="sec-img-flag"></span>';
+    b.querySelector('.sec-num').textContent = i + 1;
+    b.querySelector('.sec-label').textContent = sec.name || 'Untitled cut';
+    b.querySelector('.sec-img-flag').textContent = sec.image ? 'image' : 'no image';
+    b.addEventListener('click', () => { selectSection(i); if (!st.panelOpen) openSectionPanel(); });
+    return b;
+  }));
+  const sec = st.sections[st.active];
+  secEditor.classList.toggle('hidden', !sec);
+  if (!sec) return;
+  if (document.activeElement !== secName) secName.value = sec.name;
+  if (document.activeElement !== secNote) secNote.value = sec.note;
+  const b = st.basis;
+  secLevel.value = Math.round((sec.t - b.tMin) / (b.tMax - b.tMin) * 1000);
+  secTiltA.value = sec.tilt[0]; secTiltAVal.textContent = `${sec.tilt[0]}°`;
+  secTiltB.value = sec.tilt[1]; secTiltBVal.textContent = `${sec.tilt[1]}°`;
+  secImageName.textContent = sec.image ? sec.image : 'No image yet';
+  secImage.value = '';
+}
+
+// Recompute a cut's plane from its level + tilt, then redraw (throttled to a
+// frame so dragging a slider stays smooth).
+let _secRebuildPending = false;
+function updateActiveSection(changes = {}) {
+  const st = sectionState;
+  const sec = st?.sections[st.active];
+  if (!sec) return;
+  const b = st.basis;
+  if ('t' in changes) sec.t = THREE.MathUtils.clamp(changes.t, b.tMin, b.tMax);
+  if ('tilt' in changes) sec.tilt = changes.tilt;
+  sec.normal = sectionNormal(b, sec.tilt);
+  sec.point = b.center.clone().addScaledVector(b.axis, sec.t);
+  if (_secRebuildPending) return;
+  _secRebuildPending = true;
+  requestAnimationFrame(() => {
+    _secRebuildPending = false;
+    const cur = sectionState?.sections[sectionState.active];
+    if (!cur) return;
+    rebuildSection3D(cur);
+    sortSections();
+    renderSectionPanel();
+    renderSectionEditor();
+  });
+}
+
+secAdd.addEventListener('click', () => {
+  const st = sectionState;
+  if (!st || st.sections.length >= SECTION_MAX) return;
+  const sec = sectionFromData({ tilt: [0, 0], point: st.basis.center.toArray() }, st.basis);
+  st.sections.push(sec);
+  st.active = st.sections.length - 1;
+  rebuildSection3D(sec);
+  sortSections();
+  openSectionPanel();
+  renderSectionEditor();
+  setSectionPlaceMode(true);
+  secName.focus();
+});
+secPlace.addEventListener('click', () => setSectionPlaceMode(!sectionPlaceMode));
+
+renderer.domElement.addEventListener('click', e => {
+  if (!sectionPlaceMode || !sectionState || !currentModel) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  _ndc.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
+  _ndc.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
+  _ray.setFromCamera(_ndc, camera);
+  const hit = _ray.intersectObject(sectionState.basis.mesh, false)[0];
+  if (!hit) return;
+  const local = currentModel.worldToLocal(hit.point.clone());
+  updateActiveSection({ t: local.sub(sectionState.basis.center).dot(sectionState.basis.axis) });
+  setSectionPlaceMode(false);
+});
+
+secLevel.addEventListener('input', () => {
+  const b = sectionState.basis;
+  updateActiveSection({ t: b.tMin + (b.tMax - b.tMin) * (+secLevel.value / 1000) });
+});
+const _onTilt = () => {
+  secTiltAVal.textContent = `${secTiltA.value}°`;
+  secTiltBVal.textContent = `${secTiltB.value}°`;
+  updateActiveSection({ tilt: [+secTiltA.value, +secTiltB.value] });
+};
+secTiltA.addEventListener('input', _onTilt);
+secTiltB.addEventListener('input', _onTilt);
+secName.addEventListener('input', () => {
+  const sec = sectionState?.sections[sectionState.active];
+  if (!sec) return;
+  sec.name = secName.value;
+  renderSectionPanel(); renderSectionEditor();
+});
+secNote.addEventListener('input', () => {
+  const sec = sectionState?.sections[sectionState.active];
+  if (!sec) return;
+  sec.note = secNote.value;
+  renderSectionPanel();
+});
+[secName, secNote].forEach(el => el.addEventListener('keydown', e => e.stopPropagation()));
+secImage.addEventListener('change', () => {
+  const sec = sectionState?.sections[sectionState.active];
+  const file = secImage.files?.[0];
+  if (!sec || !file) return;
+  if (sec._url) URL.revokeObjectURL(sec._url);
+  sec._url = URL.createObjectURL(file); // preview now; the real file goes in sections/
+  sec.image = `sections/${file.name}`;
+  renderSectionPanel(); renderSectionEditor();
+});
+secDelete.addEventListener('click', () => {
+  const st = sectionState;
+  const sec = st?.sections[st.active];
+  if (!sec) return;
+  if (sec._contour) { st.group.remove(sec._contour); sec._contour.geometry.dispose(); sec._contour.material.dispose(); }
+  if (sec._disc) { st.group.remove(sec._disc); sec._disc.material.dispose(); }
+  if (sec._url) URL.revokeObjectURL(sec._url);
+  st.sections.splice(st.active, 1);
+  st.active = Math.min(st.active, Math.max(0, st.sections.length - 1));
+  setSectionPlaceMode(false);
+  renderSectionPanel(); renderSectionEditor();
+});
+secDownload.addEventListener('click', () => {
+  const st = sectionState;
+  if (!st) return;
+  const r = v => v.toArray().map(x => Math.round(x * 1000) / 1000);
+  const data = {
+    sections: st.sections.map(sec => ({
+      name: sec.name, image: sec.image, note: sec.note,
+      point: r(sec.point), normal: r(sec.normal), tilt: sec.tilt,
+    })),
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${st.model.id}_sections.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  const missing = st.sections.filter(s => !s.image).length;
+  showToast(`Saved ${a.download}`, missing ? `${missing} cut(s) have no image` : `copy the images into models/${st.model.id}/sections/`);
 });
