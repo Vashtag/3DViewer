@@ -19,12 +19,50 @@
           <p class="subtitle">School of Anatomy | University of Waterloo</p>
         </div>
       </div>
-      <button id="settings-btn" type="button" aria-label="Settings" title="Settings">&#9881;</button>
+      <div id="header-actions">
+        <button id="shortcuts-btn" type="button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" aria-haspopup="dialog">?</button>
+        <button id="settings-btn" type="button" aria-label="Settings" title="Settings" aria-haspopup="dialog">&#9881;</button>
+      </div>
     </header>
+
+    <!-- Keyboard shortcuts sheet (opened with "?" or the header button) -->
+    <div id="shortcuts-modal" class="hidden">
+      <div id="shortcuts-modal-box" class="dialog-box" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title">
+        <p class="modal-title" id="shortcuts-title">Keyboard shortcuts</p>
+        <div class="shortcut-group">
+          <p class="settings-section-label">Model (click the model first)</p>
+          <dl class="shortcut-list">
+            <div><dt>Rotate</dt><dd><kbd>&larr;</kbd> <kbd>&rarr;</kbd> <kbd>&uarr;</kbd> <kbd>&darr;</kbd></dd></div>
+            <div><dt>Zoom in / out</dt><dd><kbd>+</kbd> <kbd>&minus;</kbd></dd></div>
+          </dl>
+        </div>
+        <div class="shortcut-group">
+          <p class="settings-section-label">Anywhere</p>
+          <dl class="shortcut-list">
+            <div><dt>Roll the view</dt><dd><kbd>Q</kbd> <kbd>E</kbd></dd></div>
+            <div><dt>Reset view</dt><dd><kbd>R</kbd></dd></div>
+            <div><dt>Show / hide labels</dt><dd><kbd>L</kbd></dd></div>
+            <div><dt>This list</dt><dd><kbd>?</kbd></dd></div>
+            <div><dt>Leave pin / draw mode, close dialogs</dt><dd><kbd>Esc</kbd></dd></div>
+          </dl>
+        </div>
+        <div class="shortcut-group">
+          <p class="settings-section-label">Fly mode</p>
+          <dl class="shortcut-list">
+            <div><dt>Move</dt><dd><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></dd></div>
+            <div><dt>Rise / descend</dt><dd><kbd>Space</kbd> <kbd>Shift</kbd></dd></div>
+          </dl>
+        </div>
+        <p class="shortcut-note" id="shortcut-note">Single-key shortcuts can be turned off in Settings.</p>
+        <div class="dialog-actions">
+          <button id="shortcuts-modal-close" type="button">Close</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Settings modal -->
     <div id="settings-modal" class="hidden">
-      <div id="settings-modal-box" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div id="settings-modal-box" class="dialog-box" role="dialog" aria-modal="true" aria-labelledby="settings-title">
         <p class="modal-title" id="settings-title">Settings</p>
 
         <div class="settings-section">
@@ -32,9 +70,9 @@
           <div class="settings-field">
             <span class="settings-field-label">Default background</span>
             <div class="bg-swatches">
-              <button class="bg-swatch" data-bg="dark"  title="Black"></button>
-              <button class="bg-swatch" data-bg="light" title="White"></button>
-              <button class="bg-swatch" data-bg="lab"   title="Lab photo"></button>
+              <button type="button" class="bg-swatch" data-bg="dark"  title="Black" aria-label="Black background" aria-pressed="false"></button>
+              <button type="button" class="bg-swatch" data-bg="light" title="White" aria-label="White background" aria-pressed="false"></button>
+              <button type="button" class="bg-swatch" data-bg="lab"   title="Lab photo" aria-label="Lab photo background" aria-pressed="false"></button>
             </div>
           </div>
           <label class="settings-row">
@@ -65,12 +103,16 @@
             <input type="checkbox" id="reduced-motion-toggle">
             Reduce motion
           </label>
+          <label class="settings-row">
+            <input type="checkbox" id="single-key-toggle" checked>
+            Single-key shortcuts (R, L, Q, E, ?)
+          </label>
           <div class="settings-field">
             <span class="settings-field-label">Label text size</span>
             <div id="label-size-seg" class="settings-seg">
-              <button type="button" data-size="s">S</button>
-              <button type="button" data-size="m" class="active">M</button>
-              <button type="button" data-size="l">L</button>
+              <button type="button" data-size="s" aria-label="Small labels">S</button>
+              <button type="button" data-size="m" class="active" aria-label="Medium labels">M</button>
+              <button type="button" data-size="l" aria-label="Large labels">L</button>
             </div>
           </div>
         </div>
@@ -96,7 +138,7 @@
       <aside id="sidebar">
         <div class="sidebar-header">
           <p class="sidebar-label">Regions</p>
-          <button id="sidebar-collapse-btn" type="button" aria-label="Hide sidebar" title="Hide sidebar">&#10094;</button>
+          <button id="sidebar-collapse-btn" type="button" aria-controls="sidebar" aria-label="Hide sidebar" title="Hide sidebar">&#10094;</button>
         </div>
         <!-- Region buttons are generated from the MODELS list in js/main.js -->
         <nav id="region-selector"></nav>
@@ -105,15 +147,15 @@
         <div id="display-controls" class="hidden">
           <p class="sidebar-label">Background</p>
           <div id="bg-swatches">
-            <button class="bg-swatch active" data-bg="dark"  title="Black"></button>
-            <button class="bg-swatch"        data-bg="light" title="White"></button>
-            <button class="bg-swatch"        data-bg="lab"   title="Lab photo"></button>
+            <button type="button" class="bg-swatch active" data-bg="dark"  title="Black" aria-label="Black background" aria-pressed="true"></button>
+            <button type="button" class="bg-swatch"        data-bg="light" title="White" aria-label="White background" aria-pressed="false"></button>
+            <button type="button" class="bg-swatch"        data-bg="lab"   title="Lab photo" aria-label="Lab photo background" aria-pressed="false"></button>
           </div>
 
           <!-- Labels (shown only when the current model has annotations) -->
           <div id="labels-section" class="hidden">
             <p class="sidebar-label">Labels</p>
-            <button id="labels-toggle" type="button">Show labels</button>
+            <button id="labels-toggle" type="button" aria-pressed="false">Show labels</button>
             <button id="quiz-btn" type="button" class="hidden">Test me</button>
             <div id="category-filters" class="hidden">
               <label class="cat-filter-row" data-filter-cat="">
@@ -217,22 +259,43 @@
           <p id="empty-sub">Choose a model from the list on the left.</p>
         </div>
 
-        <!-- Loading overlay -->
+        <!-- Loading overlay: a still "poster" of the model (models/<id>/<id>_poster.webp)
+             shows in place while the GLB downloads, with a thin progress bar on top. -->
         <div id="loading-overlay" class="hidden">
+          <img id="loading-poster" alt="" aria-hidden="true">
+          <div id="progress-bar-track"><div id="progress-bar-fill"></div></div>
           <div id="loading-box">
             <div id="loading-spinner"></div>
             <p id="loading-text">Loading model…</p>
-            <div id="progress-bar-track">
-              <div id="progress-bar-fill"></div>
-            </div>
           </div>
         </div>
 
-        <!-- Three.js canvas -->
-        <canvas id="viewer-canvas"></canvas>
+        <!-- Three.js canvas. Focusable so the arrow / +/- keys can drive it. -->
+        <canvas id="viewer-canvas" tabindex="0" role="application"
+                aria-roledescription="3D viewer"
+                aria-label="3D model. Arrow keys rotate, plus and minus zoom."></canvas>
+
+        <!-- Freehand drawing layer (Draw mode), screen-space like a whiteboard -->
+        <canvas id="draw-canvas" aria-hidden="true"></canvas>
+
+        <!-- Shows which click-mode is on (pin / draw / place label / line) and how to leave it -->
+        <div id="mode-banner" class="hidden">
+          <span id="mode-banner-text"></span>
+          <span id="draw-tools" class="hidden">
+            <button type="button" class="draw-color active" data-color="#ffd23f" aria-label="Yellow pen" aria-pressed="true" style="--c:#ffd23f"></button>
+            <button type="button" class="draw-color" data-color="#ff5a5a" aria-label="Red pen" aria-pressed="false" style="--c:#ff5a5a"></button>
+            <button type="button" class="draw-color" data-color="#4fd2ff" aria-label="Blue pen" aria-pressed="false" style="--c:#4fd2ff"></button>
+            <button type="button" id="draw-undo" class="banner-btn">Undo</button>
+            <button type="button" id="draw-clear" class="banner-btn">Clear</button>
+          </span>
+          <button type="button" id="mode-banner-done" class="banner-btn">Done <kbd>Esc</kbd></button>
+        </div>
+
+        <!-- Brief confirmations (e.g. "Screenshot saved") -->
+        <div id="toast" class="hidden" aria-hidden="true"></div>
 
         <!-- Mobile menu button (shown only on small screens) -->
-        <button id="mobile-menu-btn" aria-label="Menu">&#9776;</button>
+        <button id="mobile-menu-btn" type="button" aria-label="Menu" aria-controls="sidebar" aria-expanded="false">&#9776;</button>
 
         <!-- Re-open the sidebar after it's been hidden (desktop only) -->
         <button id="sidebar-open-btn" type="button" aria-label="Show sidebar" title="Show sidebar">&#10095;</button>
@@ -242,12 +305,13 @@
           <div class="toolbar-row">
             <div class="toolbar-stack">
               <div class="toolbar-row">
-                <button id="screenshot-btn" title="Save screenshot">&#128247;</button>
-                <button id="pin-btn" title="Drop a pin on the model">&#128204;</button>
+                <button id="screenshot-btn" type="button" title="Save screenshot" aria-label="Save screenshot">&#128247;</button>
+                <button id="pin-btn" type="button" title="Drop a pin on the model" aria-label="Drop a pin" aria-pressed="false">&#128204;</button>
+                <button id="draw-btn" type="button" title="Draw on the screen" aria-label="Draw" aria-pressed="false">&#9998;</button>
               </div>
-              <button id="reset-btn" title="Reset view">&#8635; Reset View</button>
+              <button id="reset-btn" type="button" title="Reset view (R)">&#8635; Reset View</button>
             </div>
-            <canvas id="gizmo-canvas" title="Orientation indicator"></canvas>
+            <canvas id="gizmo-canvas" title="Orientation indicator" aria-hidden="true"></canvas>
           </div>
           <!-- View shortcut buttons are generated per-model in js/main.js -->
           <div id="view-buttons"></div>
@@ -262,8 +326,8 @@
             <span class="hint-keep">Q / E to roll <span class="divider">·</span> Drag to rotate</span>
           </div>
           <div id="nav-modes">
-            <button class="nav-btn active" data-mode="orbit">Orbit</button>
-            <button class="nav-btn" data-mode="fly">Fly</button>
+            <button type="button" class="nav-btn active" data-mode="orbit" aria-pressed="true">Orbit</button>
+            <button type="button" class="nav-btn" data-mode="fly" aria-pressed="false">Fly</button>
           </div>
         </div>
 
@@ -330,6 +394,9 @@
       </main>
     </div>
   </div>
+
+  <!-- Screen-reader announcements (view changes, screenshot saved…) -->
+  <div id="sr-status" class="visually-hidden" role="status" aria-live="polite"></div>
 
   <!-- Backdrop that closes the mobile sidebar drawer when tapped -->
   <div id="sidebar-backdrop"></div>

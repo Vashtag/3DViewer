@@ -47,15 +47,37 @@ const sidebarBackdrop = document.getElementById('sidebar-backdrop');
 const bodyEl              = document.getElementById('body');
 const sidebarCollapseBtn  = document.getElementById('sidebar-collapse-btn');
 const sidebarOpenBtn      = document.getElementById('sidebar-open-btn');
+const loadingPoster   = document.getElementById('loading-poster');
+const modeBanner      = document.getElementById('mode-banner');
+const modeBannerText  = document.getElementById('mode-banner-text');
+const modeBannerDone  = document.getElementById('mode-banner-done');
+const drawTools       = document.getElementById('draw-tools');
+const drawBtn         = document.getElementById('draw-btn');
+const drawCanvas      = document.getElementById('draw-canvas');
+const drawCtx         = drawCanvas.getContext('2d');
+const toastEl         = document.getElementById('toast');
+const srStatus        = document.getElementById('sr-status');
+
+// Draw mode state. Declared up here because resize() (run at startup) redraws it.
+let drawMode    = false;
+let drawStrokes = [];       // [{ color, w, pts: [[x, y], …] }] in CSS px
+let _drawing    = null;     // the stroke being drawn right now
+let drawColor   = '#ffd23f';
+
+// Single-key shortcuts (R, L, Q, E, ?) can be switched off in Settings
+// (WCAG 2.1.4). Arrow keys and +/- only act while the 3D canvas has focus.
+let singleKeyShortcuts = localStorage.getItem('singleKeys') !== '0';
 
 // ── Mobile drawer ─────────────────────────────────────────
 function openDrawer()  {
   sidebarEl.classList.add('open');
   sidebarBackdrop.classList.add('visible');
+  mobileMenuBtn.setAttribute('aria-expanded', 'true');
 }
 function closeDrawer() {
   sidebarEl.classList.remove('open');
   sidebarBackdrop.classList.remove('visible');
+  mobileMenuBtn.setAttribute('aria-expanded', 'false');
 }
 mobileMenuBtn.addEventListener('click', () =>
   sidebarEl.classList.contains('open') ? closeDrawer() : openDrawer()
@@ -114,6 +136,35 @@ settingsModal.addEventListener('keydown', e => {
 });
 // Colour-blind toggle behaviour is wired up further down, once the
 // category colour schemes are defined.
+
+// ── Keyboard shortcuts sheet ("?" or the header button) ───
+const shortcutsBtn        = document.getElementById('shortcuts-btn');
+const shortcutsModal      = document.getElementById('shortcuts-modal');
+const shortcutsModalClose = document.getElementById('shortcuts-modal-close');
+const shortcutNote        = document.getElementById('shortcut-note');
+
+let _shortcutsLastFocus = null;
+function openShortcuts() {
+  _shortcutsLastFocus = document.activeElement;
+  shortcutNote.textContent = singleKeyShortcuts
+    ? 'Single-key shortcuts can be turned off in Settings.'
+    : 'Single-key shortcuts are off. Turn them back on in Settings.';
+  shortcutsModal.classList.remove('hidden');
+  shortcutsModalClose.focus();
+}
+function closeShortcuts() {
+  shortcutsModal.classList.add('hidden');
+  if (_shortcutsLastFocus && document.contains(_shortcutsLastFocus)) _shortcutsLastFocus.focus();
+}
+function shortcutsOpen() { return !shortcutsModal.classList.contains('hidden'); }
+
+shortcutsBtn.addEventListener('click', openShortcuts);
+shortcutsModalClose.addEventListener('click', closeShortcuts);
+shortcutsModal.addEventListener('click', e => { if (e.target === shortcutsModal) closeShortcuts(); });
+shortcutsModal.addEventListener('keydown', e => {
+  if (e.key === 'Escape' || e.key === '?') { e.preventDefault(); e.stopPropagation(); closeShortcuts(); return; }
+  if (e.key === 'Tab') { e.preventDefault(); shortcutsModalClose.focus(); } // only one control inside
+});
 
 // ── Model catalogue ───────────────────────────────────────
 // To add a model: convert your OBJ to a Draco GLB (see tools/README.md),
@@ -266,14 +317,17 @@ function flySpeedPerSec() {
 
 document.addEventListener('keydown', e => {
   if (e.code === 'Escape') {
+    if (drawMode) { setDrawMode(false); return; }
     if (lineDrawing) { setLineDrawing(false); return; }
     if (labelPlacementMode) { setLabelPlacementMode(false); return; }
     if (pinMode) { setPinMode(false); return; }
   }
   // Don't hijack keys while the user is typing (quiz answers, label names…).
   if (e.target.closest?.('input, textarea, [contenteditable="true"]')) return;
-  // Q/E roll works in orbit mode.
+  // Q/E roll works in orbit mode (a single-key shortcut, so it can be turned off).
   if (navMode === 'orbit') {
+    if (!singleKeyShortcuts || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (settingsOpen() || shortcutsOpen()) return;
     if (e.code === 'KeyQ') rollKeys.ccw = true;
     if (e.code === 'KeyE') rollKeys.cw = true;
     return;
@@ -333,6 +387,7 @@ function resize() {
   labelRenderer.setSize(w, h);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
+  sizeDrawCanvas(w, h);
 }
 new ResizeObserver(resize).observe(container);
 resize();
@@ -527,11 +582,30 @@ animate();
 // ── Loading helpers ───────────────────────────────────────
 let currentModel = null;
 
-function setProgress(pct) { progressFill.style.width = pct + '%'; }
+let _loadingMsg = '';
+function setProgress(pct) {
+  progressFill.style.width = pct + '%';
+  if (_loadingMsg) loadingText.textContent = pct > 0 && pct < 100 ? `${_loadingMsg} ${pct}%` : _loadingMsg;
+}
 
-function showLoading(msg = 'Loading model…') {
+// Still image shown in place of the model while it downloads. Captured at the
+// default framing (square, model filling the height), so object-fit: contain
+// lines it up with where the model appears. Missing posters fall back to a
+// dimmed overlay.
+function posterUrl(model) { return `models/${model.id}/${model.id}_poster.webp`; }
+
+function showLoading(msg = 'Loading model…', poster = null) {
+  _loadingMsg = msg;
   loadingText.textContent = msg;
   setProgress(0);
+  emptyState.classList.add('hidden'); // don't show "Select a region" over the poster
+  loadingOverlay.classList.add('no-poster');
+  if (poster) {
+    loadingPoster.onload  = () => loadingOverlay.classList.remove('no-poster');
+    loadingPoster.onerror = () => loadingOverlay.classList.add('no-poster');
+    loadingPoster.src = poster;
+    if (loadingPoster.complete && loadingPoster.naturalWidth) loadingOverlay.classList.remove('no-poster');
+  }
   loadingOverlay.classList.remove('hidden');
 }
 
@@ -763,7 +837,9 @@ gltfLoader.setDRACOLoader(dracoLoader);
 async function loadRegion(region) {
   const model = MODEL_BY_ID[region];
   if (!model) { console.error('Unknown model:', region); return; }
-  showLoading('Loading ' + model.label + ' model…');
+  showLoading('Loading ' + model.label + '…', posterUrl(model));
+  canvas.setAttribute('aria-label', `3D model of the ${model.label}. Arrow keys rotate, plus and minus zoom.`);
+  setDrawMode(false);
   buildViewButtons(model);
   updateGizmoLabels(model);
   if (EDIT_MODE) populateOrientViewSelect(model);
@@ -843,7 +919,7 @@ async function loadRegion(region) {
     (xhr) => {
       if (xhr.lengthComputable) setProgress(Math.round((xhr.loaded / xhr.total) * 100));
     },
-    (err) => { loadingText.textContent = 'Error loading model.'; console.error(err); }
+    (err) => { _loadingMsg = ''; loadingText.textContent = 'Could not load the model. Check your connection and try again.'; console.error(err); }
   );
 }
 
@@ -857,6 +933,7 @@ function closeAllRegionGroups(except) {
     if (g === except) return;
     g.classList.remove('open');
     g.querySelector('.region-group-body').classList.add('hidden');
+    g.querySelector('.region-group-toggle').setAttribute('aria-expanded', 'false');
   });
 }
 
@@ -866,8 +943,9 @@ function makeRegionButton(model) {
   btn.dataset.region = model.id;
   btn.innerHTML = `<span class="region-label">${model.label}</span>`;
   btn.addEventListener('click', () => {
-    regionSelector.querySelectorAll('.region-btn').forEach(b => b.classList.remove('active'));
+    regionSelector.querySelectorAll('.region-btn').forEach(b => { b.classList.remove('active'); b.removeAttribute('aria-current'); });
     btn.classList.add('active');
+    btn.setAttribute('aria-current', 'true');
     // Closing unrelated groups keeps the picked model's own group open
     // (if it's nested) while making sure nothing else stays highlighted.
     closeAllRegionGroups(btn.closest('.region-group'));
@@ -891,7 +969,8 @@ regionCategories.forEach((models, categoryName) => {
   const toggle = document.createElement('button');
   toggle.className = 'region-group-toggle';
   toggle.type = 'button';
-  toggle.innerHTML = `<span>${categoryName}</span><span class="region-group-caret">▸</span>`;
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.innerHTML = `<span>${categoryName}</span><span class="region-group-caret" aria-hidden="true">▸</span>`;
 
   const body = document.createElement('div');
   body.className = 'region-group-body hidden';
@@ -903,6 +982,7 @@ regionCategories.forEach((models, categoryName) => {
     if (!wasOpen) {
       group.classList.add('open');
       body.classList.remove('hidden');
+      toggle.setAttribute('aria-expanded', 'true');
       // Opening a group deselects any active top-level region.
       regionSelector.querySelectorAll('.region-btn').forEach(b => b.classList.remove('active'));
     }
@@ -915,8 +995,10 @@ regionCategories.forEach((models, categoryName) => {
 
 // ── Reset view ────────────────────────────────────────────
 // Returns to the default orbit framing (and out of fly mode if active).
-resetBtn.addEventListener('click', () => {
+resetBtn.addEventListener('click', resetView);
+function resetView() {
   if (!camera._defaultPos) return;
+  _viewTween = null;
   if (navMode === 'fly') setNavMode('orbit');
   camera.up.set(0, 1, 0);
   camera.position.copy(camera._defaultPos);
@@ -925,7 +1007,7 @@ resetBtn.addEventListener('click', () => {
   camera.updateProjectionMatrix();
   controls.target.set(0, 0, 0);
   controls.update();
-});
+}
 
 // ── View shortcut buttons (built per-model) ──────────────
 function buildViewButtons(model) {
@@ -1025,7 +1107,10 @@ const LABEL_SIZES = { s: '0.66rem', m: '0.78rem', l: '0.94rem' };
 function applyReducedMotion() { controls.enableDamping = !reducedMotionSetting; }
 function applyLabelSize(size) {
   document.documentElement.style.setProperty('--label-font-size', LABEL_SIZES[size] || LABEL_SIZES.m);
-  labelSizeSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.size === size));
+  labelSizeSeg.querySelectorAll('button').forEach(b => {
+    b.classList.toggle('active', b.dataset.size === size);
+    b.setAttribute('aria-pressed', String(b.dataset.size === size));
+  });
 }
 function applyControlsHint(show) { controlsHint.classList.toggle('hidden', !show); }
 function applyPerformanceMode(on) {
@@ -1085,8 +1170,21 @@ performanceToggle.addEventListener('change', () => {
 });
 if (performanceMode) applyPerformanceMode(true);
 
+// Single-key shortcuts
+const singleKeyToggle = document.getElementById('single-key-toggle');
+singleKeyToggle.checked = singleKeyShortcuts;
+singleKeyToggle.addEventListener('change', () => {
+  singleKeyShortcuts = singleKeyToggle.checked;
+  localStorage.setItem('singleKeys', singleKeyShortcuts ? '1' : '0');
+  if (!singleKeyShortcuts) { rollKeys.ccw = rollKeys.cw = false; }
+  if (currentModel) updateHint();
+});
+
 // Reset every setting to its default and apply immediately.
 settingsReset.addEventListener('click', () => {
+  singleKeyShortcuts = true; singleKeyToggle.checked = true;
+  localStorage.setItem('singleKeys', '1');
+
   colorblindMode = false; colorblindToggle.checked = false;
   localStorage.setItem('colorblindMode', '0'); applyCategoryColorScheme();
 
@@ -1251,6 +1349,7 @@ function setLabelsVisible(v) {
   }
   labelsToggle.textContent = v ? 'Hide labels' : 'Show labels';
   labelsToggle.classList.toggle('active', v);
+  labelsToggle.setAttribute('aria-pressed', String(v));
   categoryFilters.classList.toggle('hidden', !v);
   setLinesVisible(v);
 }
@@ -1346,10 +1445,11 @@ function updateLabelLeaders() {
 
 // Edit mode: label placement — only active when labelPlacementMode is on.
 function setLabelPlacementMode(on) {
-  if (on) setOrientMode(false);
+  if (on) { setOrientMode(false); setDrawMode(false); }
   labelPlacementMode = on;
   labelPlaceBtn.classList.toggle('active', on);
   container.classList.toggle('label-place-mode', on);
+  updateModeBanner();
 }
 
 labelPlaceBtn.addEventListener('click', () => setLabelPlacementMode(!labelPlacementMode));
@@ -1641,7 +1741,7 @@ function setLinesVisible(v) {
 }
 
 function setLineDrawing(on) {
-  if (on) setOrientMode(false);
+  if (on) { setOrientMode(false); setDrawMode(false); }
   lineDrawing = on;
   lineDrawBtn.classList.toggle('active', on);
   container.classList.toggle('line-draw-mode', on);
@@ -1651,6 +1751,7 @@ function setLineDrawing(on) {
     _wipLine = null;
     _wip = [];
   }
+  updateModeBanner();
 }
 
 // Direct geometry from a flat array of [x,y,z] triples (dense / surface-projected).
@@ -1945,12 +2046,14 @@ let pinMode  = false;
 let pinCount = 0;
 
 function setPinMode(on) {
-  if (on) setOrientMode(false);
+  if (on) { setOrientMode(false); setDrawMode(false); }
   pinMode = on;
   pinBtn.classList.toggle('active', on);
+  pinBtn.setAttribute('aria-pressed', String(on));
   container.classList.toggle('pin-mode', on);
   if (on && navMode === 'orbit') controls.enabled = false;
-  else if (!on && navMode === 'orbit' && !dragging) controls.enabled = true;
+  else if (!on && navMode === 'orbit' && !dragging && !drawMode) controls.enabled = true;
+  updateModeBanner();
 }
 
 function dropPin(worldPoint) {
@@ -2035,16 +2138,21 @@ function updateHint(locked = flyControls.isLocked) {
     // to rotate) stays as the essentials.
     controlsHint.innerHTML =
       '<span class="hint-fade">Scroll to zoom <span class="divider">·</span> Right-drag to pan</span>' +
-      '<span class="hint-keep">Q / E to roll <span class="divider">·</span> Drag to rotate</span>';
+      '<span class="hint-keep">' + (singleKeyShortcuts ? 'Q / E to roll <span class="divider">·</span> ' : '') +
+      'Drag to rotate' + (singleKeyShortcuts ? ' <span class="divider">·</span> ? for shortcuts' : '') + '</span>';
     scheduleHintFade();
   }
 }
 
 function setNavMode(mode) {
   navMode = mode;
-  navBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  navBtns.forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+    b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
+  });
   if (mode === 'fly') {
     setPinMode(false); // can't pin while flying
+    setDrawMode(false);
     controls.enabled = false;
     camera.up.set(0, 1, 0);
   } else {
@@ -2081,7 +2189,10 @@ function setBackground(bg, persist = true) {
   currentBg = bg;
   // Mark every swatch with this value active — the control is mirrored in both
   // the sidebar and the settings modal.
-  bgSwatches.forEach(s => s.classList.toggle('active', s.dataset.bg === bg));
+  bgSwatches.forEach(s => {
+    s.classList.toggle('active', s.dataset.bg === bg);
+    s.setAttribute('aria-pressed', String(s.dataset.bg === bg));
+  });
   const s = BG_STYLES[bg] || BG_STYLES.dark;
   container.style.backgroundImage = s.image;
   container.style.backgroundColor = s.color;
@@ -2173,12 +2284,22 @@ function captureScreenshot() {
     });
   }
 
+  // Anything drawn in Draw mode goes on top, so annotated views can be saved.
+  if (drawStrokes.length) ctx.drawImage(drawCanvas, 0, 0, W, H);
+
   out.toBlob(blob => {
+    if (!blob) { showToast('Could not save the screenshot', '', false); return; }
+    const name = `${activeModelId || 'model'}-${Date.now()}.png`;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `${activeModelId || 'model'}-${Date.now()}.png`;
+    a.download = name;
+    // Some browsers (Firefox) only follow a download link that's in the page,
+    // and revoking the URL straight away can cancel the download.
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(a.href);
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    showToast('Screenshot saved', name);
   }, 'image/png');
 }
 
@@ -2383,6 +2504,7 @@ function applyQuizViewOffset() {
 }
 
 function startQuiz() {
+  setDrawMode(false);
   if (!currentModel) return;
   buildQuiz();
   if (!quizList.length) return;
@@ -2486,3 +2608,260 @@ function endQuiz() {
 quizBtn.addEventListener('click', startQuiz);
 quizClose.addEventListener('click', endQuiz);
 quizNextBtn.addEventListener('click', nextQuiz);
+
+// ── Mode banner ───────────────────────────────────────────
+// While a click-mode is on (pin, draw, or the edit-mode label / line tools),
+// a pill at the top of the viewer says what clicking does and how to leave.
+const MODE_TEXT = {
+  draw:  'Drag to draw. Done clears the drawing.',
+  pin:   'Click the model to drop a pin. Click a pin to remove it.',
+  label: 'Click the model to place a label.',
+  line:  'Click the model to add points, then Finish line.',
+};
+function currentClickMode() {
+  if (drawMode) return 'draw';
+  if (pinMode) return 'pin';
+  if (labelPlacementMode) return 'label';
+  if (lineDrawing) return 'line';
+  return null;
+}
+function updateModeBanner() {
+  const mode = currentClickMode();
+  modeBanner.classList.toggle('hidden', !mode);
+  if (!mode) return;
+  modeBannerText.textContent = MODE_TEXT[mode];
+  drawTools.classList.toggle('hidden', mode !== 'draw');
+}
+modeBannerDone.addEventListener('click', () => {
+  if (drawMode) setDrawMode(false);
+  if (pinMode) setPinMode(false);
+  if (labelPlacementMode) setLabelPlacementMode(false);
+  if (lineDrawing) setLineDrawing(false);
+});
+
+// ── Toast + screen-reader announcements ──────────────────
+let _toastTimer = null;
+function showToast(msg, sub = '', ok = true) {
+  toastEl.replaceChildren();
+  if (ok) {
+    const check = document.createElement('span');
+    check.className = 'toast-check'; check.textContent = '✓';
+    toastEl.appendChild(check);
+  }
+  const main = document.createElement('span'); main.textContent = msg;
+  toastEl.appendChild(main);
+  if (sub) {
+    const s = document.createElement('span');
+    s.className = 'toast-sub'; s.textContent = sub;
+    toastEl.appendChild(s);
+  }
+  toastEl.classList.remove('hidden');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => toastEl.classList.add('hidden'), 2600);
+  announce(msg);
+}
+
+// Polite live region. Clearing first makes a repeated message re-announce.
+function announce(msg) {
+  srStatus.textContent = '';
+  requestAnimationFrame(() => { srStatus.textContent = msg; });
+}
+
+// ── Draw mode (whiteboard) ───────────────────────────────
+// Freehand strokes on a transparent canvas over the viewer, in screen space
+// like a whiteboard: the model can't be rotated while drawing, and leaving the
+// mode clears the drawing. Screenshots taken while drawing include it.
+function sizeDrawCanvas(w = container.clientWidth, h = container.clientHeight) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  drawCanvas.width  = Math.max(1, Math.round(w * dpr));
+  drawCanvas.height = Math.max(1, Math.round(h * dpr));
+  drawCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  redrawStrokes();
+}
+
+function strokePath(st) {
+  const p = st.pts;
+  if (!p.length) return;
+  drawCtx.strokeStyle = st.color;
+  drawCtx.lineWidth = st.w;
+  drawCtx.lineCap = 'round';
+  drawCtx.lineJoin = 'round';
+  drawCtx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+  drawCtx.shadowBlur = 3;
+  drawCtx.beginPath();
+  drawCtx.moveTo(p[0][0], p[0][1]);
+  if (p.length === 1) drawCtx.lineTo(p[0][0] + 0.01, p[0][1]); // a tap draws a dot
+  for (let i = 1; i < p.length; i++) drawCtx.lineTo(p[i][0], p[i][1]);
+  drawCtx.stroke();
+}
+
+function redrawStrokes() {
+  drawCtx.save();
+  drawCtx.setTransform(1, 0, 0, 1, 0, 0);
+  drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+  drawCtx.restore();
+  drawStrokes.forEach(strokePath);
+  if (_drawing) strokePath(_drawing);
+}
+
+function setDrawMode(on) {
+  if (on) {
+    if (navMode === 'fly') setNavMode('orbit');
+    if (!quizPanel.classList.contains('hidden')) return; // not during a quiz
+    setPinMode(false);
+    if (EDIT_MODE) { setLabelPlacementMode(false); setLineDrawing(false); setOrientMode(false); }
+  }
+  drawMode = on;
+  drawBtn.classList.toggle('active', on);
+  drawBtn.setAttribute('aria-pressed', String(on));
+  container.classList.toggle('draw-mode', on);
+  if (!on) { drawStrokes = []; _drawing = null; redrawStrokes(); }
+  if (navMode === 'orbit') controls.enabled = !on && !pinMode;
+  updateModeBanner();
+}
+
+drawBtn.addEventListener('click', () => setDrawMode(!drawMode));
+
+function _drawPoint(e) {
+  const r = drawCanvas.getBoundingClientRect();
+  return [e.clientX - r.left, e.clientY - r.top];
+}
+drawCanvas.addEventListener('pointerdown', e => {
+  if (!drawMode || e.button > 0) return;
+  e.preventDefault();
+  drawCanvas.setPointerCapture(e.pointerId);
+  _drawing = { color: drawColor, w: 4, pts: [_drawPoint(e)] };
+  redrawStrokes();
+});
+drawCanvas.addEventListener('pointermove', e => {
+  if (!_drawing) return;
+  const pt = _drawPoint(e), last = _drawing.pts[_drawing.pts.length - 1];
+  if (Math.hypot(pt[0] - last[0], pt[1] - last[1]) < 1.5) return; // skip jitter
+  _drawing.pts.push(pt);
+  redrawStrokes();
+});
+function _endStroke() {
+  if (!_drawing) return;
+  drawStrokes.push(_drawing);
+  _drawing = null;
+  redrawStrokes();
+}
+drawCanvas.addEventListener('pointerup', _endStroke);
+drawCanvas.addEventListener('pointercancel', _endStroke);
+
+drawTools.querySelectorAll('.draw-color').forEach(b => b.addEventListener('click', () => {
+  drawColor = b.dataset.color;
+  drawTools.querySelectorAll('.draw-color').forEach(x => {
+    x.classList.toggle('active', x === b);
+    x.setAttribute('aria-pressed', String(x === b));
+  });
+}));
+document.getElementById('draw-undo').addEventListener('click', () => { drawStrokes.pop(); redrawStrokes(); });
+document.getElementById('draw-clear').addEventListener('click', () => { drawStrokes = []; redrawStrokes(); });
+
+// ── Keyboard control of the model ────────────────────────
+// With the 3D canvas focused (click it, or Tab to it): arrow keys orbit in
+// 15° steps and +/- zoom. A live region names the nearest preset view so
+// screen-reader users know where they are.
+const KEY_ROT_STEP = THREE.MathUtils.degToRad(15);
+const KEY_ZOOM_STEP = 0.85;
+const _kOff = new THREE.Vector3(), _kUp = new THREE.Vector3(), _kRight = new THREE.Vector3();
+let _keyAnnounceTimer = null;
+
+function keyOrbit(dAzimuth, dPolar) {
+  _viewTween = null;
+  _kOff.copy(camera.position).sub(controls.target);
+  _kUp.copy(camera.up).normalize();
+  if (dAzimuth) _kOff.applyAxisAngle(_kUp, dAzimuth);
+  if (dPolar) {
+    _kRight.crossVectors(_kOff, _kUp).normalize();
+    const next = _kOff.clone().applyAxisAngle(_kRight, dPolar);
+    const a = next.angleTo(_kUp);
+    if (a > 0.05 && a < Math.PI - 0.05) _kOff.copy(next); // don't flip over the poles
+  }
+  camera.position.copy(controls.target).add(_kOff);
+  controls.update();
+}
+
+function keyZoom(factor) {
+  _viewTween = null;
+  _kOff.copy(camera.position).sub(controls.target);
+  const d = THREE.MathUtils.clamp(_kOff.length() * factor, controls.minDistance, controls.maxDistance);
+  _kOff.setLength(d);
+  camera.position.copy(controls.target).add(_kOff);
+  controls.update();
+}
+
+// Nearest preset view, compared in the model's own frame (views with a saved
+// orientation rotate the model, not just the camera).
+function nearestViewLabel() {
+  const model = MODEL_BY_ID[activeModelId];
+  if (!model || !currentModel) return '';
+  const camLocal = camera.position.clone().sub(controls.target).normalize()
+    .applyQuaternion(currentModel.quaternion.clone().invert());
+  let best = null, bestDot = -2;
+  (model.views || DEFAULT_VIEWS).forEach(v => {
+    const d = VIEW_DIRS[v.dir];
+    if (!d) return;
+    const saved = savedViews[v.dir];
+    const q = (saved && Array.isArray(saved.rotation))
+      ? new THREE.Quaternion().setFromEuler(new THREE.Euler(...saved.rotation.map(THREE.MathUtils.degToRad)))
+      : currentModel.quaternion;
+    const local = new THREE.Vector3(...d).applyQuaternion(q.clone().invert());
+    const dot = local.dot(camLocal);
+    if (dot > bestDot) { bestDot = dot; best = v; }
+  });
+  if (!best) return '';
+  return bestDot > 0.95 ? `${best.label} view` : `Near the ${best.label} view`;
+}
+
+function announceAfterKey(action) {
+  clearTimeout(_keyAnnounceTimer);
+  _keyAnnounceTimer = setTimeout(() => {
+    const where = nearestViewLabel();
+    announce(where ? `${action}. ${where}.` : `${action}.`);
+  }, 350); // wait for key-repeat to settle
+}
+
+// ── Keyboard shortcuts ───────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.target.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+  if (settingsOpen() || shortcutsOpen() || !labelModal.classList.contains('hidden')) return;
+
+  // Canvas-focused keys: arrows rotate, +/- zoom (orbit mode only).
+  if (document.activeElement === canvas && currentModel && navMode === 'orbit') {
+    let handled = true;
+    switch (e.key) {
+      case 'ArrowLeft':  keyOrbit( KEY_ROT_STEP, 0); announceAfterKey('Rotated left');  break;
+      case 'ArrowRight': keyOrbit(-KEY_ROT_STEP, 0); announceAfterKey('Rotated right'); break;
+      case 'ArrowUp':    keyOrbit(0, -KEY_ROT_STEP); announceAfterKey('Tilted up');     break;
+      case 'ArrowDown':  keyOrbit(0,  KEY_ROT_STEP); announceAfterKey('Tilted down');   break;
+      case '+': case '=': keyZoom(KEY_ZOOM_STEP);     announceAfterKey('Zoomed in');     break;
+      case '-': case '_': keyZoom(1 / KEY_ZOOM_STEP); announceAfterKey('Zoomed out');    break;
+      default: handled = false;
+    }
+    if (handled) { e.preventDefault(); return; }
+  }
+
+  if (!singleKeyShortcuts) return;
+  if (e.key === '?') { e.preventDefault(); openShortcuts(); return; }
+  if (!currentModel) return;
+  const k = e.key.toLowerCase();
+  if (k === 'r') {
+    resetView();
+    announce('View reset.');
+  } else if (k === 'l') {
+    // Not during a quiz (that would give the answers away).
+    if (!labelsSection.classList.contains('hidden') && quizPanel.classList.contains('hidden')) {
+      labelsToggle.click();
+      announce(labelsVisible ? 'Labels shown.' : 'Labels hidden.');
+    }
+  }
+});
+
+// Fetch the loading posters ahead of time so they're ready on first click.
+const _posterCache = [];
+(window.requestIdleCallback || (fn => setTimeout(fn, 1500)))(() => {
+  MODELS.forEach(m => { const img = new Image(); img.src = posterUrl(m); _posterCache.push(img); });
+});
