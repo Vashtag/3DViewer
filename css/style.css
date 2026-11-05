@@ -8,7 +8,29 @@
   --accent-hover: #6b93ff;
   --text: #e8eaf0;
   --text-muted: #8b90ab; /* ~5.3:1 on the sidebar surface — clears WCAG AA */
+  --focus: #9db6ff;     /* keyboard focus ring */
   --radius: 10px;
+}
+
+/* ── Keyboard focus ──
+   One visible ring for every control when it's reached by keyboard (mouse
+   clicks don't show it). Inputs that style their own focus border keep it. */
+:where(button, a[href], input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+/* The 3D canvas fills the viewer, so draw its ring inside the edge. */
+#viewer-canvas:focus-visible { outline-offset: -3px; }
+#viewer-canvas:focus { outline: none; }
+#viewer-canvas:focus-visible { outline: 2px solid var(--focus); }
+
+/* Text only screen readers hear */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 body {
@@ -63,7 +85,8 @@ body {
 }
 
 /* ── Settings ── */
-#settings-btn {
+#header-actions { display: flex; gap: 8px; flex-shrink: 0; }
+#settings-btn, #shortcuts-btn {
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -75,13 +98,14 @@ body {
   flex-shrink: 0;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
-#settings-btn:hover {
+#shortcuts-btn { font-size: 0.9rem; font-weight: 600; }
+#settings-btn:hover, #shortcuts-btn:hover {
   border-color: var(--accent);
   color: var(--text);
   background: #1e2540;
 }
 
-#settings-modal {
+#settings-modal, #shortcuts-modal {
   position: fixed;
   inset: 0;
   display: flex;
@@ -91,9 +115,9 @@ body {
   background: rgba(15, 17, 23, 0.55);
   backdrop-filter: blur(3px);
 }
-#settings-modal.hidden { display: none; }
+#settings-modal.hidden, #shortcuts-modal.hidden { display: none; }
 
-#settings-modal-box {
+.dialog-box {
   background: var(--surface);
   border: 1.5px solid var(--border);
   border-radius: var(--radius);
@@ -126,13 +150,14 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 28px;
   font-size: 0.82rem;
   color: var(--text);
   cursor: pointer;
 }
 .settings-row input[type="checkbox"] {
-  width: 15px;
-  height: 15px;
+  width: 17px;
+  height: 17px;
   cursor: pointer;
   accent-color: var(--accent);
 }
@@ -158,8 +183,8 @@ body {
   overflow: hidden;
 }
 .settings-seg button {
-  min-width: 30px;
-  padding: 5px 0;
+  min-width: 34px;
+  padding: 7px 0;
   border: none;
   background: transparent;
   color: var(--text-muted);
@@ -225,8 +250,8 @@ body {
 .sidebar-header .sidebar-label { margin-bottom: 10px; }
 
 #sidebar-collapse-btn {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   margin-bottom: 10px;
   display: flex;
   align-items: center;
@@ -358,6 +383,13 @@ body {
 
 /* ── Display controls ── */
 #display-controls.hidden { display: none; }
+/* Separate the display controls from the region list (the first label's own
+   margin is reset below, so the container carries the gap). */
+#display-controls {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
 #display-controls .sidebar-label { margin-top: 22px; }
 #display-controls > .sidebar-label:first-child { margin-top: 0; }
 
@@ -367,8 +399,8 @@ body {
 }
 
 .bg-swatch {
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   border: 2px solid var(--border);
   cursor: pointer;
@@ -468,7 +500,7 @@ body {
 #category-filters {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 2px;
   margin-top: 10px;
   padding-left: 2px;
 }
@@ -477,12 +509,13 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 28px;
   font-size: 0.78rem;
   color: var(--text-muted);
   cursor: pointer;
   user-select: none;
 }
-.cat-filter-row input { accent-color: var(--accent); cursor: pointer; }
+.cat-filter-row input { accent-color: var(--accent); cursor: pointer; width: 16px; height: 16px; }
 .cat-filter-divider {
   border-top: 1px solid var(--border);
   margin: 4px 0;
@@ -773,6 +806,12 @@ body {
   border-color: rgba(240, 192, 64, 0.6);
 }
 
+#draw-btn.active {
+  background: rgba(255, 210, 63, 0.22);
+  color: #ffd23f;
+  border-color: rgba(255, 210, 63, 0.6);
+}
+
 /* ── Edit mode cursors ── */
 #viewer-container.label-place-mode #viewer-canvas { cursor: crosshair; }
 #viewer-container.line-draw-mode   #viewer-canvas { cursor: crosshair; }
@@ -879,7 +918,7 @@ body {
   padding: 5px 6px;
   border-radius: 7px;
   border: 1.5px solid var(--border);
-  background: var(--panel);
+  background: var(--bg);
   color: var(--text);
   font-size: 0.78rem;
   cursor: pointer;
@@ -911,7 +950,7 @@ body {
 
 .edit-hint-small {
   font-size: 0.72rem;
-  color: var(--text-dim);
+  color: var(--text-muted);
   margin: 0 0 8px;
   line-height: 1.4;
 }
@@ -1004,52 +1043,75 @@ body {
   height: 100%;
 }
 
-/* ── Loading overlay ── */
+/* ── Loading overlay ──
+   A still image of the model ("poster") sits where the model will appear,
+   with a thin progress bar along the top of the viewer and a small status
+   pill. Without a poster the overlay dims the viewer instead. */
 #loading-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(15, 17, 23, 0.88);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   z-index: 10;
+  background: transparent;
   transition: opacity 0.3s;
 }
+#loading-overlay.no-poster { background: rgba(15, 17, 23, 0.88); }
 
 #loading-overlay.hidden {
   opacity: 0;
   pointer-events: none;
 }
 
-#loading-box {
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
+#loading-poster {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0.55;
+  filter: blur(2px) saturate(0.7);
 }
+#loading-overlay.no-poster #loading-poster { display: none; }
+
+#loading-box {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(26, 29, 39, 0.85);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(6px);
+  white-space: nowrap;
+}
+#loading-overlay.no-poster #loading-box { bottom: 50%; transform: translate(-50%, 50%); }
 
 #loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--border);
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
 #loading-text {
-  font-size: 0.9rem;
-  color: var(--text-muted);
+  font-size: 0.82rem;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
 
 #progress-bar-track {
-  width: 180px;
-  height: 4px;
-  background: var(--border);
-  border-radius: 2px;
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.06);
   overflow: hidden;
 }
 
@@ -1057,9 +1119,125 @@ body {
   height: 100%;
   width: 0%;
   background: var(--accent);
-  border-radius: 2px;
+  box-shadow: 0 0 8px var(--accent);
   transition: width 0.15s ease;
 }
+
+/* ── Mode banner (pin / draw / place label / line) ── */
+#mode-banner {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 24px);
+  padding: 5px 6px 5px 14px;
+  border-radius: 999px;
+  background: rgba(26, 29, 39, 0.92);
+  border: 1px solid rgba(255, 210, 63, 0.55);
+  color: #f6d77a;
+  font-size: 0.8rem;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+#mode-banner.hidden { display: none; }
+#mode-banner-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#draw-tools { display: flex; align-items: center; gap: 6px; }
+#draw-tools.hidden { display: none; }
+.banner-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.banner-btn:hover { border-color: var(--accent); }
+.banner-btn kbd, .shortcut-list kbd {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.7rem;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  color: var(--text-muted);
+}
+.draw-color {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: var(--c);
+  cursor: pointer;
+  padding: 0;
+}
+.draw-color.active { border-color: #fff; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25); }
+
+/* Drawing layer: transparent until Draw mode is on */
+#draw-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 4;
+  pointer-events: none;
+  touch-action: none;
+}
+#viewer-container.draw-mode #draw-canvas { pointer-events: auto; cursor: crosshair; }
+
+/* ── Toast (e.g. "Screenshot saved") ── */
+#toast {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translate(-50%, 0);
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  background: #1f2330;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.82rem;
+  white-space: nowrap;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  transition: opacity 0.2s, transform 0.2s;
+}
+#toast.hidden { opacity: 0; transform: translate(-50%, 6px); pointer-events: none; }
+#toast .toast-check { color: #4fd18b; font-weight: 700; }
+#toast .toast-sub { color: var(--text-muted); font-size: 0.74rem; font-family: ui-monospace, Menlo, Consolas, monospace; }
+
+/* ── Keyboard shortcuts sheet ── */
+#shortcuts-modal-box { width: 340px; }
+.shortcut-group { display: flex; flex-direction: column; gap: 8px; }
+.shortcut-list { margin: 0; display: flex; flex-direction: column; gap: 7px; }
+.shortcut-list > div { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 0.82rem; }
+.shortcut-list dt { color: var(--text); }
+.shortcut-list dd { margin: 0; display: flex; gap: 4px; flex-shrink: 0; }
+.shortcut-list kbd { color: var(--text); min-width: 22px; text-align: center; }
+.shortcut-note { font-size: 0.75rem; color: var(--text-muted); }
+.dialog-actions { display: flex; justify-content: flex-end; }
+#shortcuts-modal-close {
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+#shortcuts-modal-close:hover { border-color: var(--accent); color: var(--text); }
 
 /* ── Viewer toolbar (reset + gizmo + view shortcuts) ── */
 #viewer-toolbar {
@@ -1120,7 +1298,7 @@ body {
   grid-column: 1 / -1;
 }
 
-#reset-btn, #screenshot-btn, #pin-btn {
+#reset-btn, #screenshot-btn, #pin-btn, #draw-btn {
   padding: 8px 14px;
   border-radius: var(--radius);
   border: 1.5px solid var(--border);
@@ -1133,10 +1311,10 @@ body {
   transition: border-color 0.15s, background 0.15s;
 }
 
-#screenshot-btn, #pin-btn { padding: 8px 11px; font-size: 0.95rem; line-height: 1; }
+#screenshot-btn, #pin-btn, #draw-btn { padding: 8px 11px; font-size: 0.95rem; line-height: 1; min-width: 38px; }
 #reset-btn { width: 100%; }
 
-#reset-btn:hover, #screenshot-btn:hover, #pin-btn:hover {
+#reset-btn:hover, #screenshot-btn:hover, #pin-btn:hover, #draw-btn:hover {
   border-color: var(--accent);
   background: rgba(30, 37, 64, 0.95);
 }
@@ -1316,6 +1494,12 @@ body {
 
   /* Compact toolbar */
   #viewer-toolbar { top: 10px; right: 10px; gap: 8px; }
+
+  /* Mode banner + toast move to the bottom, clear of the toolbar */
+  #mode-banner { top: auto; bottom: 14px; flex-wrap: wrap; justify-content: center; border-radius: 16px; padding: 6px 8px; }
+  #mode-banner-text { white-space: normal; text-align: center; }
+  #toast { bottom: 76px; }
+  #shortcuts-btn { display: none; } /* no keyboard on a phone */
   #reset-btn { padding: 7px 11px; font-size: 0.8rem; }
 }
 
@@ -1325,7 +1509,7 @@ body {
 @media (pointer: coarse) {
   .bg-swatch { width: 34px; height: 34px; }
   .view-btn { padding: 11px 8px; }
-  #reset-btn, #screenshot-btn, #pin-btn { padding: 11px 14px; }
+  #reset-btn, #screenshot-btn, #pin-btn, #draw-btn { padding: 11px 14px; }
   #labels-toggle { padding-top: 11px; padding-bottom: 11px; }
   .cat-filter-row, .lcat-option { padding: 4px 0; }
   .settings-row input[type="checkbox"] { width: 18px; height: 18px; }
@@ -1391,8 +1575,8 @@ body {
 
 #quiz-close {
   position: absolute;
-  top: 8px; right: 10px;
-  width: 24px; height: 24px;
+  top: 6px; right: 8px;
+  width: 32px; height: 32px;
   border: none;
   background: transparent;
   color: var(--text-muted);
@@ -1408,7 +1592,7 @@ body {
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-  padding-right: 24px; /* keep the countdown clear of the close (×) button */
+  padding-right: 32px; /* keep the countdown clear of the close (×) button */
 }
 #quiz-time {
   font-size: 0.8rem;

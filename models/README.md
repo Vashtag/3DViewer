@@ -5,6 +5,10 @@ Each region lives in `models/<id>/`:
 - `<id>.glb` — the Draco-compressed model (see `../tools/README.md` to make one)
 - `<id>_labels.json` — *optional* annotations for that model
   (e.g. `pelvis_labels.json`, `shoulder_labels.json`)
+- `<id>_poster.webp` — *optional* still image shown, faded, while the model
+  downloads. It's a square, transparent capture of the model at its default
+  view, filling the height (so it lines up with where the model appears).
+  Without one the viewer shows a plain dimmed overlay instead.
 
 ## Adding labels (annotations)
 
