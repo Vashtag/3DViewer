@@ -2083,7 +2083,7 @@ function regionTipAllowed() {
 // most once per frame.
 renderer.domElement.addEventListener('pointermove', e => {
   if (e.pointerType !== 'mouse' || !regionTipAllowed()) return;
-  if (e.buttons) { hideRegionTip(); return; } // dragging the view
+  if (e.buttons || !structPop.classList.contains('hidden')) { hideRegionTip(); return; } // dragging, or pop-up open
   _tipPos = [e.clientX, e.clientY];
   if (!regionTip.classList.contains('hidden')) placeRegionTip(e.clientX, e.clientY, false);
   if (_tipFrame) return;
@@ -2098,8 +2098,8 @@ renderer.domElement.addEventListener('pointerleave', e => { if (e.pointerType ==
 // (Uses pointer events rather than "click", which touch browsers don't
 // always send after a tap on the 3D canvas.)
 let _tapStart = null;
-// A click (mouse) or tap (touch) without dragging also selects the structure
-// for the Structures panel; clicking empty space clears the selection.
+// On models with a Structures panel, a click or tap without dragging opens
+// the isolate / hide pop-up for the structure under it instead.
 renderer.domElement.addEventListener('pointerdown', e => {
   if (e.pointerType === 'mouse' && e.button !== 0) { _tapStart = null; return; }
   _tapStart = e.isPrimary ? { x: e.clientX, y: e.clientY, t: performance.now() } : null;
@@ -2110,8 +2110,8 @@ renderer.domElement.addEventListener('pointerup', e => {
   const quick = performance.now() - _tapStart.t < 500;
   _tapStart = null;
   if (moved > (e.pointerType === 'mouse' ? 4 : 10) || !quick || !regionTipAllowed()) return;
-  if (e.pointerType !== 'mouse') showRegionTipAt(e.clientX, e.clientY, true);
-  if (structState.active) selectStructure(pickRegionAt(e.clientX, e.clientY)?.region ?? null);
+  if (structState.active && !structSection.classList.contains('hidden')) onStructureClick(e.clientX, e.clientY, e.pointerType !== 'mouse');
+  else if (e.pointerType !== 'mouse') showRegionTipAt(e.clientX, e.clientY, true);
 });
 renderer.domElement.addEventListener('pointercancel', () => { _tapStart = null; });
 
@@ -2120,27 +2120,28 @@ window.addEventListener('keydown', () => { if (slicer.sections) hideRegionTip();
 
 // ── Structures: show / hide layers, isolate / hide (models with `layers`) ──
 // In the spirit of brainglobe-heatmap's per-region alpha: each layer of the
-// model (cortex, white matter, ...) gets an on/off button, and a selected
-// structure can be isolated or hidden. Hidden structures also drop out of the
-// cut face, and hover / click see through hidden or faded ones.
+// model (cortex, white matter, ...) gets an on/off button, and clicking a
+// structure on the model opens a small pop-up to isolate or hide it. Hidden
+// structures also drop out of the cut face, and hover / click see through
+// them.
 // `var` so code that runs before this block (render loop, caps) can check it.
 var structState = {
   active: false,
-  layers: [],          // [{ id, label, groups, except, rest, opacity, regions: [...] }]
+  layers: [],          // [{ id, label, groups, except, rest, opacity (0|1), regions: [...] }]
   regionLayer: [],     // region index -> its layer
   meshes: new Map(),   // region index -> [mesh]
-  hidden: new Set(),   // region indices hidden one by one (Hide / Isolate / list)
-  selected: null,      // selected region record
+  hidden: new Set(),   // region indices hidden one by one (Hide / Isolate)
+  selected: null,      // region shown in the pop-up
 };
 
-const structSection  = document.getElementById('struct-section');
-const structLayersEl = document.getElementById('struct-layers');
-const structSelName  = document.getElementById('struct-selected-name');
-const structIsolate  = document.getElementById('struct-isolate');
-const structHide     = document.getElementById('struct-hide');
-const structShowAll  = document.getElementById('struct-show-all');
-const structSearch   = document.getElementById('struct-search');
-const structList     = document.getElementById('struct-list');
+const structSection   = document.getElementById('struct-section');
+const structLayersEl  = document.getElementById('struct-layers');
+const structShowAll   = document.getElementById('struct-show-all');
+const structPop       = document.getElementById('struct-pop');
+const structPopName   = document.getElementById('struct-pop-name');
+const structPopIsolate = document.getElementById('struct-pop-isolate');
+const structPopHide   = document.getElementById('struct-pop-hide');
+const structPopClose  = document.getElementById('struct-pop-close');
 
 const structName = r => r.name.charAt(0).toUpperCase() + r.name.slice(1);
 
@@ -2148,7 +2149,7 @@ function regionOpacity(idx) {
   if (structState.hidden.has(idx)) return 0;
   return structState.regionLayer[idx]?.opacity ?? 1;
 }
-// Hover and click pass through hidden or mostly-transparent structures.
+// Hover and click pass through hidden structures.
 function regionPickable(region) {
   return !structState.active || regionOpacity(region.index) >= 0.5;
 }
@@ -2172,48 +2173,34 @@ function initStructures(model) {
     structState.meshes.get(r.index).push(o);
   });
   structState.active = true;
-  buildStructuresUI();
+  buildLayerButtons();
   applyStructures();
   applyStructuresFeature();
 }
 
 function resetStructures() {
+  closeStructPop();
   structState.active = false;
   structState.layers = [];
   structState.regionLayer = [];
   structState.meshes = new Map();
   structState.hidden = new Set();
-  structState.selected = null;
   structLayersEl.replaceChildren();
-  structList.replaceChildren();
-  structSearch.value = '';
-  updateSelectedUI();
   structSection.classList.add('hidden');
 }
 
-// Pushes the current state to the meshes, the cut face and the list.
+// Pushes the current state to the meshes and the cut face.
 function applyStructures() {
   if (!structState.active) return;
   structState.meshes.forEach((list, idx) => {
-    const op = regionOpacity(idx);
-    list.forEach(o => {
-      o.visible = op > 0.001;
-      const m = o.material;
-      const transparent = op < 0.999;
-      if (m.transparent !== transparent) {
-        m.transparent = transparent;
-        m.depthWrite = !transparent; // see-through layers mustn't hide what's inside
-        m.needsUpdate = true;
-      }
-      m.opacity = op;
-    });
+    const visible = regionOpacity(idx) > 0;
+    list.forEach(o => { o.visible = visible; });
   });
   const sec = slicer.sections;
   if (sec) {
-    sec.regions.forEach(r => { if (r) sec.palData[r.index * 4 + 3] = regionOpacity(r.index) > 0.001 ? 255 : 0; });
+    sec.regions.forEach(r => { if (r) sec.palData[r.index * 4 + 3] = regionOpacity(r.index) > 0 ? 255 : 0; });
     sec.pal.needsUpdate = true;
   }
-  structList.querySelectorAll('input[data-idx]').forEach(cb => { cb.checked = !structState.hidden.has(Number(cb.dataset.idx)); });
 }
 
 function setEmissive(idx, on) {
@@ -2225,24 +2212,56 @@ function setEmissive(idx, on) {
   });
 }
 
-function selectStructure(region) {
+function setSelected(region) {
   if (structState.selected) setEmissive(structState.selected.index, false);
   structState.selected = region;
   if (region) setEmissive(region.index, true);
   if (slicer.caps) slicer.caps.children[0].material.uniforms.uSel.value = region?.index ?? 0;
-  updateSelectedUI();
 }
 
-function updateSelectedUI() {
-  const r = structState.selected;
-  structSelName.textContent = r ? structName(r) : 'Click a structure to select it';
-  structSelName.classList.toggle('empty', !r);
-  structIsolate.disabled = structHide.disabled = !r;
-  structList.querySelectorAll('.struct-row').forEach(row => {
-    const on = r && Number(row.dataset.idx) === r.index;
-    row.classList.toggle('selected', !!on);
-    if (on && structList.closest('details').open) row.scrollIntoView({ block: 'nearest' });
-  });
+// True when `region` is the only structure showing (it was isolated).
+function isIsolated(region) {
+  return structState.hidden.size > 0 && structState.hidden.size === structState.meshes.size - 1
+    && !structState.hidden.has(region.index);
+}
+
+// Opens the pop-up for `region` next to the click / tap point.
+function openStructPop(region, clientX, clientY, touch) {
+  setSelected(region);
+  structPopName.textContent = structName(region);
+  const isolated = isIsolated(region);
+  structPopIsolate.textContent = isolated ? 'Show all' : 'Isolate';
+  structPopIsolate.dataset.action = isolated ? 'show-all' : 'isolate';
+  structPop.classList.remove('hidden');
+  // Same placement rules as the name tip: beside the cursor, above a finger,
+  // always inside the viewer.
+  const rect = container.getBoundingClientRect();
+  const w = structPop.offsetWidth, h = structPop.offsetHeight;
+  let left = clientX - rect.left + (touch ? -w / 2 : 14);
+  let top  = clientY - rect.top  + (touch ? -h - 28 : 14);
+  if (top < 8) top = clientY - rect.top + 28;
+  structPop.style.left = `${Math.max(8, Math.min(left, rect.width - w - 8))}px`;
+  structPop.style.top  = `${Math.max(8, Math.min(top, rect.height - h - 8))}px`;
+}
+
+function closeStructPop() {
+  structPop.classList.add('hidden');
+  setSelected(null);
+}
+
+// A click or tap on the model: open the pop-up for what's under it, or close
+// it when clicking empty space.
+function onStructureClick(clientX, clientY, touch) {
+  const hit = pickRegionAt(clientX, clientY);
+  if (!hit) { closeStructPop(); return; }
+  hideRegionTip();
+  openStructPop(hit.region, clientX, clientY, touch);
+}
+
+function showAllStructures() {
+  structState.hidden.clear();
+  structState.layers.forEach(l => setLayerOpacity(l, 1));
+  applyStructures();
 }
 
 // Layers are all or nothing: shown (opacity 1) or hidden (0).
@@ -2252,9 +2271,8 @@ function setLayerOpacity(layer, value) {
   if (btn) btn.setAttribute('aria-pressed', String(value > 0));
 }
 
-function buildStructuresUI() {
+function buildLayerButtons() {
   structLayersEl.replaceChildren();
-  structList.replaceChildren();
   structState.layers.forEach(layer => {
     // On/off toggle per layer (pressed = shown).
     const btn = document.createElement('button');
@@ -2270,86 +2288,44 @@ function buildStructuresUI() {
       announce(`${layer.label} ${layer.opacity > 0 ? 'shown' : 'hidden'}`);
     });
     structLayersEl.append(btn);
-
-    const head = document.createElement('p');
-    head.className = 'struct-group';
-    head.textContent = layer.label;
-    structList.append(head);
-    [...layer.regions].sort((a, b) => a.name.localeCompare(b.name)).forEach(r => {
-      const row = document.createElement('div');
-      row.className = 'struct-row';
-      row.dataset.idx = String(r.index);
-      row.dataset.search = `${r.name} ${r.acronym}`.toLowerCase();
-      row.setAttribute('role', 'listitem');
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.checked = true;
-      cb.dataset.idx = String(r.index);
-      cb.setAttribute('aria-label', `Show ${r.name}`);
-      cb.addEventListener('change', () => {
-        if (cb.checked) structState.hidden.delete(r.index); else structState.hidden.add(r.index);
-        applyStructures();
-      });
-      const sw = document.createElement('span');
-      sw.className = 'struct-swatch';
-      sw.style.background = r.color;
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = structName(r);
-      btn.title = structName(r);
-      btn.addEventListener('click', () => selectStructure(r));
-      row.append(cb, sw, btn);
-      structList.append(row);
-    });
   });
 }
 
-structSearch.addEventListener('input', () => {
-  const q = structSearch.value.trim().toLowerCase();
-  let head = null, headHasRows = false;
-  const finishHead = () => { if (head) head.hidden = !headHasRows; };
-  [...structList.children].forEach(el => {
-    if (el.classList.contains('struct-group')) { finishHead(); head = el; headHasRows = false; return; }
-    const show = !q || el.dataset.search.includes(q);
-    el.hidden = !show;
-    if (show) headHasRows = true;
-  });
-  finishHead();
-});
-
-structIsolate.addEventListener('click', () => {
+structPopIsolate.addEventListener('click', () => {
   const r = structState.selected;
   if (!r) return;
-  structState.hidden = new Set(structState.meshes.keys());
-  structState.hidden.delete(r.index);
-  const layer = structState.regionLayer[r.index];
-  if (layer && layer.opacity < 1) setLayerOpacity(layer, 1);
-  applyStructures();
-  announce(`Showing only ${r.name}`);
+  if (structPopIsolate.dataset.action === 'show-all') {
+    showAllStructures();
+  } else {
+    structState.hidden = new Set(structState.meshes.keys());
+    structState.hidden.delete(r.index);
+    const layer = structState.regionLayer[r.index];
+    if (layer && layer.opacity < 1) setLayerOpacity(layer, 1);
+    applyStructures();
+    announce(`Showing only ${r.name}`);
+  }
+  closeStructPop();
 });
-structHide.addEventListener('click', () => {
+structPopHide.addEventListener('click', () => {
   const r = structState.selected;
   if (!r) return;
   structState.hidden.add(r.index);
-  selectStructure(null);
+  closeStructPop();
   applyStructures();
   announce(`${structName(r)} hidden`);
 });
-structShowAll.addEventListener('click', () => {
-  structState.hidden.clear();
-  structState.layers.forEach(l => setLayerOpacity(l, 1));
-  applyStructures();
-});
+structPopClose.addEventListener('click', closeStructPop);
+structShowAll.addEventListener('click', () => { closeStructPop(); showAllStructures(); });
+controls.addEventListener('start', () => { if (!structPop.classList.contains('hidden')) closeStructPop(); });
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && !structPop.classList.contains('hidden')) closeStructPop(); });
 
 function applyStructuresFeature() {
   const feature = activeModelDef?.devFeature;
   const on = structState.active && (!feature || isDevFeatureEnabled(feature));
   structSection.classList.toggle('hidden', !on);
   if (!on && structState.active) { // feature switched off: put the model back to normal
-    structState.hidden.clear();
-    structState.layers.forEach(l => setLayerOpacity(l, 1));
-    selectStructure(null);
-    applyStructures();
+    closeStructPop();
+    showAllStructures();
   }
 }
 window.addEventListener('devfeaturechange', applyStructuresFeature);

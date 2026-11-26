@@ -364,7 +364,7 @@ body:not(.dev-mode) .dev-only { display: none !important; }
 
 /* ── Structures panel (dev feature) ── */
 #struct-section.hidden { display: none; }
-#struct-show-all, #struct-isolate, #struct-hide, #slice-straighten {
+#struct-show-all, #slice-straighten {
   width: 100%;
   padding: 7px 8px;
   border-radius: 8px;
@@ -376,33 +376,39 @@ body:not(.dev-mode) .dev-only { display: none !important; }
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 #slice-straighten { width: auto; }
-#struct-show-all:hover, #struct-isolate:hover:not(:disabled), #struct-hide:hover:not(:disabled), #slice-straighten:hover:not(:disabled) {
+#struct-show-all:hover, #slice-straighten:hover:not(:disabled) {
   border-color: var(--accent); color: var(--text); background: #1e2540;
 }
-#struct-isolate:disabled, #struct-hide:disabled, #slice-straighten:disabled { opacity: 0.4; cursor: default; }
-#struct-selected {
-  display: flex; flex-direction: column; gap: 6px;
-  margin: 12px 0 8px; padding: 8px; border-radius: 8px; background: #141722;
+#slice-straighten:disabled { opacity: 0.4; cursor: default; }
+.struct-hint { margin: 10px 0 8px; font-size: 0.74rem; line-height: 1.35; color: var(--text-muted); }
+
+/* Isolate / hide pop-up next to the clicked structure. */
+#struct-pop {
+  position: absolute;
+  z-index: 7;
+  width: 200px;
+  padding: 8px 10px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(20, 23, 34, 0.96);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
 }
-#struct-selected-name { font-size: 0.78rem; color: var(--text); line-height: 1.3; }
-#struct-selected-name.empty { color: var(--text-muted); }
-#struct-list-wrap { margin-top: 10px; font-size: 0.78rem; color: var(--text-muted); }
-#struct-list-wrap summary { cursor: pointer; padding: 4px 0; }
-#struct-search {
-  width: 100%; margin: 6px 0; padding: 6px 8px; border-radius: 6px;
-  border: 1.5px solid var(--border); background: var(--bg); color: var(--text); font-size: 0.78rem;
+#struct-pop.hidden { display: none; }
+.struct-pop-head { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 8px; }
+#struct-pop-name { flex: 1; font-size: 0.82rem; font-weight: 600; color: var(--text); line-height: 1.3; }
+#struct-pop-close {
+  width: 24px; height: 24px; margin: -2px -4px 0 0; border: none; border-radius: 6px;
+  background: transparent; color: var(--text-muted); font-size: 1.1rem; line-height: 1; cursor: pointer;
 }
-#struct-list { max-height: 260px; overflow-y: auto; padding-right: 2px; }
-.struct-group { margin: 8px 0 2px; font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
-.struct-row { display: flex; align-items: center; gap: 6px; min-height: 24px; }
-.struct-row input { accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
-.struct-row button {
-  flex: 1; min-width: 0; text-align: left; border: none; background: none; padding: 2px 4px; border-radius: 4px;
-  color: var(--text); font-size: 0.76rem; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+#struct-pop-close:hover { color: var(--text); background: #1e2540; }
+.struct-pop-btns { display: flex; gap: 6px; }
+.struct-pop-btns button {
+  flex: 1; padding: 7px 6px; border-radius: 8px; border: 1.5px solid var(--border);
+  background: transparent; color: var(--text); font-size: 0.78rem; cursor: pointer;
 }
-.struct-row button:hover { background: #1e2540; }
-.struct-row.selected button { background: rgba(79, 124, 255, 0.25); }
-.struct-row .struct-swatch { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+#struct-pop-isolate { border-color: var(--accent); background: rgba(79, 124, 255, 0.18); }
+.struct-pop-btns button:hover { border-color: var(--accent); background: #1e2540; }
+@media (pointer: coarse) { .struct-pop-btns button { padding: 10px 6px; } }
 #slice-flip:disabled { opacity: 0.4; cursor: default; }
 .anno-label.slice-hidden { display: none !important; }
 #region-tip {
