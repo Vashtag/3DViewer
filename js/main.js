@@ -180,6 +180,7 @@ shortcutsModal.addEventListener('keydown', e => {
 //   devFeature: optional developer-feature id; the model is only listed while
 //             that feature is switched on (Settings > Developer).
 //   slicer:   true to offer the Cross-section panel for this model.
+//   noFly:    true to hide the Orbit / Fly switch (orbit only).
 //   sections: optional <id>_regions.json with region names and a voxel
 //             volume used to colour the cut face by region (see the brain).
 //   credit:   optional source/licence line shown in the viewer's corner while
@@ -244,6 +245,7 @@ const MODELS = [
     id: 'brain', label: 'Brain (Allen atlas)', file: 'models/brain/brain.glb',
     category: 'CNS',
     slicer: true,         // shows the Cross-section panel
+    noFly: true,          // orbit only (no Fly mode)
     sections: 'models/brain/brain_regions.json', // region names + section volume
     // Shown in the viewer's bottom-right corner while this model is open.
     credit: [
@@ -676,6 +678,8 @@ function showViewerUI() {
   viewerToolbar.classList.remove('hidden');
   displayControls.classList.remove('hidden');
   setNavMode('orbit'); // always start a freshly-loaded model in orbit mode
+  // Models marked noFly (the brain) are orbit-only: no Orbit / Fly switch.
+  document.getElementById('nav-modes').style.display = activeModelDef?.noFly ? 'none' : '';
   // Apply the saved background on first load (defaults to black).
   if (!container.dataset.bgSet) {
     setBackground(localStorage.getItem('background') || 'dark');
@@ -3383,6 +3387,7 @@ function updateHint(locked = flyControls.isLocked) {
 }
 
 function setNavMode(mode) {
+  if (mode === 'fly' && activeModelDef?.noFly) mode = 'orbit';
   navMode = mode;
   navBtns.forEach(b => {
     b.classList.toggle('active', b.dataset.mode === mode);
