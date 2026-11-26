@@ -562,6 +562,8 @@ function animate() {
     camera.updateProjectionMatrix();
   }
 
+  updateSlicer(dt); // cross-section planes follow the model (dev feature)
+
   // Keep the headlamp at the camera so the viewed face is always lit.
   headlamp.position.copy(camera.position);
 
@@ -868,6 +870,7 @@ async function loadRegion(region) {
     if (EDIT_MODE) { setLabelPlacementMode(false); setOrientMode(false); }
     clearPins();
     setPinMode(false);
+    setSlicing(false);
     scene.remove(currentModel);
     currentModel.traverse(child => {
       if (child.isMesh) {
@@ -904,6 +907,7 @@ async function loadRegion(region) {
       scene.add(object);
       currentModel = object;
       recenterModel();
+      prepareSliceMaterials(object);
       fitCameraToModel(object);
       // If the first view was authored, frame the model with its saved
       // zoom and pan offset.
@@ -1231,6 +1235,8 @@ settingsReset.addEventListener('click', () => {
 const DEV_PASSWORD = 'developer';
 const DEV_FEATURES = [
   // { id: 'example', label: 'Example feature', description: 'What it does and what to test.' },
+  { id: 'slicer', label: 'Cross-section slicer',
+    description: 'Adds a Cross-section panel to the sidebar: cut the model along a coronal, sagittal or transverse plane, view a thin slab, or sweep through it.' },
 ];
 
 let devMode = localStorage.getItem('devMode') === '1';
@@ -1329,6 +1335,295 @@ devDisableBtn.addEventListener('click', () => {
   showToast('Developer mode off');
 });
 applyDevMode();
+
+// ── Cross-section slicer (developer feature "slicer") ─────
+// Cuts the model with a plane (or keeps a thin slab between two planes), in
+// the spirit of brainglobe-heatmap's Slicer. The plane is defined in the
+// model's own anatomical frame (captured at load, where anterior faces +Z and
+// superior +Y), so the cut stays on the same anatomy when a preset view
+// rotates the model.
+//
+// Clipping uses renderer.clippingPlanes, so it applies to everything drawn by
+// the main renderer. The cut face is "filled" by drawing the model's back
+// faces in one flat colour: looking through the cut you see the inside of the
+// far wall, and painting it flat makes it read as a solid section. This works
+// even when a scan isn't perfectly watertight.
+//
+// State lives in one `var` so the render loop (which starts before this code
+// runs) can safely check it.
+var slicer = null;
+
+const SLICE_AXES = {
+  coronal:    new THREE.Vector3(0, 0, 1), // anterior
+  sagittal:   new THREE.Vector3(1, 0, 0),
+  transverse: new THREE.Vector3(0, 1, 0), // superior
+};
+// Written straight to the output after colour conversion, so store the sRGB
+// values as-is (no linear conversion).
+const SLICE_CAP_COLOR = new THREE.Color().setRGB(0xd0 / 255, 0x8a / 255, 0x78 / 255, THREE.LinearSRGBColorSpace);
+
+slicer = {
+  on: false,
+  axis: 'coronal',
+  pos: 0.5,          // 0..1 across the model's extent along the axis
+  slab: false,
+  thick: 0.10,       // slab thickness, fraction of the extent
+  flip: false,
+  showPlane: true,
+  sweep: null,       // { t } while sweeping
+  baseQuat: new THREE.Quaternion(), // model orientation at load = anatomical frame
+  extents: {},       // axis -> { min, max } in model-local space
+  localPlanes: [new THREE.Plane(), new THREE.Plane()],
+  worldPlanes: [new THREE.Plane(), new THREE.Plane()],
+  capOn: { value: 0 },
+  capColor: { value: SLICE_CAP_COLOR },
+  helpers: null,     // THREE.Group with the plane indicators
+};
+
+const sliceSection   = document.getElementById('slice-section');
+const sliceToggle    = document.getElementById('slice-toggle');
+const sliceControls  = document.getElementById('slice-controls');
+const sliceAxes      = document.getElementById('slice-axes');
+const slicePos       = document.getElementById('slice-pos');
+const slicePosVal    = document.getElementById('slice-pos-val');
+const sliceSlab      = document.getElementById('slice-slab');
+const sliceThickRow  = document.getElementById('slice-thick-row');
+const sliceThick     = document.getElementById('slice-thick');
+const sliceThickVal  = document.getElementById('slice-thick-val');
+const slicePlaneShow = document.getElementById('slice-plane-show');
+const sliceFlip      = document.getElementById('slice-flip');
+const sliceSweep     = document.getElementById('slice-sweep');
+
+// Called once per loaded model: hooks the cap colour into its materials.
+function prepareSliceMaterials(object) {
+  slicer.baseQuat.copy(object.quaternion);
+  slicer.extents = {};
+  object.traverse(child => {
+    if (!child.isMesh) return;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    mats.forEach(m => {
+      m.userData.sliceOrigSide = m.side;
+      const prev = m.onBeforeCompile;
+      m.onBeforeCompile = (shader, r) => {
+        if (prev) prev(shader, r);
+        shader.uniforms.sliceCapOn = slicer.capOn;
+        shader.uniforms.sliceCapColor = slicer.capColor;
+        shader.fragmentShader = shader.fragmentShader
+          .replace('void main() {', 'uniform float sliceCapOn;\nuniform vec3 sliceCapColor;\nvoid main() {')
+          .replace('#include <dithering_fragment>',
+            '#include <dithering_fragment>\n' +
+            'if (sliceCapOn > 0.5 && !gl_FrontFacing) gl_FragColor = vec4(sliceCapColor, 1.0);');
+      };
+      m.customProgramCacheKey = () => 'slice-cap';
+      m.needsUpdate = true;
+    });
+  });
+}
+
+// Back faces must be drawn for the cap to show; restore the original side after.
+function setSliceMaterialsDoubleSided(on) {
+  if (!currentModel) return;
+  currentModel.traverse(child => {
+    if (!child.isMesh || child.userData.sliceHelper) return;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    mats.forEach(m => {
+      if (!('sliceOrigSide' in m.userData)) return;
+      const side = on ? THREE.DoubleSide : m.userData.sliceOrigSide;
+      if (m.side !== side) { m.side = side; m.needsUpdate = true; }
+    });
+  });
+}
+
+// The model's extent along an anatomical axis, in model-local space, measured
+// from the actual vertices (tighter than a bounding box for oblique axes).
+function sliceExtent(axis) {
+  if (slicer.extents[axis]) return slicer.extents[axis];
+  const n = sliceLocalNormal(axis);
+  const inv = currentModel.matrixWorld.clone().invert();
+  const m = new THREE.Matrix4();
+  const v = new THREE.Vector3();
+  let min = Infinity, max = -Infinity;
+  currentModel.updateMatrixWorld(true);
+  currentModel.traverse(child => {
+    if (!child.isMesh || child.userData.sliceHelper || !child.geometry?.attributes?.position) return;
+    m.multiplyMatrices(inv, child.matrixWorld);
+    const pos = child.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const d = v.fromBufferAttribute(pos, i).applyMatrix4(m).dot(n);
+      if (d < min) min = d;
+      if (d > max) max = d;
+    }
+  });
+  if (!isFinite(min)) { min = -1; max = 1; }
+  return (slicer.extents[axis] = { min, max });
+}
+
+// Axis direction in model-local space (world axis at the load orientation).
+function sliceLocalNormal(axis) {
+  return SLICE_AXES[axis].clone().applyQuaternion(slicer.baseQuat.clone().invert()).normalize();
+}
+
+// Rebuilds the local-space planes from the current settings.
+function updateSlicePlanes() {
+  if (!currentModel) return;
+  const n = sliceLocalNormal(slicer.axis);
+  const { min, max } = sliceExtent(slicer.axis);
+  const span = max - min;
+  const c = min + slicer.pos * span;
+  const [p0, p1] = slicer.localPlanes;
+  if (slicer.slab) {
+    const h = (slicer.thick * span) / 2;
+    p0.set(n.clone(), -(c - h));        // keep n·x >= c - h
+    p1.set(n.clone().negate(), c + h);  // keep n·x <= c + h
+  } else if (slicer.flip) {
+    p0.set(n.clone(), -c);              // keep the anterior/left/superior side
+  } else {
+    p0.set(n.clone().negate(), c);      // keep the posterior/right/inferior side
+  }
+  slicePosVal.textContent = Math.round(slicer.pos * 100) + '%';
+  sliceThickVal.textContent = Math.round(slicer.thick * 100) + '%';
+}
+
+function buildSliceHelpers() {
+  const g = new THREE.Group();
+  for (let i = 0; i < 2; i++) {
+    const geo = new THREE.PlaneGeometry(1, 1);
+    const fill = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+      color: 0x4f7cff, transparent: true, opacity: 0.12,
+      side: THREE.DoubleSide, depthWrite: false,
+    }));
+    const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geo),
+      new THREE.LineBasicMaterial({ color: 0x9db6ff, transparent: true, opacity: 0.7 }));
+    fill.add(edge);
+    fill.userData.sliceHelper = true;
+    fill.renderOrder = 2;
+    g.add(fill);
+  }
+  scene.add(g);
+  return g;
+}
+
+const _sliceQ = new THREE.Quaternion();
+const _sliceZ = new THREE.Vector3(0, 0, 1);
+const _sliceP = new THREE.Vector3();
+const _sliceDir = new THREE.Vector3();
+// Per frame: move the planes with the model and advance a sweep.
+function updateSlicer(dt) {
+  if (!slicer || !slicer.on || !currentModel) return;
+
+  if (slicer.sweep) {
+    slicer.sweep.t += dt / 6; // full pass in ~6 s
+    slicer.pos = Math.min(slicer.sweep.t, 1);
+    slicePos.value = String(Math.round(slicer.pos * 1000));
+    updateSlicePlanes();
+    if (slicer.sweep.t >= 1) setSliceSweep(false);
+  }
+
+  currentModel.updateMatrixWorld(true);
+  const count = slicer.slab ? 2 : 1;
+  for (let i = 0; i < count; i++) {
+    slicer.worldPlanes[i].copy(slicer.localPlanes[i]).applyMatrix4(currentModel.matrixWorld);
+  }
+  renderer.clippingPlanes = slicer.worldPlanes.slice(0, count);
+
+  // Plane indicators sit a hair inside the kept side so they aren't clipped.
+  // They fade as they turn to face the camera, where a tint over the whole
+  // section would only get in the way; edge-on they're most useful.
+  const size = Math.max(fitRadius, 0.001) * 1.6;
+  camera.getWorldDirection(_sliceDir);
+  slicer.helpers.children.forEach((h, i) => {
+    h.visible = slicer.showPlane && i < count;
+    if (!h.visible) return;
+    const wp = slicer.worldPlanes[i];
+    wp.coplanarPoint(_sliceP).addScaledVector(wp.normal, fitRadius * 0.002);
+    h.position.copy(_sliceP);
+    h.quaternion.copy(_sliceQ.setFromUnitVectors(_sliceZ, wp.normal));
+    h.scale.setScalar(size);
+    const facing = Math.abs(_sliceDir.dot(wp.normal)); // 1 = head-on
+    h.material.opacity = 0.14 * (1 - facing * facing);
+    h.children[0].material.opacity = 0.15 + 0.6 * (1 - facing);
+  });
+
+  // Hide labels whose point has been cut away.
+  if (labelLayer) {
+    labelLayer.children.forEach(o => {
+      o.getWorldPosition(_sliceP);
+      o.element?.classList.toggle('slice-hidden', isPointSliced(_sliceP));
+    });
+  }
+}
+
+// True when a world-space point is in the cut-away part of the model.
+function isPointSliced(p) {
+  if (!slicer || !slicer.on) return false;
+  return renderer.clippingPlanes.some(pl => pl.distanceToPoint(p) < 0);
+}
+
+// Raycast against the model, ignoring surface that has been sliced away, so
+// pins, labels and line points can only land on what's actually visible.
+function modelHits(ray) {
+  if (!currentModel) return [];
+  const hits = ray.intersectObject(currentModel, true).filter(h => !h.object.userData.sliceHelper);
+  return slicer && slicer.on ? hits.filter(h => !isPointSliced(h.point)) : hits;
+}
+
+function setSliceSweep(on) {
+  slicer.sweep = on ? { t: slicer.pos >= 0.999 ? 0 : slicer.pos } : null;
+  sliceSweep.setAttribute('aria-pressed', String(on));
+  sliceSweep.textContent = on ? 'Stop' : 'Sweep';
+}
+
+function setSlicing(on) {
+  if (on && !currentModel) return;
+  slicer.on = on;
+  sliceToggle.setAttribute('aria-pressed', String(on));
+  sliceToggle.textContent = on ? 'Stop slicing' : 'Slice model';
+  sliceControls.classList.toggle('hidden', !on);
+  slicer.capOn.value = on ? 1 : 0;
+  setSliceMaterialsDoubleSided(on);
+  if (on) {
+    if (!slicer.helpers) slicer.helpers = buildSliceHelpers();
+    updateSlicePlanes();
+  } else {
+    setSliceSweep(false);
+    renderer.clippingPlanes = [];
+    if (slicer.helpers) slicer.helpers.children.forEach(h => { h.visible = false; });
+    document.querySelectorAll('.anno-label.slice-hidden').forEach(el => el.classList.remove('slice-hidden'));
+  }
+}
+
+function applySlicerFeature() {
+  const enabled = isDevFeatureEnabled('slicer');
+  sliceSection.classList.toggle('hidden', !enabled);
+  if (!enabled && slicer.on) setSlicing(false);
+}
+
+sliceToggle.addEventListener('click', () => setSlicing(!slicer.on));
+sliceAxes.addEventListener('change', e => {
+  if (e.target.name !== 'slice-axis') return;
+  slicer.axis = e.target.value;
+  updateSlicePlanes();
+});
+slicePos.addEventListener('input', () => {
+  setSliceSweep(false);
+  slicer.pos = Number(slicePos.value) / 1000;
+  updateSlicePlanes();
+});
+sliceSlab.addEventListener('change', () => {
+  slicer.slab = sliceSlab.checked;
+  sliceThickRow.classList.toggle('hidden', !slicer.slab);
+  sliceFlip.disabled = slicer.slab; // a slab has no "side" to flip
+  updateSlicePlanes();
+});
+sliceThick.addEventListener('input', () => {
+  slicer.thick = Number(sliceThick.value) / 100;
+  updateSlicePlanes();
+});
+slicePlaneShow.addEventListener('change', () => { slicer.showPlane = slicePlaneShow.checked; });
+sliceFlip.addEventListener('click', () => { slicer.flip = !slicer.flip; updateSlicePlanes(); });
+sliceSweep.addEventListener('click', () => setSliceSweep(!slicer.sweep));
+window.addEventListener('devfeaturechange', e => { if (e.detail.id === 'slicer') applySlicerFeature(); });
+applySlicerFeature();
 
 function addLabel(name, localPos, category = '', record = true) {
   if (!labelLayer) return;
@@ -1578,7 +1873,7 @@ renderer.domElement.addEventListener('click', e => {
   _ndc.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
   _ndc.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
   _ray.setFromCamera(_ndc, camera);
-  const hits = _ray.intersectObject(currentModel, true);
+  const hits = modelHits(_ray);
   if (!hits.length) return;
   _pendingLabelHit = hits[0].point.clone();
   labelModalName.value = '';
@@ -1626,7 +1921,7 @@ window.addEventListener('pointermove', e => {
   _ndc.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
   _ndc.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
   _ray.setFromCamera(_ndc, camera);
-  const hits = _ray.intersectObject(currentModel, true);
+  const hits = modelHits(_ray);
   if (!hits.length) return; // keep last valid spot if dragged off the model
   const local = currentModel.worldToLocal(hits[0].point.clone());
   dragging.obj.position.copy(local);
@@ -1906,7 +2201,7 @@ function _projectLineToSurface(worldPts) {
     _projDir.divideScalar(distToCam);
 
     _projRay.set(camPos, _projDir);
-    const hits = _projRay.intersectObject(currentModel, true);
+    const hits = modelHits(_projRay);
     if (!hits.length) return currentModel.worldToLocal(wp.clone());
 
     // Among all intersections pick the one closest to the original sample point.
@@ -2084,7 +2379,7 @@ renderer.domElement.addEventListener('click', e => {
   _ndc.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
   _ndc.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
   _ray.setFromCamera(_ndc, camera);
-  const hits = _ray.intersectObject(currentModel, true);
+  const hits = modelHits(_ray);
   if (!hits.length) return;
   _wip.push(hits[0].point.clone());
 
@@ -2225,7 +2520,7 @@ container.addEventListener('pointerdown', e => {
    -((e.clientY - rect.top)  / rect.height) * 2 + 1
   );
   _ray.setFromCamera(_ndc, camera);
-  const hits = currentModel ? _ray.intersectObject(currentModel, true) : [];
+  const hits = modelHits(_ray);
   if (hits.length) dropPin(hits[0].point);
   setPinMode(false); // one-shot: disarm whether or not the click hit the model
 }, true); // capture phase so we beat OrbitControls

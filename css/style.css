@@ -270,6 +270,76 @@ body:not(.dev-mode) .dev-only { display: none !important; }
 .dev-feature { display: flex; flex-direction: column; gap: 2px; }
 .dev-feature-desc { padding-left: 25px; }
 
+/* ── Cross-section slicer (dev feature) ── */
+.dev-tag {
+  margin-left: 4px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: #f5a524;
+  color: #1a1d27;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+#slice-section.hidden, #slice-controls.hidden, #slice-thick-row.hidden { display: none; }
+#slice-toggle, #slice-flip, #slice-sweep {
+  width: 100%;
+  padding: 8px 8px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+#slice-toggle:hover, #slice-flip:hover, #slice-sweep:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  background: #1e2540;
+}
+#slice-toggle[aria-pressed="true"], #slice-sweep[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: #1e2540;
+  color: var(--text);
+}
+#slice-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+#slice-axes { display: flex; flex-direction: column; gap: 2px; }
+.slice-axis, .slice-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 26px;
+  font-size: 0.8rem;
+  color: var(--text);
+  cursor: pointer;
+}
+.slice-axis span {
+  margin-left: auto;
+  white-space: nowrap;
+  font-size: 0.66rem;
+  color: var(--text-muted);
+}
+.slice-axis input, .slice-check input { accent-color: var(--accent); cursor: pointer; }
+.slice-range-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.slice-range-label output { color: var(--text); font-variant-numeric: tabular-nums; }
+#slice-pos, #slice-thick { width: 100%; accent-color: var(--accent); cursor: pointer; }
+.slice-btn-row { display: flex; gap: 6px; }
+#slice-flip:disabled { opacity: 0.4; cursor: default; }
+.anno-label.slice-hidden { display: none !important; }
+
 /* ── Body layout (sidebar + viewer) ── */
 #body {
   flex: 1;

@@ -217,6 +217,31 @@
             </div>
           </div>
 
+          <!-- Cross-section slicer (developer-mode feature "slicer") -->
+          <div id="slice-section" class="hidden dev-only">
+            <p class="sidebar-label">Cross-section <span class="dev-tag">DEV</span></p>
+            <button id="slice-toggle" type="button" aria-pressed="false" aria-controls="slice-controls">Slice model</button>
+            <div id="slice-controls" class="hidden">
+              <div id="slice-axes" role="radiogroup" aria-label="Cutting plane">
+                <label class="slice-axis"><input type="radio" name="slice-axis" value="coronal" checked> Coronal <span>front/back</span></label>
+                <label class="slice-axis"><input type="radio" name="slice-axis" value="sagittal"> Sagittal <span>left/right</span></label>
+                <label class="slice-axis"><input type="radio" name="slice-axis" value="transverse"> Transverse <span>top/bottom</span></label>
+              </div>
+              <label class="slice-range-label" for="slice-pos">Position <output id="slice-pos-val">50%</output></label>
+              <input type="range" id="slice-pos" min="0" max="1000" value="500">
+              <label class="slice-check"><input type="checkbox" id="slice-slab"> Thin slab</label>
+              <div id="slice-thick-row" class="hidden">
+                <label class="slice-range-label" for="slice-thick">Thickness <output id="slice-thick-val">10%</output></label>
+                <input type="range" id="slice-thick" min="2" max="50" value="10">
+              </div>
+              <label class="slice-check"><input type="checkbox" id="slice-plane-show" checked> Show cutting plane</label>
+              <div class="slice-btn-row">
+                <button id="slice-flip" type="button">Flip side</button>
+                <button id="slice-sweep" type="button" aria-pressed="false">Sweep</button>
+              </div>
+            </div>
+          </div>
+
           <!-- Author tools (only when the page URL contains ?edit) -->
           <div id="edit-section" class="hidden">
             <div class="edit-group">
