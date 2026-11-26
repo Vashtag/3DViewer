@@ -131,6 +131,9 @@ body {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
+/* Settings has more controls than the other dialogs, so give it more room. */
+#settings-modal-box { width: min(440px, calc(100vw - 32px)); }
+
 /* Grouped sections (Display / Accessibility / Performance) */
 .settings-section {
   display: flex;
@@ -214,6 +217,58 @@ body {
 }
 #settings-reset:hover,
 #settings-modal-close:hover { border-color: var(--accent); color: var(--text); }
+
+/* ── Developer mode ── */
+#dev-badge {
+  align-self: center;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: #f5a524;
+  color: #1a1d27;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+#dev-badge.hidden, #dev-panel.hidden, #dev-unlock.hidden { display: none; }
+/* Anything marked dev-only stays hidden unless developer mode is on. */
+body:not(.dev-mode) .dev-only { display: none !important; }
+
+.dev-unlock { display: flex; flex-direction: column; gap: 8px; }
+.dev-unlock-row { display: flex; gap: 8px; }
+#dev-password {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.82rem;
+}
+#dev-password:focus { border-color: var(--accent); outline: none; }
+#dev-unlock-btn, #dev-disable {
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+#dev-unlock-btn:hover, #dev-disable:hover { border-color: var(--accent); color: var(--text); }
+#dev-disable { align-self: flex-start; margin-top: 4px; }
+.dev-error { font-size: 0.76rem; color: #ff7a7a; min-height: 0; }
+.dev-error:empty { display: none; }
+#dev-panel { display: flex; flex-direction: column; gap: 10px; }
+.dev-note, .dev-empty, .dev-feature-desc {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+#dev-features { display: flex; flex-direction: column; gap: 10px; }
+.dev-feature { display: flex; flex-direction: column; gap: 2px; }
+.dev-feature-desc { padding-left: 25px; }
 
 /* ── Body layout (sidebar + viewer) ── */
 #body {
