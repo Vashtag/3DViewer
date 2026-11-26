@@ -20,7 +20,7 @@ That mapping is a mirror, so triangle winding is reversed to keep normals
 pointing outward.
 
 Usage (Python 3.10+):
-    pip install brainglobe-atlasapi trimesh fast-simplification
+    pip install brainglobe-atlasapi trimesh fast-simplification networkx scipy
     python tools/build-brain.py
     cd tools && npx gltf-pipeline -i ../models/brain/brain.plain.glb \
         -o ../models/brain/brain.glb -d --draco.compressionLevel 7
@@ -45,7 +45,19 @@ CACHE = Path(sys.argv[1]) if len(sys.argv) > 1 else None
 MAX_TRIS_PER_REGION = 12000
 MIN_TRIS_PER_REGION = 500
 KEEP_FRACTION = 0.4
+MIN_FRAGMENT_TRIS = 60   # pieces smaller than this (or 2% of the main piece) are dropped
+OUTLINE_TRIS = 30000
 VOLUME_STRIDE = 2  # 500 um atlas voxels -> 1 mm section voxels
+
+
+def drop_fragments(tm):
+    """Remove tiny disconnected pieces (stray specks in the atlas meshes)."""
+    parts = tm.split(only_watertight=False)
+    if len(parts) <= 1:
+        return tm
+    biggest = max(len(p.faces) for p in parts)
+    keep = [p for p in parts if len(p.faces) >= max(MIN_FRAGMENT_TRIS, biggest * 0.02)]
+    return trimesh.util.concatenate(keep)
 
 
 def srgb_to_linear(c255):
@@ -87,7 +99,7 @@ def main():
                 verts.astype(np.float32), faces.astype(np.int32),
                 target_reduction=1 - target / len(faces))
 
-        tm = trimesh.Trimesh(vertices=verts, faces=faces, process=True)
+        tm = drop_fragments(trimesh.Trimesh(vertices=verts, faces=faces, process=True))
         if tm.is_volume and tm.volume < 0:
             tm.invert()
         rgb = st["rgb_triplet"]
@@ -115,6 +127,20 @@ def main():
             "group": group,
         })
         print(f"{idx:3d} {acr:8s} {len(tm.faces):6d} tris  {st['name']}")
+
+    # Whole-brain outline, used only as a stencil mask so the region-coloured
+    # cut face stops exactly at the brain surface (not hidden in the viewer).
+    root = atlas.mesh_from_structure("root")
+    verts = to_viewer(np.asarray(root.points, dtype=np.float64))
+    faces = np.asarray(root.cells[0].data)[:, ::-1]
+    verts, faces = fast_simplification.simplify(
+        verts.astype(np.float32), faces.astype(np.int32),
+        target_reduction=1 - OUTLINE_TRIS / len(faces))
+    outline = drop_fragments(trimesh.Trimesh(vertices=verts, faces=faces, process=True))
+    outline.visual = trimesh.visual.TextureVisuals(
+        material=trimesh.visual.material.PBRMaterial(name="__outline"))
+    scene.add_geometry(outline, node_name="__outline", geom_name="__outline")
+    print(f"outline {len(outline.faces)} tris, watertight={outline.is_watertight}")
 
     glb = scene.export(file_type="glb", include_normals=True)
     (OUT / "brain.plain.glb").write_bytes(glb)

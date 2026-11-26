@@ -260,7 +260,9 @@ const MODEL_BY_ID = Object.fromEntries(MODELS.map(m => [m.id, m]));
 // ── Main renderer ─────────────────────────────────────────
 // alpha: true makes the canvas transparent so the CSS background (lab photo
 // or solid colour) shows through behind the 3D model.
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+// stencil: the cross-section slicer masks the cut face to the model's outline.
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true, stencil: true });
+renderer.localClippingEnabled = true; // the slicer clips per material
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setClearColor(0x000000, 0); // fully transparent
@@ -794,6 +796,7 @@ function _applyViewTarget(t) {
 
 function setView(name, animate = false) {
   if (!currentModel || !fitRadius) return;
+  if (slicer) hideRegionTip(); // the name would point at the wrong place
   const target = _computeViewTarget(name);
   if (!target) return;
 
@@ -1376,13 +1379,15 @@ applyDevMode();
 // superior +Y), so the cut stays on the same anatomy when a preset view
 // rotates the model.
 //
-// Clipping uses renderer.clippingPlanes, so it applies to everything drawn by
-// the main renderer. The cut face is filled two ways:
+// Clipping is per material (everything under the model shares one array of
+// active planes). The cut face is filled two ways:
 //   • Back faces are drawn in a flat colour (the region's own colour on the
 //     brain), so looking through the cut the far wall reads as solid.
 //   • Models with a `sections` volume also get a "cap" plane on the cut that
 //     looks up which atlas region each point is in and paints it in that
-//     region's colour with thin borders, like an atlas section.
+//     region's colour with thin borders, like an atlas section. A stencil
+//     mask built from the model's "__outline" mesh trims the cap to the
+//     real (smooth) brain surface, so its 1 mm voxel steps never stick out.
 //
 // State lives in one `var` so the render loop (which starts before this code
 // runs) can safely check it.
@@ -1411,6 +1416,9 @@ slicer = {
   extents: {},       // axis -> { min, max } in model-local space
   localPlanes: [new THREE.Plane(), new THREE.Plane()],
   worldPlanes: [new THREE.Plane(), new THREE.Plane()],
+  activePlanes: [],  // the world planes in use; shared by every clipped material
+  outline: null,     // the model's "__outline" mesh (stencil mask source), if any
+  stencils: null,    // per-cap stencil passes built from the outline
   capOn: { value: 0 },
   helpers: null,     // THREE.Group with the plane outlines
   caps: null,        // THREE.Group with the region-coloured cut faces
@@ -1438,8 +1446,18 @@ const regionTip      = document.getElementById('region-tip');
 function prepareSliceMaterials(object, model) {
   slicer.baseQuat.copy(object.quaternion);
   slicer.extents = {};
+  slicer.outline = null;
+  slicer.stencils = null;
   object.traverse(child => {
     if (!child.isMesh) return;
+    if (child.name === '__outline') {
+      // Never drawn itself (material hidden so its stencil children still
+      // render); only its shape is used.
+      child.userData.sliceOutline = true;
+      child.material.visible = false;
+      slicer.outline = child;
+      return;
+    }
     const mats = Array.isArray(child.material) ? child.material : [child.material];
     mats.forEach(m => {
       m.userData.sliceOrigSide = m.side;
@@ -1560,15 +1578,18 @@ const SECTION_CAP_FRAG = /* glsl */`
   uniform float uHover; // region index under the pointer (0 = none)
   varying vec3 vWorld;
   float regionAt(vec3 t) { return floor(texture(uVol, t).r * 255.0 + 0.5); }
+  // 1 when a neighbour is a different region (not empty space: the outer
+  // edge is trimmed smoothly by the outline stencil instead).
+  float border(float n, float r) { return step(0.5, n) * step(0.5, abs(n - r)); }
   void main() {
     vec3 t = (uWorldToTex * vec4(vWorld, 1.0)).xyz;
     if (any(lessThan(t, vec3(0.0))) || any(greaterThan(t, vec3(1.0)))) discard;
     float r = regionAt(t);
     if (r < 0.5) discard;
     vec3 col = texture(uPal, vec2((r + 0.5) / 256.0, 0.5)).rgb;
-    // Darken voxels on a region border (neighbours within the plane differ).
-    float edge = step(0.5, abs(regionAt(t + uTexU) - r)) + step(0.5, abs(regionAt(t - uTexU) - r))
-               + step(0.5, abs(regionAt(t + uTexV) - r)) + step(0.5, abs(regionAt(t - uTexV) - r));
+    // Darken voxels on a border between regions (neighbours within the plane).
+    float edge = border(regionAt(t + uTexU), r) + border(regionAt(t - uTexU), r)
+               + border(regionAt(t + uTexV), r) + border(regionAt(t - uTexV), r);
     if (edge > 0.0) col *= 0.7;
     if (abs(r - uHover) < 0.5) col = mix(col, vec3(1.0), 0.35);
     gl_FragColor = vec4(col, 1.0);
@@ -1588,25 +1609,66 @@ function buildSectionCaps() {
       uHover: { value: 0 },
     },
     side: THREE.DoubleSide,
+    polygonOffset: true,      // in front of mesh fragments lying on the plane
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -4,
+    // Drawn only where the outline's stencil pass marked "inside the model",
+    // and resets the stencil as it goes so the next cap starts clean.
+    stencilWrite: true,
+    stencilRef: 0,
+    stencilFunc: THREE.NotEqualStencilFunc,
+    stencilFail: THREE.ReplaceStencilOp,
+    stencilZFail: THREE.ReplaceStencilOp,
+    stencilZPass: THREE.ReplaceStencilOp,
   });
   for (let i = 0; i < 2; i++) {
     const cap = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
     cap.visible = false;
+    cap.renderOrder = 2 + i * 2; // right after its own stencil pass
     g.add(cap);
   }
   scene.add(g);
   return g;
 }
 
-// Region at a world-space point, from the section volume (or null).
-function sectionRegionAt(p) {
-  const sec = slicer.sections;
-  if (!sec) return null;
-  const t = _sliceT.copy(p).applyMatrix4(slicer.worldToTex);
-  const [w, h, d] = sec.dims;
-  const x = Math.floor(t.x * w), y = Math.floor(t.y * h), z = Math.floor(t.z * d);
-  if (x < 0 || y < 0 || z < 0 || x >= w || y >= h || z >= d) return null;
-  return sec.regions[sec.data[(z * h + y) * w + x]] ?? null;
+// For each cap, two invisible passes of the outline mesh clipped by that cap's
+// plane: back faces count up, front faces count down. Where the count is
+// non-zero, the cap point is inside the model (three.js clipping-stencil
+// technique).
+function buildOutlineStencils() {
+  const o = slicer.outline;
+  return [0, 1].map(i => {
+    const g = new THREE.Group();
+    const make = (side, op) => {
+      const m = new THREE.Mesh(o.geometry, new THREE.MeshBasicMaterial({
+        side, colorWrite: false, depthWrite: false, depthTest: false,
+        stencilWrite: true, stencilFunc: THREE.AlwaysStencilFunc,
+        stencilFail: op, stencilZFail: op, stencilZPass: op,
+        clippingPlanes: [slicer.worldPlanes[i]],
+      }));
+      m.userData.sliceStencil = true;
+      m.renderOrder = 1 + i * 2;
+      return m;
+    };
+    g.add(make(THREE.BackSide, THREE.IncrementWrapStencilOp));
+    g.add(make(THREE.FrontSide, THREE.DecrementWrapStencilOp));
+    g.visible = false;
+    o.add(g); // child of the outline, so it follows the model's transform
+    return g;
+  });
+}
+
+// Every material under the model clips against the active planes (including
+// pins and drawn lines added later), except the stencil passes.
+function applyModelClipping() {
+  if (!currentModel) return;
+  const planes = slicer.on ? slicer.activePlanes : null;
+  currentModel.traverse(o => {
+    if (!o.material || o.userData.sliceStencil) return;
+    (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => {
+      if (m.clippingPlanes !== planes) { m.clippingPlanes = planes; m.needsUpdate = true; }
+    });
+  });
 }
 
 // The model's extent along an anatomical axis, in model-local space, measured
@@ -1621,6 +1683,7 @@ function sliceExtent(axis) {
   let min = Infinity, max = -Infinity;
   currentModel.traverse(child => {
     if (!child.isMesh || !child.geometry?.attributes?.position) return;
+    if (child.userData.sliceOutline || child.userData.sliceStencil) return;
     if (!('sliceOrigSide' in (Array.isArray(child.material) ? child.material[0] : child.material).userData)) return;
     m.multiplyMatrices(inv, child.matrixWorld);
     const pos = child.geometry.attributes.position;
@@ -1681,7 +1744,6 @@ function buildSliceHelpers() {
 const _sliceQ   = new THREE.Quaternion();
 const _sliceZ   = new THREE.Vector3(0, 0, 1);
 const _sliceP   = new THREE.Vector3();
-const _sliceT   = new THREE.Vector3();
 const _sliceDir = new THREE.Vector3();
 const _sliceM3  = new THREE.Matrix3();
 const _sliceInv = new THREE.Matrix4();
@@ -1707,10 +1769,13 @@ function updateSlicer(dt) {
   for (let i = 0; i < count; i++) {
     slicer.worldPlanes[i].copy(slicer.localPlanes[i]).applyMatrix4(currentModel.matrixWorld);
   }
-  renderer.clippingPlanes = slicer.worldPlanes.slice(0, count);
+  slicer.activePlanes.length = 0;
+  for (let i = 0; i < count; i++) slicer.activePlanes.push(slicer.worldPlanes[i]);
+  applyModelClipping();
+  if (slicer.stencils) slicer.stencils.forEach((g, i) => { g.visible = i < count && !!slicer.sections; });
 
-  // Outlines and caps sit a hair inside the kept side so they aren't clipped.
-  // Outlines fade as they turn to face the camera, where a tint over the
+  // Outlines and caps sit exactly on the plane (they aren't clipped; the cap
+  // wins the depth test against the cut edges via polygonOffset). Outlines fade as they turn to face the camera, where a tint over the
   // whole section would only get in the way; edge-on they're most useful.
   const outline = Math.max(fitRadius, 0.001) * 1.6;
   const capSize = Math.max(fitRadius, 0.001) * 2.4;
@@ -1719,7 +1784,7 @@ function updateSlicer(dt) {
     const active = i < count;
     const wp = slicer.worldPlanes[i];
     if (active) {
-      wp.coplanarPoint(_sliceP).addScaledVector(wp.normal, fitRadius * 0.002);
+      wp.coplanarPoint(_sliceP);
       _sliceQ.setFromUnitVectors(_sliceZ, wp.normal);
     }
     const h = slicer.helpers.children[i];
@@ -1734,7 +1799,7 @@ function updateSlicer(dt) {
     }
     if (slicer.caps) {
       const cap = slicer.caps.children[i];
-      cap.visible = active && !!slicer.sections;
+      cap.visible = active && !!slicer.sections && !!slicer.outline;
       if (cap.visible) {
         cap.position.copy(_sliceP);
         cap.quaternion.copy(_sliceQ);
@@ -1764,14 +1829,15 @@ function updateSlicer(dt) {
 // True when a world-space point is in the cut-away part of the model.
 function isPointSliced(p) {
   if (!slicer || !slicer.on) return false;
-  return renderer.clippingPlanes.some(pl => pl.distanceToPoint(p) < 0);
+  return slicer.activePlanes.some(pl => pl.distanceToPoint(p) < 0);
 }
 
 // Raycast against the model, ignoring surface that has been sliced away, so
 // pins, labels and line points can only land on what's actually visible.
 function modelHits(ray) {
   if (!currentModel) return [];
-  const hits = ray.intersectObject(currentModel, true);
+  const hits = ray.intersectObject(currentModel, true)
+    .filter(h => !h.object.userData.sliceOutline && !h.object.userData.sliceStencil);
   return slicer && slicer.on ? hits.filter(h => !isPointSliced(h.point)) : hits;
 }
 
@@ -1792,11 +1858,14 @@ function setSlicing(on) {
   if (on) {
     if (!slicer.helpers) slicer.helpers = buildSliceHelpers();
     if (!slicer.caps) slicer.caps = buildSectionCaps();
+    if (slicer.outline && !slicer.stencils) slicer.stencils = buildOutlineStencils();
     updateSlicePlanes();
   } else {
     setSliceSweep(false);
-    renderer.clippingPlanes = [];
+    slicer.activePlanes.length = 0;
+    applyModelClipping();
     [slicer.helpers, slicer.caps].forEach(g => g?.children.forEach(h => { h.visible = false; }));
+    slicer.stencils?.forEach(g => { g.visible = false; });
     document.querySelectorAll('.anno-label.slice-hidden').forEach(el => el.classList.remove('slice-hidden'));
   }
 }
@@ -1817,65 +1886,132 @@ function applyDevModelButtons() {
 }
 
 // ── Region names under the pointer (models with sections) ──
-// Hover (mouse) or tap shows the region's name: on the cut face it comes from
-// the section volume, elsewhere from the mesh under the pointer.
-let _tipPending = null, _tipTimer = null;
+// Hover with a mouse, or tap on a touch screen, to see the region's name.
+//
+// Picking never raycasts the ~500k-triangle region meshes. Instead it walks
+// the pointer's ray through the section volume (in the model's own space) in
+// half-voxel steps and stops at the first voxel that belongs to a region and
+// hasn't been sliced away: that's what is visible at that pixel. If that
+// voxel sits on a cut plane, the pointer is on the cut face. A walk is a few
+// hundred array reads, well under a millisecond.
+const _tipRay  = new THREE.Raycaster();
+const _tipNdc  = new THREE.Vector2();
+const _tipP    = new THREE.Vector3();
+const _tipInv  = new THREE.Matrix4();
+const _tipLRay = new THREE.Ray();
+const _tipBox  = new THREE.Box3();
+let _tipPos = null, _tipFrame = 0, _tipRegion = null;
+
+// Returns { region, cap } for the pixel at client (x, y), or null.
+function pickRegionAt(clientX, clientY) {
+  const sec = slicer.sections;
+  if (!sec || !currentModel) return null;
+  const rect = renderer.domElement.getBoundingClientRect();
+  _tipNdc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+  _tipRay.setFromCamera(_tipNdc, camera);
+
+  // Into model-local space, where the volume is an axis-aligned box:
+  // voxel (x, y, z) spans X [x, x+1]v, Y -[y, y+1]v, Z -[z, z+1]v.
+  _tipInv.copy(currentModel.matrixWorld).invert();
+  const ray = _tipLRay.copy(_tipRay.ray).applyMatrix4(_tipInv);
+  ray.direction.normalize();
+  const [w, h, d] = sec.dims, v = sec.voxelMm;
+  _tipBox.min.set(0, -h * v, -d * v);
+  _tipBox.max.set(w * v, 0, 0);
+  let t = 0;
+  if (!_tipBox.containsPoint(ray.origin)) {
+    if (!ray.intersectBox(_tipBox, _tipP)) return null;
+    t = ray.origin.distanceTo(_tipP);
+  }
+  const planes = slicer.on ? slicer.localPlanes.slice(0, slicer.slab ? 2 : 1) : [];
+  const step = v * 0.5;
+  const end = t + _tipBox.min.distanceTo(_tipBox.max);
+  for (; t <= end; t += step) {
+    ray.at(t, _tipP);
+    const x = Math.floor(_tipP.x / v), y = Math.floor(-_tipP.y / v), z = Math.floor(-_tipP.z / v);
+    if (x < 0 || y < 0 || z < 0 || x >= w || y >= h || z >= d) continue;
+    if (planes.some(pl => pl.distanceToPoint(_tipP) < 0)) continue; // sliced away
+    const region = sec.regions[sec.data[(z * h + y) * w + x]];
+    if (!region) continue;
+    const cap = planes.some(pl => pl.distanceToPoint(_tipP) < step * 1.5);
+    return { region, cap };
+  }
+  return null;
+}
+
 function hideRegionTip() {
+  _tipPos = null;
+  _tipRegion = null;
   regionTip.classList.add('hidden');
   if (slicer.caps) slicer.caps.children[0].material.uniforms.uHover.value = 0;
 }
-function regionUnderPointer(clientX, clientY) {
-  const rect = renderer.domElement.getBoundingClientRect();
-  _ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
-  _ray.setFromCamera(_ndc, camera);
-  let best = null;
-  const meshHit = modelHits(_ray)[0];
-  if (meshHit) {
-    const acr = meshHit.object.name || meshHit.object.parent?.name;
-    const r = slicer.sections.byAcronym[acr];
-    if (r) best = { dist: meshHit.distance, region: r };
-  }
-  if (slicer.on && slicer.caps) {
-    _ray.intersectObjects(slicer.caps.children.filter(c => c.visible), false).some(h => {
-      const r = sectionRegionAt(h.point);
-      if (!r) return false; // outside the brain on the cap square: look further
-      if (!best || h.distance <= best.dist + fitRadius * 0.01) best = { dist: h.distance, region: r, cap: true };
-      return true;
-    });
-  }
-  return best;
-}
-function showRegionTip(clientX, clientY) {
-  const hit = slicer.sections && currentModel ? regionUnderPointer(clientX, clientY) : null;
-  if (slicer.caps) slicer.caps.children[0].material.uniforms.uHover.value = hit?.cap ? hit.region.index : 0;
-  if (!hit) { regionTip.classList.add('hidden'); return; }
-  const name = hit.region.name;
-  regionTip.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+
+// Places the tip next to the pointer, kept inside the viewer. Touch puts it
+// above the finger so it isn't hidden under it.
+function placeRegionTip(clientX, clientY, touch) {
   const rect = container.getBoundingClientRect();
-  regionTip.style.left = `${clientX - rect.left + 14}px`;
-  regionTip.style.top  = `${clientY - rect.top + 14}px`;
+  const w = regionTip.offsetWidth, h = regionTip.offsetHeight;
+  let left = clientX - rect.left + (touch ? -w / 2 : 14);
+  let top  = clientY - rect.top  + (touch ? -h - 28 : 16);
+  if (top < 8) top = clientY - rect.top + 28;
+  left = Math.max(8, Math.min(left, rect.width - w - 8));
+  top  = Math.max(8, Math.min(top, rect.height - h - 8));
+  regionTip.style.left = `${left}px`;
+  regionTip.style.top  = `${top}px`;
+}
+
+function showRegionTipAt(clientX, clientY, touch) {
+  const hit = pickRegionAt(clientX, clientY);
+  if (slicer.caps) slicer.caps.children[0].material.uniforms.uHover.value = hit?.cap ? hit.region.index : 0;
+  if (!hit) { _tipRegion = null; regionTip.classList.add('hidden'); return; }
+  if (hit.region !== _tipRegion) {
+    const name = hit.region.name;
+    regionTip.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+    _tipRegion = hit.region;
+  }
   regionTip.classList.remove('hidden');
+  placeRegionTip(clientX, clientY, touch);
 }
+
 function regionTipAllowed() {
-  return slicer.sections && navMode === 'orbit' && currentClickMode() === null && !drawMode;
+  return !!slicer.sections && navMode === 'orbit' && currentClickMode() === null && !drawMode;
 }
+
+// Mouse: the tip follows the cursor every move; the (cheap) pick runs at
+// most once per frame.
 renderer.domElement.addEventListener('pointermove', e => {
   if (e.pointerType !== 'mouse' || !regionTipAllowed()) return;
   if (e.buttons) { hideRegionTip(); return; } // dragging the view
-  _tipPending = [e.clientX, e.clientY];
-  if (_tipTimer) return;
-  _tipTimer = setTimeout(() => { // ~12 updates a second keeps raycasts cheap
-    _tipTimer = null;
-    if (_tipPending) showRegionTip(..._tipPending);
-  }, 80);
+  _tipPos = [e.clientX, e.clientY];
+  if (!regionTip.classList.contains('hidden')) placeRegionTip(e.clientX, e.clientY, false);
+  if (_tipFrame) return;
+  _tipFrame = requestAnimationFrame(() => {
+    _tipFrame = 0;
+    if (_tipPos) showRegionTipAt(_tipPos[0], _tipPos[1], false);
+  });
 });
-renderer.domElement.addEventListener('pointerleave', () => { _tipPending = null; hideRegionTip(); });
-controls.addEventListener('start', hideRegionTip);           // the view is about to move
+renderer.domElement.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') hideRegionTip(); });
+
+// Touch / pen: a quick tap without moving names the region under the finger.
+// (Uses pointer events rather than "click", which touch browsers don't
+// always send after a tap on the 3D canvas.)
+let _tapStart = null;
+renderer.domElement.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse') return;
+  _tapStart = e.isPrimary ? { x: e.clientX, y: e.clientY, t: performance.now() } : null;
+});
+renderer.domElement.addEventListener('pointerup', e => {
+  if (e.pointerType === 'mouse' || !_tapStart) return;
+  const moved = Math.hypot(e.clientX - _tapStart.x, e.clientY - _tapStart.y);
+  const quick = performance.now() - _tapStart.t < 500;
+  _tapStart = null;
+  if (moved > 10 || !quick || !regionTipAllowed()) return;
+  showRegionTipAt(e.clientX, e.clientY, true);
+});
+renderer.domElement.addEventListener('pointercancel', () => { _tapStart = null; });
+
+controls.addEventListener('start', () => { if (slicer.sections) hideRegionTip(); }); // the view is about to move
 window.addEventListener('keydown', () => { if (slicer.sections) hideRegionTip(); });
-renderer.domElement.addEventListener('click', e => {
-  if (e.pointerType === 'mouse' || !regionTipAllowed()) return;
-  showRegionTip(e.clientX, e.clientY); // tap on touch screens
-});
 
 sliceToggle.addEventListener('click', () => setSlicing(!slicer.on));
 sliceAxes.addEventListener('change', e => {
