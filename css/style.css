@@ -337,8 +337,29 @@ body:not(.dev-mode) .dev-only { display: none !important; }
 .slice-range-label output { color: var(--text); font-variant-numeric: tabular-nums; }
 #slice-pos, #slice-thick { width: 100%; accent-color: var(--accent); cursor: pointer; }
 .slice-btn-row { display: flex; gap: 6px; }
-#slice-tilt, #struct-layers { display: flex; flex-direction: column; gap: 4px; }
-#slice-tilt input[type="range"], .struct-layer input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+#slice-tilt { display: flex; flex-direction: column; gap: 4px; }
+#slice-tilt input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+/* Layer on/off toggles (pressed = shown), two per row. */
+#struct-layers { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.struct-layer-btn {
+  padding: 7px 6px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  line-height: 1.2;
+  cursor: pointer;
+  text-decoration: line-through;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.struct-layer-btn[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: #1e2540;
+  color: var(--text);
+  text-decoration: none;
+}
+.struct-layer-btn:hover { border-color: var(--accent); color: var(--text); }
 #slice-straighten { align-self: flex-start; padding: 4px 10px; margin-top: 2px; }
 
 /* ── Structures panel (dev feature) ── */
@@ -359,7 +380,6 @@ body:not(.dev-mode) .dev-only { display: none !important; }
   border-color: var(--accent); color: var(--text); background: #1e2540;
 }
 #struct-isolate:disabled, #struct-hide:disabled, #slice-straighten:disabled { opacity: 0.4; cursor: default; }
-.struct-layer .slice-range-label { margin-top: 4px; }
 #struct-selected {
   display: flex; flex-direction: column; gap: 6px;
   margin: 12px 0 8px; padding: 8px; border-radius: 8px; background: #141722;
