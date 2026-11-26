@@ -182,6 +182,8 @@ shortcutsModal.addEventListener('keydown', e => {
 //   slicer:   true to offer the Cross-section panel for this model.
 //   sections: optional <id>_regions.json with region names and a voxel
 //             volume used to colour the cut face by region (see the brain).
+//   layers:   optional groups of regions (needs `sections`) for the Structures
+//             panel: [{ id, label, groups: [...], except?: [...], rest? }].
 //   credit:   optional source/licence line shown in the viewer's corner while
 //             the model is open: [{ text, href? }, …].
 const DEFAULT_VIEWS = [
@@ -246,6 +248,17 @@ const MODELS = [
     devFeature: 'brain',  // only listed while this developer feature is on
     slicer: true,         // shows the Cross-section panel
     sections: 'models/brain/brain_regions.json', // region names + section volume
+    // Structures panel: each layer gets an opacity slider. Regions are matched
+    // by their `group` in brain_regions.json; `rest` takes everything else.
+    layers: [
+      { id: 'cortex', label: 'Cerebral cortex',
+        groups: ['frontal lobe', 'parietal lobe', 'temporal lobe', 'occipital lobe', 'insular lobe',
+                 'limbic lobe', 'periallocortex', 'allocortex', ''],
+        except: ['HiH', 'HiB', 'HiT'] }, // hippocampus stays with the deep structures
+      { id: 'white', label: 'White matter', groups: ['white matter of forebrain', 'white matter of hindbrain'] },
+      { id: 'cerebellum', label: 'Cerebellum', groups: ['cerebellum'] },
+      { id: 'deep', label: 'Deep structures', rest: true },
+    ],
     // Shown in the viewer's bottom-right corner while this model is open.
     credit: [
       { text: 'Allen Human Reference Atlas, 3D, 2020', href: 'https://atlas.brain-map.org' },
@@ -1432,6 +1445,14 @@ const SLICE_AXES = {
   sagittal:   new THREE.Vector3(1, 0, 0),
   transverse: new THREE.Vector3(0, 1, 0), // superior
 };
+// The two axes each plane can tilt about (anatomical frame), with the name of
+// that rotation: about left-right = pitch, vertical = yaw, front-back = roll.
+const _AX_LR = new THREE.Vector3(1, 0, 0), _AX_SI = new THREE.Vector3(0, 1, 0), _AX_AP = new THREE.Vector3(0, 0, 1);
+const SLICE_TILTS = {
+  coronal:    [{ axis: _AX_LR, name: 'Pitch' }, { axis: _AX_SI, name: 'Yaw' }],
+  sagittal:   [{ axis: _AX_AP, name: 'Roll' },  { axis: _AX_SI, name: 'Yaw' }],
+  transverse: [{ axis: _AX_LR, name: 'Pitch' }, { axis: _AX_AP, name: 'Roll' }],
+};
 // Written straight to the output after colour conversion, so store the sRGB
 // values as-is (no linear conversion).
 const SLICE_CAP_COLOR = new THREE.Color().setRGB(0xd0 / 255, 0x8a / 255, 0x78 / 255, THREE.LinearSRGBColorSpace);
@@ -1440,6 +1461,8 @@ slicer = {
   on: false,
   axis: 'coronal',
   pos: 0.5,          // 0..1 across the model's extent along the axis
+  tilt: [0, 0],      // degrees about the plane's two tilt axes (SLICE_TILTS)
+  samplePts: null,   // model-local vertex sample for measuring extents
   slab: false,
   thick: 0.10,       // slab thickness, fraction of the extent
   flip: false,
@@ -1472,6 +1495,10 @@ const sliceThickVal  = document.getElementById('slice-thick-val');
 const slicePlaneShow = document.getElementById('slice-plane-show');
 const sliceFlip      = document.getElementById('slice-flip');
 const sliceSweep     = document.getElementById('slice-sweep');
+const sliceTilt      = [document.getElementById('slice-tilt-a'), document.getElementById('slice-tilt-b')];
+const sliceTiltName  = [document.getElementById('slice-tilt-a-name'), document.getElementById('slice-tilt-b-name')];
+const sliceTiltVal   = [document.getElementById('slice-tilt-a-val'), document.getElementById('slice-tilt-b-val')];
+const sliceStraighten = document.getElementById('slice-straighten');
 const regionTip      = document.getElementById('region-tip');
 
 // Called once per loaded model: hooks the back-face cap colour into its
@@ -1479,6 +1506,7 @@ const regionTip      = document.getElementById('region-tip');
 function prepareSliceMaterials(object, model) {
   slicer.baseQuat.copy(object.quaternion);
   slicer.extents = {};
+  slicer.samplePts = null;
   slicer.outline = null;
   slicer.stencils = null;
   object.traverse(child => {
@@ -1506,7 +1534,7 @@ function prepareSliceMaterials(object, model) {
           .replace('void main() {', 'uniform float sliceCapOn;\nuniform vec3 sliceCapColor;\nvoid main() {')
           .replace('#include <dithering_fragment>',
             '#include <dithering_fragment>\n' +
-            'if (sliceCapOn > 0.5 && !gl_FrontFacing) gl_FragColor = vec4(sliceCapColor, 1.0);');
+            'if (sliceCapOn > 0.5 && !gl_FrontFacing) gl_FragColor = vec4(sliceCapColor, gl_FragColor.a);');
       };
       m.customProgramCacheKey = () => 'slice-cap';
       m.needsUpdate = true;
@@ -1577,19 +1605,21 @@ async function loadSections(model) {
       .multiply(new THREE.Matrix4().makeTranslation(-origin.x, -origin.y, -origin.z));
 
     slicer.sections = {
-      data, dims: [w, h, d], voxelMm: v, origin, regions, tex, pal, localToTex,
+      data, dims: [w, h, d], voxelMm: v, origin, regions, tex, pal, palData, localToTex,
       byAcronym: Object.fromEntries(meta.regions.map(r => [r.acronym, r])),
     };
     if (slicer.caps) slicer.caps.children.forEach(c => {
       c.material.uniforms.uVol.value = tex;
       c.material.uniforms.uPal.value = pal;
     });
+    initStructures(model);
   } catch (e) {
     console.error('Could not load the region sections:', e);
   }
 }
 
 function disposeSections() {
+  resetStructures();
   if (!slicer.sections) return;
   slicer.sections.tex.dispose();
   slicer.sections.pal.dispose();
@@ -1612,6 +1642,7 @@ const SECTION_CAP_FRAG = /* glsl */`
   uniform vec3 uTexU;   // one voxel along the plane's x axis, in texture units
   uniform vec3 uTexV;   // one voxel along the plane's y axis
   uniform float uHover; // region index under the pointer (0 = none)
+  uniform float uSel;   // selected region index (0 = none)
   varying vec3 vWorld;
   float regionAt(vec3 t) { return floor(texture(uVol, t).r * 255.0 + 0.5); }
   // 1 when a neighbour is a different region (not empty space: the outer
@@ -1622,12 +1653,14 @@ const SECTION_CAP_FRAG = /* glsl */`
     if (any(lessThan(t, vec3(0.0))) || any(greaterThan(t, vec3(1.0)))) discard;
     float r = regionAt(t);
     if (r < 0.5) discard;
-    vec3 col = texture(uPal, vec2((r + 0.5) / 256.0, 0.5)).rgb;
+    vec4 pc = texture(uPal, vec2((r + 0.5) / 256.0, 0.5));
+    if (pc.a < 0.5) discard; // region hidden in the Structures panel
+    vec3 col = pc.rgb;
     // Darken voxels on a border between regions (neighbours within the plane).
     float edge = border(regionAt(t + uTexU), r) + border(regionAt(t - uTexU), r)
                + border(regionAt(t + uTexV), r) + border(regionAt(t - uTexV), r);
     if (edge > 0.0) col *= 0.7;
-    if (abs(r - uHover) < 0.5) col = mix(col, vec3(1.0), 0.35);
+    if (abs(r - uHover) < 0.5 || abs(r - uSel) < 0.5) col = mix(col, vec3(1.0), 0.35);
     gl_FragColor = vec4(col, 1.0);
   }`;
 
@@ -1643,6 +1676,7 @@ function buildSectionCaps() {
       uTexU: { value: new THREE.Vector3() },
       uTexV: { value: new THREE.Vector3() },
       uHover: { value: 0 },
+      uSel: { value: structState.selected?.index ?? 0 },
     },
     side: THREE.DoubleSide,
     polygonOffset: true,      // in front of mesh fragments lying on the plane
@@ -1707,42 +1741,67 @@ function applyModelClipping() {
   });
 }
 
-// The model's extent along an anatomical axis, in model-local space, measured
-// from the actual vertices (tighter than a bounding box for oblique axes).
-function sliceExtent(axis) {
-  if (slicer.extents[axis]) return slicer.extents[axis];
-  const n = sliceLocalNormal(axis);
+// The model's extent along the current cutting direction, in model-local
+// space. Measured on a sample of the real vertices (tighter than a bounding
+// box for tilted planes), cached per direction.
+function sliceExtent() {
+  const key = `${slicer.axis}|${slicer.tilt[0]}|${slicer.tilt[1]}`;
+  if (slicer.extents[key]) return slicer.extents[key];
+  if (!slicer.samplePts) slicer.samplePts = sampleModelPoints(60000);
+  const n = sliceLocalNormal();
+  const p = slicer.samplePts;
+  let min = Infinity, max = -Infinity;
+  for (let i = 0; i < p.length; i += 3) {
+    const dd = p[i] * n.x + p[i + 1] * n.y + p[i + 2] * n.z;
+    if (dd < min) min = dd;
+    if (dd > max) max = dd;
+  }
+  if (!isFinite(min)) { min = -1; max = 1; }
+  return (slicer.extents[key] = { min, max });
+}
+
+// Up to `limit` model-local vertex positions (every k-th vertex).
+function sampleModelPoints(limit) {
   currentModel.updateMatrixWorld(true);
   const inv = currentModel.matrixWorld.clone().invert();
-  const m = new THREE.Matrix4();
-  const v = new THREE.Vector3();
-  let min = Infinity, max = -Infinity;
+  const meshes = [];
+  let total = 0;
   currentModel.traverse(child => {
     if (!child.isMesh || !child.geometry?.attributes?.position) return;
     if (child.userData.sliceOutline || child.userData.sliceStencil) return;
     if (!('sliceOrigSide' in (Array.isArray(child.material) ? child.material[0] : child.material).userData)) return;
+    meshes.push(child);
+    total += child.geometry.attributes.position.count;
+  });
+  const stride = Math.max(1, Math.ceil(total / limit));
+  const out = [];
+  const m = new THREE.Matrix4(), v = new THREE.Vector3();
+  meshes.forEach(child => {
     m.multiplyMatrices(inv, child.matrixWorld);
     const pos = child.geometry.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-      const dd = v.fromBufferAttribute(pos, i).applyMatrix4(m).dot(n);
-      if (dd < min) min = dd;
-      if (dd > max) max = dd;
+    for (let i = 0; i < pos.count; i += stride) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(m);
+      out.push(v.x, v.y, v.z);
     }
   });
-  if (!isFinite(min)) { min = -1; max = 1; }
-  return (slicer.extents[axis] = { min, max });
+  return new Float32Array(out);
 }
 
-// Axis direction in model-local space (world axis at the load orientation).
-function sliceLocalNormal(axis) {
-  return SLICE_AXES[axis].clone().applyQuaternion(slicer.baseQuat.clone().invert()).normalize();
+// Cutting direction in model-local space: the plane's axis, tilted, in the
+// anatomical frame captured at load.
+function sliceLocalNormal() {
+  const n = SLICE_AXES[slicer.axis].clone();
+  SLICE_TILTS[slicer.axis].forEach((t, i) => {
+    if (slicer.tilt[i]) n.applyAxisAngle(t.axis, THREE.MathUtils.degToRad(slicer.tilt[i]));
+  });
+  return n.applyQuaternion(slicer.baseQuat.clone().invert()).normalize();
 }
 
 // Rebuilds the local-space planes from the current settings.
 function updateSlicePlanes() {
   if (!currentModel) return;
-  const n = sliceLocalNormal(slicer.axis);
-  const { min, max } = sliceExtent(slicer.axis);
+  const n = sliceLocalNormal();
+  const { min, max } = sliceExtent();
   const span = max - min;
   const c = min + slicer.pos * span;
   const [p0, p1] = slicer.localPlanes;
@@ -1756,6 +1815,12 @@ function updateSlicePlanes() {
     p0.set(n.clone().negate(), c);      // keep the posterior/right/inferior side
   }
   slicePosVal.textContent = Math.round(slicer.pos * 100) + '%';
+  SLICE_TILTS[slicer.axis].forEach((t, i) => {
+    sliceTiltName[i].textContent = t.name;
+    sliceTiltVal[i].textContent = `${slicer.tilt[i]}°`;
+    sliceTilt[i].value = String(slicer.tilt[i]);
+  });
+  sliceStraighten.disabled = !slicer.tilt[0] && !slicer.tilt[1];
   sliceThickVal.textContent = Math.round(slicer.thick * 100) + '%';
 }
 
@@ -1873,7 +1938,7 @@ function isPointSliced(p) {
 function modelHits(ray) {
   if (!currentModel) return [];
   const hits = ray.intersectObject(currentModel, true)
-    .filter(h => !h.object.userData.sliceOutline && !h.object.userData.sliceStencil);
+    .filter(h => h.object.visible && !h.object.userData.sliceOutline && !h.object.userData.sliceStencil);
   return slicer && slicer.on ? hits.filter(h => !isPointSliced(h.point)) : hits;
 }
 
@@ -1969,7 +2034,7 @@ function pickRegionAt(clientX, clientY) {
     if (x < 0 || y < 0 || z < 0 || x >= w || y >= h || z >= d) continue;
     if (planes.some(pl => pl.distanceToPoint(_tipP) < 0)) continue; // sliced away
     const region = sec.regions[sec.data[(z * h + y) * w + x]];
-    if (!region) continue;
+    if (!region || !regionPickable(region)) continue; // see through hidden / faded ones
     const cap = planes.some(pl => pl.distanceToPoint(_tipP) < step * 1.5);
     return { region, cap };
   }
@@ -2033,29 +2098,285 @@ renderer.domElement.addEventListener('pointerleave', e => { if (e.pointerType ==
 // (Uses pointer events rather than "click", which touch browsers don't
 // always send after a tap on the 3D canvas.)
 let _tapStart = null;
+// A click (mouse) or tap (touch) without dragging also selects the structure
+// for the Structures panel; clicking empty space clears the selection.
 renderer.domElement.addEventListener('pointerdown', e => {
-  if (e.pointerType === 'mouse') return;
+  if (e.pointerType === 'mouse' && e.button !== 0) { _tapStart = null; return; }
   _tapStart = e.isPrimary ? { x: e.clientX, y: e.clientY, t: performance.now() } : null;
 });
 renderer.domElement.addEventListener('pointerup', e => {
-  if (e.pointerType === 'mouse' || !_tapStart) return;
+  if (!_tapStart) return;
   const moved = Math.hypot(e.clientX - _tapStart.x, e.clientY - _tapStart.y);
   const quick = performance.now() - _tapStart.t < 500;
   _tapStart = null;
-  if (moved > 10 || !quick || !regionTipAllowed()) return;
-  showRegionTipAt(e.clientX, e.clientY, true);
+  if (moved > (e.pointerType === 'mouse' ? 4 : 10) || !quick || !regionTipAllowed()) return;
+  if (e.pointerType !== 'mouse') showRegionTipAt(e.clientX, e.clientY, true);
+  if (structState.active) selectStructure(pickRegionAt(e.clientX, e.clientY)?.region ?? null);
 });
 renderer.domElement.addEventListener('pointercancel', () => { _tapStart = null; });
 
 controls.addEventListener('start', () => { if (slicer.sections) hideRegionTip(); }); // the view is about to move
 window.addEventListener('keydown', () => { if (slicer.sections) hideRegionTip(); });
 
+// ── Structures: layer opacity, isolate / hide (models with `layers`) ──
+// In the spirit of brainglobe-heatmap's per-region alpha: each layer of the
+// model (cortex, white matter, ...) gets an opacity slider, and a selected
+// structure can be isolated or hidden. Hidden structures also drop out of the
+// cut face, and hover / click see through hidden or faded ones.
+// `var` so code that runs before this block (render loop, caps) can check it.
+var structState = {
+  active: false,
+  layers: [],          // [{ id, label, groups, except, rest, opacity, regions: [...] }]
+  regionLayer: [],     // region index -> its layer
+  meshes: new Map(),   // region index -> [mesh]
+  hidden: new Set(),   // region indices hidden one by one (Hide / Isolate / list)
+  selected: null,      // selected region record
+};
+
+const structSection  = document.getElementById('struct-section');
+const structLayersEl = document.getElementById('struct-layers');
+const structSelName  = document.getElementById('struct-selected-name');
+const structIsolate  = document.getElementById('struct-isolate');
+const structHide     = document.getElementById('struct-hide');
+const structShowAll  = document.getElementById('struct-show-all');
+const structSearch   = document.getElementById('struct-search');
+const structList     = document.getElementById('struct-list');
+
+const structName = r => r.name.charAt(0).toUpperCase() + r.name.slice(1);
+
+function regionOpacity(idx) {
+  if (structState.hidden.has(idx)) return 0;
+  return structState.regionLayer[idx]?.opacity ?? 1;
+}
+// Hover and click pass through hidden or mostly-transparent structures.
+function regionPickable(region) {
+  return !structState.active || regionOpacity(region.index) >= 0.5;
+}
+
+function initStructures(model) {
+  resetStructures();
+  if (!model.layers || !slicer.sections || activeModelDef !== model) return;
+  const regions = slicer.sections.regions.filter(Boolean);
+  structState.layers = model.layers.map(l => ({ ...l, opacity: 1, regions: [] }));
+  const rest = structState.layers.find(l => l.rest);
+  regions.forEach(r => {
+    const layer = structState.layers.find(l => !l.rest && l.groups?.includes(r.group) && !l.except?.includes(r.acronym)) ?? rest;
+    structState.regionLayer[r.index] = layer;
+    layer?.regions.push(r);
+  });
+  currentModel.traverse(o => {
+    if (!o.isMesh || o.userData.sliceOutline || o.userData.sliceStencil) return;
+    const r = slicer.sections.byAcronym[o.name];
+    if (!r) return;
+    if (!structState.meshes.has(r.index)) structState.meshes.set(r.index, []);
+    structState.meshes.get(r.index).push(o);
+  });
+  structState.active = true;
+  buildStructuresUI();
+  applyStructures();
+  applyStructuresFeature();
+}
+
+function resetStructures() {
+  structState.active = false;
+  structState.layers = [];
+  structState.regionLayer = [];
+  structState.meshes = new Map();
+  structState.hidden = new Set();
+  structState.selected = null;
+  structLayersEl.replaceChildren();
+  structList.replaceChildren();
+  structSearch.value = '';
+  updateSelectedUI();
+  structSection.classList.add('hidden');
+}
+
+// Pushes the current state to the meshes, the cut face and the list.
+function applyStructures() {
+  if (!structState.active) return;
+  structState.meshes.forEach((list, idx) => {
+    const op = regionOpacity(idx);
+    list.forEach(o => {
+      o.visible = op > 0.001;
+      const m = o.material;
+      const transparent = op < 0.999;
+      if (m.transparent !== transparent) {
+        m.transparent = transparent;
+        m.depthWrite = !transparent; // see-through layers mustn't hide what's inside
+        m.needsUpdate = true;
+      }
+      m.opacity = op;
+    });
+  });
+  const sec = slicer.sections;
+  if (sec) {
+    sec.regions.forEach(r => { if (r) sec.palData[r.index * 4 + 3] = regionOpacity(r.index) > 0.001 ? 255 : 0; });
+    sec.pal.needsUpdate = true;
+  }
+  structList.querySelectorAll('input[data-idx]').forEach(cb => { cb.checked = !structState.hidden.has(Number(cb.dataset.idx)); });
+}
+
+function setEmissive(idx, on) {
+  structState.meshes.get(idx)?.forEach(o => {
+    const m = o.material;
+    if (!m.emissive) return;
+    if (on) m.emissive.copy(m.color).multiplyScalar(0.55);
+    else m.emissive.setRGB(0, 0, 0);
+  });
+}
+
+function selectStructure(region) {
+  if (structState.selected) setEmissive(structState.selected.index, false);
+  structState.selected = region;
+  if (region) setEmissive(region.index, true);
+  if (slicer.caps) slicer.caps.children[0].material.uniforms.uSel.value = region?.index ?? 0;
+  updateSelectedUI();
+}
+
+function updateSelectedUI() {
+  const r = structState.selected;
+  structSelName.textContent = r ? structName(r) : 'Click a structure to select it';
+  structSelName.classList.toggle('empty', !r);
+  structIsolate.disabled = structHide.disabled = !r;
+  structList.querySelectorAll('.struct-row').forEach(row => {
+    const on = r && Number(row.dataset.idx) === r.index;
+    row.classList.toggle('selected', !!on);
+    if (on && structList.closest('details').open) row.scrollIntoView({ block: 'nearest' });
+  });
+}
+
+function setLayerOpacity(layer, value) {
+  layer.opacity = value;
+  const slider = structLayersEl.querySelector(`input[data-layer="${layer.id}"]`);
+  if (slider) {
+    slider.value = String(Math.round(value * 100));
+    slider.parentElement.querySelector('output').textContent = `${Math.round(value * 100)}%`;
+  }
+}
+
+function buildStructuresUI() {
+  structLayersEl.replaceChildren();
+  structList.replaceChildren();
+  structState.layers.forEach(layer => {
+    const wrap = document.createElement('div');
+    wrap.className = 'struct-layer';
+    const id = `struct-layer-${layer.id}`;
+    const label = document.createElement('label');
+    label.className = 'slice-range-label';
+    label.htmlFor = id;
+    const out = document.createElement('output');
+    out.textContent = '100%';
+    label.append(layer.label + ' ', out);
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.id = id;
+    input.min = '0';
+    input.max = '100';
+    input.value = '100';
+    input.dataset.layer = layer.id;
+    input.addEventListener('input', () => {
+      layer.opacity = Number(input.value) / 100;
+      out.textContent = `${input.value}%`;
+      applyStructures();
+    });
+    wrap.append(label, input);
+    structLayersEl.append(wrap);
+
+    const head = document.createElement('p');
+    head.className = 'struct-group';
+    head.textContent = layer.label;
+    structList.append(head);
+    [...layer.regions].sort((a, b) => a.name.localeCompare(b.name)).forEach(r => {
+      const row = document.createElement('div');
+      row.className = 'struct-row';
+      row.dataset.idx = String(r.index);
+      row.dataset.search = `${r.name} ${r.acronym}`.toLowerCase();
+      row.setAttribute('role', 'listitem');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = true;
+      cb.dataset.idx = String(r.index);
+      cb.setAttribute('aria-label', `Show ${r.name}`);
+      cb.addEventListener('change', () => {
+        if (cb.checked) structState.hidden.delete(r.index); else structState.hidden.add(r.index);
+        applyStructures();
+      });
+      const sw = document.createElement('span');
+      sw.className = 'struct-swatch';
+      sw.style.background = r.color;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = structName(r);
+      btn.title = structName(r);
+      btn.addEventListener('click', () => selectStructure(r));
+      row.append(cb, sw, btn);
+      structList.append(row);
+    });
+  });
+}
+
+structSearch.addEventListener('input', () => {
+  const q = structSearch.value.trim().toLowerCase();
+  let head = null, headHasRows = false;
+  const finishHead = () => { if (head) head.hidden = !headHasRows; };
+  [...structList.children].forEach(el => {
+    if (el.classList.contains('struct-group')) { finishHead(); head = el; headHasRows = false; return; }
+    const show = !q || el.dataset.search.includes(q);
+    el.hidden = !show;
+    if (show) headHasRows = true;
+  });
+  finishHead();
+});
+
+structIsolate.addEventListener('click', () => {
+  const r = structState.selected;
+  if (!r) return;
+  structState.hidden = new Set(structState.meshes.keys());
+  structState.hidden.delete(r.index);
+  const layer = structState.regionLayer[r.index];
+  if (layer && layer.opacity < 1) setLayerOpacity(layer, 1);
+  applyStructures();
+  announce(`Showing only ${r.name}`);
+});
+structHide.addEventListener('click', () => {
+  const r = structState.selected;
+  if (!r) return;
+  structState.hidden.add(r.index);
+  selectStructure(null);
+  applyStructures();
+  announce(`${structName(r)} hidden`);
+});
+structShowAll.addEventListener('click', () => {
+  structState.hidden.clear();
+  structState.layers.forEach(l => setLayerOpacity(l, 1));
+  applyStructures();
+});
+
+function applyStructuresFeature() {
+  const feature = activeModelDef?.devFeature;
+  const on = structState.active && (!feature || isDevFeatureEnabled(feature));
+  structSection.classList.toggle('hidden', !on);
+  if (!on && structState.active) { // feature switched off: put the model back to normal
+    structState.hidden.clear();
+    structState.layers.forEach(l => setLayerOpacity(l, 1));
+    selectStructure(null);
+    applyStructures();
+  }
+}
+window.addEventListener('devfeaturechange', applyStructuresFeature);
+
 sliceToggle.addEventListener('click', () => setSlicing(!slicer.on));
 sliceAxes.addEventListener('change', e => {
   if (e.target.name !== 'slice-axis') return;
   slicer.axis = e.target.value;
+  slicer.tilt = [0, 0]; // a new plane starts straight
   updateSlicePlanes();
 });
+sliceTilt.forEach((input, i) => input.addEventListener('input', () => {
+  slicer.tilt[i] = Number(input.value);
+  updateSlicePlanes();
+}));
+sliceStraighten.addEventListener('click', () => { slicer.tilt = [0, 0]; updateSlicePlanes(); });
 slicePos.addEventListener('input', () => {
   setSliceSweep(false);
   slicer.pos = Number(slicePos.value) / 1000;

@@ -227,6 +227,13 @@
                 <label class="slice-axis"><input type="radio" name="slice-axis" value="sagittal"> Sagittal <span>left/right</span></label>
                 <label class="slice-axis"><input type="radio" name="slice-axis" value="transverse"> Transverse <span>top/bottom</span></label>
               </div>
+              <div id="slice-tilt">
+                <label class="slice-range-label" for="slice-tilt-a"><span id="slice-tilt-a-name">Pitch</span> <output id="slice-tilt-a-val">0°</output></label>
+                <input type="range" id="slice-tilt-a" min="-60" max="60" value="0">
+                <label class="slice-range-label" for="slice-tilt-b"><span id="slice-tilt-b-name">Yaw</span> <output id="slice-tilt-b-val">0°</output></label>
+                <input type="range" id="slice-tilt-b" min="-60" max="60" value="0">
+                <button type="button" id="slice-straighten" disabled>Straighten</button>
+              </div>
               <label class="slice-range-label" for="slice-pos">Position <output id="slice-pos-val">50%</output></label>
               <input type="range" id="slice-pos" min="0" max="1000" value="500">
               <label class="slice-check"><input type="checkbox" id="slice-slab"> Thin slab</label>
@@ -240,6 +247,25 @@
                 <button id="slice-sweep" type="button" aria-pressed="false">Sweep</button>
               </div>
             </div>
+          </div>
+
+          <!-- Structures: per-layer opacity, isolate / hide (models with regions) -->
+          <div id="struct-section" class="hidden dev-only">
+            <p class="sidebar-label">Structures <span class="dev-tag">DEV</span></p>
+            <div id="struct-layers"></div>
+            <div id="struct-selected">
+              <p id="struct-selected-name">Click a structure to select it</p>
+              <div class="slice-btn-row">
+                <button type="button" id="struct-isolate" disabled>Isolate</button>
+                <button type="button" id="struct-hide" disabled>Hide</button>
+              </div>
+            </div>
+            <button type="button" id="struct-show-all">Show all</button>
+            <details id="struct-list-wrap">
+              <summary>All structures</summary>
+              <input type="search" id="struct-search" placeholder="Search" aria-label="Search structures">
+              <div id="struct-list" role="list"></div>
+            </details>
           </div>
 
           <!-- Author tools (only when the page URL contains ?edit) -->
