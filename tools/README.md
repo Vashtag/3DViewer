@@ -53,7 +53,7 @@ and push.
 `models/brain/` is generated, not scanned. To rebuild it (Python 3.10+):
 
 ```bash
-pip install brainglobe-atlasapi trimesh fast-simplification
+pip install brainglobe-atlasapi trimesh fast-simplification networkx scipy
 python tools/build-brain.py
 cd tools && npx gltf-pipeline -i ../models/brain/brain.plain.glb -o ../models/brain/brain.glb -d --draco.compressionLevel 7
 rm ../models/brain/brain.plain.glb
