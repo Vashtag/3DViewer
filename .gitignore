@@ -1,3 +1,4 @@
 node_modules/
 *.plain.glb
 .DS_Store
+tools/.planum-cache/

@@ -1,0 +1,860 @@
+{
+ "atlas": "Planum CDMD sub_013 (Desikan-Killiany + FreeSurfer aseg)",
+ "source": "https://github.com/JoshuaDuq/planumatlas/tree/49c8bf857a617232af561015d1575895a95e8b69",
+ "sections": {
+  "file": "brain-planum_sections.bin.gz",
+  "dims": [
+   135,
+   141,
+   152
+  ],
+  "voxelMm": 1.0,
+  "originMm": [
+   -66.5,
+   89.5,
+   66.5
+  ]
+ },
+ "regions": [
+  {
+   "index": 1,
+   "acronym": "desikan:left:-1",
+   "name": "Medial wall (unlabelled) \u00b7 left",
+   "color": "#96969e",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 2,
+   "acronym": "desikan:left:1",
+   "name": "Banks of the superior temporal sulcus \u00b7 left",
+   "color": "#196428",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 3,
+   "acronym": "desikan:left:2",
+   "name": "Caudal anterior cingulate \u00b7 left",
+   "color": "#7d64a0",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 4,
+   "acronym": "desikan:left:3",
+   "name": "Caudal middle frontal gyrus \u00b7 left",
+   "color": "#641900",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 5,
+   "acronym": "desikan:left:5",
+   "name": "Cuneus \u00b7 left",
+   "color": "#dc1464",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 6,
+   "acronym": "desikan:left:6",
+   "name": "Entorhinal cortex \u00b7 left",
+   "color": "#dc140a",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 7,
+   "acronym": "desikan:left:7",
+   "name": "Fusiform gyrus \u00b7 left",
+   "color": "#b4dc8c",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 8,
+   "acronym": "desikan:left:8",
+   "name": "Inferior parietal lobule \u00b7 left",
+   "color": "#dc3cdc",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 9,
+   "acronym": "desikan:left:9",
+   "name": "Inferior temporal gyrus \u00b7 left",
+   "color": "#b42878",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 10,
+   "acronym": "desikan:left:10",
+   "name": "Isthmus of the cingulate \u00b7 left",
+   "color": "#8c148c",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 11,
+   "acronym": "desikan:left:11",
+   "name": "Lateral occipital cortex \u00b7 left",
+   "color": "#141e8c",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 12,
+   "acronym": "desikan:left:12",
+   "name": "Lateral orbitofrontal cortex \u00b7 left",
+   "color": "#234b32",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 13,
+   "acronym": "desikan:left:13",
+   "name": "Lingual gyrus \u00b7 left",
+   "color": "#e18c8c",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 14,
+   "acronym": "desikan:left:14",
+   "name": "Medial orbitofrontal cortex \u00b7 left",
+   "color": "#c8234b",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 15,
+   "acronym": "desikan:left:15",
+   "name": "Middle temporal gyrus \u00b7 left",
+   "color": "#a06432",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 16,
+   "acronym": "desikan:left:16",
+   "name": "Parahippocampal gyrus \u00b7 left",
+   "color": "#14dc3c",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 17,
+   "acronym": "desikan:left:17",
+   "name": "Paracentral lobule \u00b7 left",
+   "color": "#3cdc3c",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 18,
+   "acronym": "desikan:left:18",
+   "name": "Pars opercularis \u00b7 left",
+   "color": "#dcb48c",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 19,
+   "acronym": "desikan:left:19",
+   "name": "Pars orbitalis \u00b7 left",
+   "color": "#146432",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 20,
+   "acronym": "desikan:left:20",
+   "name": "Pars triangularis \u00b7 left",
+   "color": "#dc3c14",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 21,
+   "acronym": "desikan:left:21",
+   "name": "Pericalcarine cortex \u00b7 left",
+   "color": "#78643c",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 22,
+   "acronym": "desikan:left:22",
+   "name": "Postcentral gyrus \u00b7 left",
+   "color": "#dc1414",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 23,
+   "acronym": "desikan:left:23",
+   "name": "Posterior cingulate \u00b7 left",
+   "color": "#dcb4dc",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 24,
+   "acronym": "desikan:left:24",
+   "name": "Precentral gyrus \u00b7 left",
+   "color": "#3c14dc",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 25,
+   "acronym": "desikan:left:25",
+   "name": "Precuneus \u00b7 left",
+   "color": "#a08cb4",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 26,
+   "acronym": "desikan:left:26",
+   "name": "Rostral anterior cingulate \u00b7 left",
+   "color": "#50148c",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 27,
+   "acronym": "desikan:left:27",
+   "name": "Rostral middle frontal gyrus \u00b7 left",
+   "color": "#4b327d",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 28,
+   "acronym": "desikan:left:28",
+   "name": "Superior frontal gyrus \u00b7 left",
+   "color": "#14dca0",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 29,
+   "acronym": "desikan:left:29",
+   "name": "Superior parietal lobule \u00b7 left",
+   "color": "#14b48c",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 30,
+   "acronym": "desikan:left:30",
+   "name": "Superior temporal gyrus \u00b7 left",
+   "color": "#8cdcdc",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 31,
+   "acronym": "desikan:left:31",
+   "name": "Supramarginal gyrus \u00b7 left",
+   "color": "#50a014",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 32,
+   "acronym": "desikan:left:32",
+   "name": "Frontal pole \u00b7 left",
+   "color": "#640064",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 33,
+   "acronym": "desikan:left:33",
+   "name": "Temporal pole \u00b7 left",
+   "color": "#4614aa",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 34,
+   "acronym": "desikan:left:34",
+   "name": "Transverse temporal gyrus \u00b7 left",
+   "color": "#9696c8",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 35,
+   "acronym": "desikan:left:35",
+   "name": "Insula \u00b7 left",
+   "color": "#ffc020",
+   "group": "Cerebral cortex",
+   "hemisphere": "left"
+  },
+  {
+   "index": 36,
+   "acronym": "desikan:right:-1",
+   "name": "Medial wall (unlabelled) \u00b7 right",
+   "color": "#96969e",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 37,
+   "acronym": "desikan:right:1",
+   "name": "Banks of the superior temporal sulcus \u00b7 right",
+   "color": "#196428",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 38,
+   "acronym": "desikan:right:2",
+   "name": "Caudal anterior cingulate \u00b7 right",
+   "color": "#7d64a0",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 39,
+   "acronym": "desikan:right:3",
+   "name": "Caudal middle frontal gyrus \u00b7 right",
+   "color": "#641900",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 40,
+   "acronym": "desikan:right:5",
+   "name": "Cuneus \u00b7 right",
+   "color": "#dc1464",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 41,
+   "acronym": "desikan:right:6",
+   "name": "Entorhinal cortex \u00b7 right",
+   "color": "#dc140a",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 42,
+   "acronym": "desikan:right:7",
+   "name": "Fusiform gyrus \u00b7 right",
+   "color": "#b4dc8c",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 43,
+   "acronym": "desikan:right:8",
+   "name": "Inferior parietal lobule \u00b7 right",
+   "color": "#dc3cdc",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 44,
+   "acronym": "desikan:right:9",
+   "name": "Inferior temporal gyrus \u00b7 right",
+   "color": "#b42878",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 45,
+   "acronym": "desikan:right:10",
+   "name": "Isthmus of the cingulate \u00b7 right",
+   "color": "#8c148c",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 46,
+   "acronym": "desikan:right:11",
+   "name": "Lateral occipital cortex \u00b7 right",
+   "color": "#141e8c",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 47,
+   "acronym": "desikan:right:12",
+   "name": "Lateral orbitofrontal cortex \u00b7 right",
+   "color": "#234b32",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 48,
+   "acronym": "desikan:right:13",
+   "name": "Lingual gyrus \u00b7 right",
+   "color": "#e18c8c",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 49,
+   "acronym": "desikan:right:14",
+   "name": "Medial orbitofrontal cortex \u00b7 right",
+   "color": "#c8234b",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 50,
+   "acronym": "desikan:right:15",
+   "name": "Middle temporal gyrus \u00b7 right",
+   "color": "#a06432",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 51,
+   "acronym": "desikan:right:16",
+   "name": "Parahippocampal gyrus \u00b7 right",
+   "color": "#14dc3c",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 52,
+   "acronym": "desikan:right:17",
+   "name": "Paracentral lobule \u00b7 right",
+   "color": "#3cdc3c",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 53,
+   "acronym": "desikan:right:18",
+   "name": "Pars opercularis \u00b7 right",
+   "color": "#dcb48c",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 54,
+   "acronym": "desikan:right:19",
+   "name": "Pars orbitalis \u00b7 right",
+   "color": "#146432",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 55,
+   "acronym": "desikan:right:20",
+   "name": "Pars triangularis \u00b7 right",
+   "color": "#dc3c14",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 56,
+   "acronym": "desikan:right:21",
+   "name": "Pericalcarine cortex \u00b7 right",
+   "color": "#78643c",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 57,
+   "acronym": "desikan:right:22",
+   "name": "Postcentral gyrus \u00b7 right",
+   "color": "#dc1414",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 58,
+   "acronym": "desikan:right:23",
+   "name": "Posterior cingulate \u00b7 right",
+   "color": "#dcb4dc",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 59,
+   "acronym": "desikan:right:24",
+   "name": "Precentral gyrus \u00b7 right",
+   "color": "#3c14dc",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 60,
+   "acronym": "desikan:right:25",
+   "name": "Precuneus \u00b7 right",
+   "color": "#a08cb4",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 61,
+   "acronym": "desikan:right:26",
+   "name": "Rostral anterior cingulate \u00b7 right",
+   "color": "#50148c",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 62,
+   "acronym": "desikan:right:27",
+   "name": "Rostral middle frontal gyrus \u00b7 right",
+   "color": "#4b327d",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 63,
+   "acronym": "desikan:right:28",
+   "name": "Superior frontal gyrus \u00b7 right",
+   "color": "#14dca0",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 64,
+   "acronym": "desikan:right:29",
+   "name": "Superior parietal lobule \u00b7 right",
+   "color": "#14b48c",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 65,
+   "acronym": "desikan:right:30",
+   "name": "Superior temporal gyrus \u00b7 right",
+   "color": "#8cdcdc",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 66,
+   "acronym": "desikan:right:31",
+   "name": "Supramarginal gyrus \u00b7 right",
+   "color": "#50a014",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 67,
+   "acronym": "desikan:right:32",
+   "name": "Frontal pole \u00b7 right",
+   "color": "#640064",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 68,
+   "acronym": "desikan:right:33",
+   "name": "Temporal pole \u00b7 right",
+   "color": "#4614aa",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 69,
+   "acronym": "desikan:right:34",
+   "name": "Transverse temporal gyrus \u00b7 right",
+   "color": "#9696c8",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 70,
+   "acronym": "desikan:right:35",
+   "name": "Insula \u00b7 right",
+   "color": "#ffc020",
+   "group": "Cerebral cortex",
+   "hemisphere": "right"
+  },
+  {
+   "index": 71,
+   "acronym": "aseg:left:4",
+   "name": "Lateral ventricle \u00b7 left",
+   "color": "#781286",
+   "group": "Deep structures",
+   "hemisphere": "left"
+  },
+  {
+   "index": 72,
+   "acronym": "aseg:left:5",
+   "name": "Inferior horn of lateral ventricle \u00b7 left",
+   "color": "#c43afa",
+   "group": "Deep structures",
+   "hemisphere": "left"
+  },
+  {
+   "index": 73,
+   "acronym": "aseg:left:7",
+   "name": "Cerebellar white matter \u00b7 left",
+   "color": "#dcf8a4",
+   "group": "Deep structures",
+   "hemisphere": "left"
+  },
+  {
+   "index": 74,
+   "acronym": "aseg:left:8",
+   "name": "Cerebellar cortex \u00b7 left",
+   "color": "#e69422",
+   "group": "Deep structures",
+   "hemisphere": "left"
+  },
+  {
+   "index": 75,
+   "acronym": "aseg:left:10",
+   "name": "Thalamus \u00b7 left",
+   "color": "#00760e",
+   "group": "Deep structures",
+   "hemisphere": "left"
+  },
+  {
+   "index": 76,
+   "acronym": "aseg:left:11",
+   "name": "Caudate nucleus \u00b7 left",
+   "color": "#7abadc",
+   "group": "Deep structures",
+   "hemisphere": "left"
+  },
+  {
+   "index": 77,
+   "acronym": "aseg:left:12",
+   "name": "Putamen \u00b7 left",
+   "color": "#ec0db0",
+   "group": "Deep structures",
+   "hemisphere": "left"
+  },
+  {
+   "index": 78,
+   "acronym": "aseg:left:13",
+   "name": "Globus pallidus \u00b7 left",
+   "color": "#0c30ff",
+   "group": "Deep structures",
+   "hemisphere": "left"
+  },
+  {
+   "index": 79,
+   "acronym": "aseg:midline:14",
+   "name": "Third ventricle",
+   "color": "#ccb68e",
+   "group": "Deep structures",
+   "hemisphere": "midline"
+  },
+  {
+   "index": 80,
+   "acronym": "aseg:midline:15",
+   "name": "Fourth ventricle",
+   "color": "#2acca4",
+   "group": "Deep structures",
+   "hemisphere": "midline"
+  },
+  {
+   "index": 81,
+   "acronym": "aseg:midline:16",
+   "name": "Brainstem",
+   "color": "#779fb0",
+   "group": "Deep structures",
+   "hemisphere": "midline"
+  },
+  {
+   "index": 82,
+   "acronym": "aseg:left:17",
+   "name": "Hippocampus \u00b7 left",
+   "color": "#dcd814",
+   "group": "Deep structures",
+   "hemisphere": "left"
+  },
+  {
+   "index": 83,
+   "acronym": "aseg:left:18",
+   "name": "Amygdala \u00b7 left",
+   "color": "#67ffff",
+   "group": "Deep structures",
+   "hemisphere": "left"
+  },
+  {
+   "index": 84,
+   "acronym": "aseg:left:26",
+   "name": "Nucleus accumbens \u00b7 left",
+   "color": "#ffa500",
+   "group": "Deep structures",
+   "hemisphere": "left"
+  },
+  {
+   "index": 85,
+   "acronym": "aseg:left:28",
+   "name": "Ventral diencephalon \u00b7 left",
+   "color": "#a52a2a",
+   "group": "Deep structures",
+   "hemisphere": "left"
+  },
+  {
+   "index": 86,
+   "acronym": "aseg:right:43",
+   "name": "Lateral ventricle \u00b7 right",
+   "color": "#781286",
+   "group": "Deep structures",
+   "hemisphere": "right"
+  },
+  {
+   "index": 87,
+   "acronym": "aseg:right:44",
+   "name": "Inferior horn of lateral ventricle \u00b7 right",
+   "color": "#c43afa",
+   "group": "Deep structures",
+   "hemisphere": "right"
+  },
+  {
+   "index": 88,
+   "acronym": "aseg:right:46",
+   "name": "Cerebellar white matter \u00b7 right",
+   "color": "#dcf8a4",
+   "group": "Deep structures",
+   "hemisphere": "right"
+  },
+  {
+   "index": 89,
+   "acronym": "aseg:right:47",
+   "name": "Cerebellar cortex \u00b7 right",
+   "color": "#e69422",
+   "group": "Deep structures",
+   "hemisphere": "right"
+  },
+  {
+   "index": 90,
+   "acronym": "aseg:right:49",
+   "name": "Thalamus \u00b7 right",
+   "color": "#00760e",
+   "group": "Deep structures",
+   "hemisphere": "right"
+  },
+  {
+   "index": 91,
+   "acronym": "aseg:right:50",
+   "name": "Caudate nucleus \u00b7 right",
+   "color": "#7abadc",
+   "group": "Deep structures",
+   "hemisphere": "right"
+  },
+  {
+   "index": 92,
+   "acronym": "aseg:right:51",
+   "name": "Putamen \u00b7 right",
+   "color": "#ec0db0",
+   "group": "Deep structures",
+   "hemisphere": "right"
+  },
+  {
+   "index": 93,
+   "acronym": "aseg:right:52",
+   "name": "Globus pallidus \u00b7 right",
+   "color": "#0d30ff",
+   "group": "Deep structures",
+   "hemisphere": "right"
+  },
+  {
+   "index": 94,
+   "acronym": "aseg:right:53",
+   "name": "Hippocampus \u00b7 right",
+   "color": "#dcd814",
+   "group": "Deep structures",
+   "hemisphere": "right"
+  },
+  {
+   "index": 95,
+   "acronym": "aseg:right:54",
+   "name": "Amygdala \u00b7 right",
+   "color": "#67ffff",
+   "group": "Deep structures",
+   "hemisphere": "right"
+  },
+  {
+   "index": 96,
+   "acronym": "aseg:right:58",
+   "name": "Nucleus accumbens \u00b7 right",
+   "color": "#ffa500",
+   "group": "Deep structures",
+   "hemisphere": "right"
+  },
+  {
+   "index": 97,
+   "acronym": "aseg:right:60",
+   "name": "Ventral diencephalon \u00b7 right",
+   "color": "#a52a2a",
+   "group": "Deep structures",
+   "hemisphere": "right"
+  },
+  {
+   "index": 98,
+   "acronym": "aseg:midline:251",
+   "name": "Corpus callosum (splenium)",
+   "color": "#000040",
+   "group": "Deep structures",
+   "hemisphere": "midline"
+  },
+  {
+   "index": 99,
+   "acronym": "aseg:midline:252",
+   "name": "Corpus callosum (mid-posterior)",
+   "color": "#000070",
+   "group": "Deep structures",
+   "hemisphere": "midline"
+  },
+  {
+   "index": 100,
+   "acronym": "aseg:midline:253",
+   "name": "Corpus callosum (central)",
+   "color": "#0000a0",
+   "group": "Deep structures",
+   "hemisphere": "midline"
+  },
+  {
+   "index": 101,
+   "acronym": "aseg:midline:254",
+   "name": "Corpus callosum (mid-anterior)",
+   "color": "#0000d0",
+   "group": "Deep structures",
+   "hemisphere": "midline"
+  },
+  {
+   "index": 102,
+   "acronym": "aseg:midline:255",
+   "name": "Corpus callosum (genu)",
+   "color": "#0000ff",
+   "group": "Deep structures",
+   "hemisphere": "midline"
+  },
+  {
+   "index": 103,
+   "acronym": "tissue:Left-Cerebral-White-Matter",
+   "name": "Cerebral white matter \u00b7 left",
+   "color": "#f5f5f5",
+   "group": "Tissue",
+   "hemisphere": "left"
+  },
+  {
+   "index": 104,
+   "acronym": "tissue:Right-Cerebral-White-Matter",
+   "name": "Cerebral white matter \u00b7 right",
+   "color": "#f5f5f5",
+   "group": "Tissue",
+   "hemisphere": "right"
+  },
+  {
+   "index": 105,
+   "acronym": "tissue:WM-hypointensities",
+   "name": "White-matter hypointensities",
+   "color": "#c846ff",
+   "group": "Tissue",
+   "hemisphere": "midline"
+  }
+ ]
+}

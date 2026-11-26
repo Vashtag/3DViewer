@@ -239,11 +239,30 @@ const MODELS = [
     // Allen Human Reference Atlas via BrainGlobe (built by tools/build-brain.py).
     // One mesh per atlas region, in the atlas colours. +X is the patient's
     // left, so the Left/Right buttons look from +X/-X respectively.
-    id: 'brain', label: 'Brain', file: 'models/brain/brain.glb',
+    id: 'brain', label: 'Brain (Allen atlas)', file: 'models/brain/brain.glb',
     category: 'CNS',
     devFeature: 'brain',  // only listed while this developer feature is on
     slicer: true,         // shows the Cross-section panel
     sections: 'models/brain/brain_regions.json', // region names + section volume
+    rotation: [0, 0, 0],
+    views: [
+      { label: 'Anterior',  dir: 'front'  },
+      { label: 'Posterior', dir: 'back'   },
+      { label: 'Left',      dir: 'right'  },
+      { label: 'Right',     dir: 'left'   },
+      { label: 'Superior',  dir: 'top'    },
+      { label: 'Inferior',  dir: 'bottom' },
+    ],
+  },
+  {
+    // A real person's brain (MGH CDMD sub_013, CC0) from Planum, reconstructed
+    // with FreeSurfer: Desikan-Killiany cortex + aseg deep structures (built by
+    // tools/build-planum-brain.py). Same axes as the Allen brain.
+    id: 'brain-planum', label: 'Brain (Planum)', file: 'models/brain-planum/brain-planum.glb',
+    category: 'CNS',
+    devFeature: 'brain',
+    slicer: true,
+    sections: 'models/brain-planum/brain-planum_regions.json',
     rotation: [0, 0, 0],
     views: [
       { label: 'Anterior',  dir: 'front'  },
@@ -1271,7 +1290,7 @@ const DEV_PASSWORD = 'developer';
 const DEV_FEATURES = [
   // { id: 'example', label: 'Example feature', description: 'What it does and what to test.' },
   { id: 'brain', label: 'Human brain + cross-sections',
-    description: 'Adds a Brain model under CNS (Allen Human Reference Atlas via BrainGlobe) with a Cross-section panel: cut it along a coronal, sagittal or transverse plane, see the regions on the cut face, and hover or tap to name them.' },
+    description: 'Adds two Brain models under CNS to compare: the Allen Human Reference Atlas (via BrainGlobe) and a real person\'s brain from Planum (FreeSurfer). Both have a Cross-section panel: cut along a coronal, sagittal or transverse plane, see the regions on the cut face, and hover or tap to name them.' },
 ];
 
 let devMode = localStorage.getItem('devMode') === '1';
@@ -1536,12 +1555,15 @@ async function loadSections(model) {
     pal.needsUpdate = true;
 
     // Model-local (mm, viewer axes) -> texture coords (0..1). The volume's
-    // texture x/y/z run along +X, -Y, -Z (left, inferior, posterior).
+    // texture x/y/z run along +X, -Y, -Z (left, inferior, posterior), starting
+    // from the corner at originMm (the model-local origin when omitted).
     const v = meta.sections.voxelMm;
-    const localToTex = new THREE.Matrix4().makeScale(1 / (w * v), -1 / (h * v), -1 / (d * v));
+    const origin = new THREE.Vector3(...(meta.sections.originMm ?? [0, 0, 0]));
+    const localToTex = new THREE.Matrix4().makeScale(1 / (w * v), -1 / (h * v), -1 / (d * v))
+      .multiply(new THREE.Matrix4().makeTranslation(-origin.x, -origin.y, -origin.z));
 
     slicer.sections = {
-      data, dims: [w, h, d], voxelMm: v, regions, tex, pal, localToTex,
+      data, dims: [w, h, d], voxelMm: v, origin, regions, tex, pal, localToTex,
       byAcronym: Object.fromEntries(meta.regions.map(r => [r.acronym, r])),
     };
     if (slicer.caps) slicer.caps.children.forEach(c => {
@@ -1910,14 +1932,15 @@ function pickRegionAt(clientX, clientY) {
   _tipNdc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
   _tipRay.setFromCamera(_tipNdc, camera);
 
-  // Into model-local space, where the volume is an axis-aligned box:
-  // voxel (x, y, z) spans X [x, x+1]v, Y -[y, y+1]v, Z -[z, z+1]v.
+  // Into model-local space, where the volume is an axis-aligned box: with
+  // corner o, voxel (x, y, z) spans X o.x+[x, x+1]v, Y o.y-[y, y+1]v,
+  // Z o.z-[z, z+1]v.
   _tipInv.copy(currentModel.matrixWorld).invert();
   const ray = _tipLRay.copy(_tipRay.ray).applyMatrix4(_tipInv);
   ray.direction.normalize();
-  const [w, h, d] = sec.dims, v = sec.voxelMm;
-  _tipBox.min.set(0, -h * v, -d * v);
-  _tipBox.max.set(w * v, 0, 0);
+  const [w, h, d] = sec.dims, v = sec.voxelMm, o = sec.origin;
+  _tipBox.min.set(o.x, o.y - h * v, o.z - d * v);
+  _tipBox.max.set(o.x + w * v, o.y, o.z);
   let t = 0;
   if (!_tipBox.containsPoint(ray.origin)) {
     if (!ray.intersectBox(_tipBox, _tipP)) return null;
@@ -1928,7 +1951,7 @@ function pickRegionAt(clientX, clientY) {
   const end = t + _tipBox.min.distanceTo(_tipBox.max);
   for (; t <= end; t += step) {
     ray.at(t, _tipP);
-    const x = Math.floor(_tipP.x / v), y = Math.floor(-_tipP.y / v), z = Math.floor(-_tipP.z / v);
+    const x = Math.floor((_tipP.x - o.x) / v), y = Math.floor((o.y - _tipP.y) / v), z = Math.floor((o.z - _tipP.z) / v);
     if (x < 0 || y < 0 || z < 0 || x >= w || y >= h || z >= d) continue;
     if (planes.some(pl => pl.distanceToPoint(_tipP) < 0)) continue; // sliced away
     const region = sec.regions[sec.data[(z * h + y) * w + x]];

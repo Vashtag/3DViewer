@@ -61,3 +61,19 @@ rm ../models/brain/brain.plain.glb
 
 See the top of `build-brain.py` for what it writes and how the atlas axes are
 mapped to the viewer's.
+
+## The Planum brain model
+
+`models/brain-planum/` is built from data files published by
+[Planum](https://github.com/JoshuaDuq/planumatlas) (pinned to one commit in
+the script, which downloads them into `tools/.planum-cache/`):
+
+```bash
+pip install numpy trimesh fast-simplification networkx scipy
+python tools/build-planum-brain.py
+cd tools && npx gltf-pipeline -i ../models/brain-planum/brain-planum.plain.glb -o ../models/brain-planum/brain-planum.glb -d --draco.compressionLevel 7
+rm ../models/brain-planum/brain-planum.plain.glb
+```
+
+Only CC0 / FreeSurfer-licensed layers are used; see
+`models/brain-planum/README.md` for the licence terms that ship with them.
