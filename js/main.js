@@ -2118,9 +2118,9 @@ renderer.domElement.addEventListener('pointercancel', () => { _tapStart = null; 
 controls.addEventListener('start', () => { if (slicer.sections) hideRegionTip(); }); // the view is about to move
 window.addEventListener('keydown', () => { if (slicer.sections) hideRegionTip(); });
 
-// ── Structures: layer opacity, isolate / hide (models with `layers`) ──
+// ── Structures: show / hide layers, isolate / hide (models with `layers`) ──
 // In the spirit of brainglobe-heatmap's per-region alpha: each layer of the
-// model (cortex, white matter, ...) gets an opacity slider, and a selected
+// model (cortex, white matter, ...) gets an on/off button, and a selected
 // structure can be isolated or hidden. Hidden structures also drop out of the
 // cut face, and hover / click see through hidden or faded ones.
 // `var` so code that runs before this block (render loop, caps) can check it.
@@ -2245,42 +2245,31 @@ function updateSelectedUI() {
   });
 }
 
+// Layers are all or nothing: shown (opacity 1) or hidden (0).
 function setLayerOpacity(layer, value) {
   layer.opacity = value;
-  const slider = structLayersEl.querySelector(`input[data-layer="${layer.id}"]`);
-  if (slider) {
-    slider.value = String(Math.round(value * 100));
-    slider.parentElement.querySelector('output').textContent = `${Math.round(value * 100)}%`;
-  }
+  const btn = structLayersEl.querySelector(`button[data-layer="${layer.id}"]`);
+  if (btn) btn.setAttribute('aria-pressed', String(value > 0));
 }
 
 function buildStructuresUI() {
   structLayersEl.replaceChildren();
   structList.replaceChildren();
   structState.layers.forEach(layer => {
-    const wrap = document.createElement('div');
-    wrap.className = 'struct-layer';
-    const id = `struct-layer-${layer.id}`;
-    const label = document.createElement('label');
-    label.className = 'slice-range-label';
-    label.htmlFor = id;
-    const out = document.createElement('output');
-    out.textContent = '100%';
-    label.append(layer.label + ' ', out);
-    const input = document.createElement('input');
-    input.type = 'range';
-    input.id = id;
-    input.min = '0';
-    input.max = '100';
-    input.value = '100';
-    input.dataset.layer = layer.id;
-    input.addEventListener('input', () => {
-      layer.opacity = Number(input.value) / 100;
-      out.textContent = `${input.value}%`;
+    // On/off toggle per layer (pressed = shown).
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'struct-layer-btn';
+    btn.id = `struct-layer-${layer.id}`;
+    btn.dataset.layer = layer.id;
+    btn.setAttribute('aria-pressed', 'true');
+    btn.textContent = layer.label;
+    btn.addEventListener('click', () => {
+      setLayerOpacity(layer, layer.opacity > 0 ? 0 : 1);
       applyStructures();
+      announce(`${layer.label} ${layer.opacity > 0 ? 'shown' : 'hidden'}`);
     });
-    wrap.append(label, input);
-    structLayersEl.append(wrap);
+    structLayersEl.append(btn);
 
     const head = document.createElement('p');
     head.className = 'struct-group';
