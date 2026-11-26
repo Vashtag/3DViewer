@@ -356,6 +356,30 @@ body:not(.dev-mode) .dev-only { display: none !important; }
 }
 #region-tip.hidden { display: none; }
 
+/* Source / licence line for atlas models, bottom-right of the viewer. */
+#model-credit {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 5;
+  max-width: min(680px, calc(100% - 24px));
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: rgba(15, 17, 23, 0.6);
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  line-height: 1.45;
+  text-align: right;
+}
+#model-credit a { white-space: nowrap; }
+#model-credit a { color: var(--text-muted); text-decoration: underline; text-underline-offset: 2px; }
+#model-credit a:hover { color: var(--text); }
+#model-credit.hidden { display: none; }
+@media (max-width: 600px) {
+  /* Above the bottom bar (Orbit / Fly) on phones, full width. */
+  #model-credit { left: 12px; right: 12px; bottom: 64px; max-width: none; text-align: left; font-size: 0.62rem; }
+}
+
 /* ── Body layout (sidebar + viewer) ── */
 #body {
   flex: 1;
