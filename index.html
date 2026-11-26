@@ -20,6 +20,7 @@
         </div>
       </div>
       <div id="header-actions">
+        <span id="dev-badge" class="hidden" title="Developer mode is on">DEV</span>
         <button id="shortcuts-btn" type="button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" aria-haspopup="dialog">?</button>
         <button id="settings-btn" type="button" aria-label="Settings" title="Settings" aria-haspopup="dialog">&#9881;</button>
       </div>
@@ -123,6 +124,25 @@
             <input type="checkbox" id="performance-toggle">
             Performance mode (lower resolution)
           </label>
+        </div>
+
+        <div class="settings-section" id="dev-section">
+          <p class="settings-section-label">Developer</p>
+          <!-- Locked: password prompt -->
+          <form id="dev-unlock" class="dev-unlock" autocomplete="off">
+            <label for="dev-password" class="settings-field-label">Developer mode</label>
+            <div class="dev-unlock-row">
+              <input type="password" id="dev-password" placeholder="Password" aria-describedby="dev-unlock-error">
+              <button type="submit" id="dev-unlock-btn">Unlock</button>
+            </div>
+            <p id="dev-unlock-error" class="dev-error" role="alert"></p>
+          </form>
+          <!-- Unlocked: work-in-progress feature flags -->
+          <div id="dev-panel" class="hidden">
+            <p class="dev-note">Developer mode is on. Turn on work-in-progress features below to test them before they're released to everyone.</p>
+            <div id="dev-features"></div>
+            <button type="button" id="dev-disable">Turn off developer mode</button>
+          </div>
         </div>
 
         <div id="settings-modal-actions">

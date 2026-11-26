@@ -1214,6 +1214,122 @@ settingsReset.addEventListener('click', () => {
   if (currentModel) setLabelsVisible(EDIT_MODE);
 });
 
+// ── Developer mode ────────────────────────────────────────
+// Unlocked from Settings with a password. It gates work-in-progress features
+// so they can be tested in the real app before everyone gets them.
+//
+// To add a WIP feature:
+//   1. Add an entry to DEV_FEATURES below.
+//   2. Guard its code with isDevFeatureEnabled('<id>'), and/or put the
+//      class "dev-only" on its HTML so it only shows in developer mode.
+//   3. To react when it's switched on/off, listen for 'devfeaturechange' on
+//      window (event.detail = { id, enabled }).
+// When the feature is ready, remove its entry and the guards.
+//
+// The password only keeps casual users out; it's visible in this source file,
+// so don't rely on it to protect anything sensitive.
+const DEV_PASSWORD = 'developer';
+const DEV_FEATURES = [
+  // { id: 'example', label: 'Example feature', description: 'What it does and what to test.' },
+];
+
+let devMode = localStorage.getItem('devMode') === '1';
+let devFlags = {};
+try { devFlags = JSON.parse(localStorage.getItem('devFlags') || '{}') || {}; } catch { devFlags = {}; }
+
+function isDevFeatureEnabled(id) { return devMode && !!devFlags[id]; }
+
+const devUnlockForm  = document.getElementById('dev-unlock');
+const devPassword    = document.getElementById('dev-password');
+const devUnlockError = document.getElementById('dev-unlock-error');
+const devPanel       = document.getElementById('dev-panel');
+const devFeaturesEl  = document.getElementById('dev-features');
+const devDisableBtn  = document.getElementById('dev-disable');
+const devBadge       = document.getElementById('dev-badge');
+
+function notifyDevFeatures(prevEnabled) {
+  DEV_FEATURES.forEach(f => {
+    const enabled = isDevFeatureEnabled(f.id);
+    if (enabled !== prevEnabled[f.id]) {
+      window.dispatchEvent(new CustomEvent('devfeaturechange', { detail: { id: f.id, enabled } }));
+    }
+  });
+}
+function devSnapshot() {
+  return Object.fromEntries(DEV_FEATURES.map(f => [f.id, isDevFeatureEnabled(f.id)]));
+}
+
+function renderDevFeatures() {
+  devFeaturesEl.replaceChildren();
+  if (!DEV_FEATURES.length) {
+    const p = document.createElement('p');
+    p.className = 'dev-empty';
+    p.textContent = 'No features are in testing right now.';
+    devFeaturesEl.appendChild(p);
+    return;
+  }
+  DEV_FEATURES.forEach(f => {
+    const wrap = document.createElement('div');
+    wrap.className = 'dev-feature';
+    const row = document.createElement('label');
+    row.className = 'settings-row';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = !!devFlags[f.id];
+    cb.addEventListener('change', () => {
+      const prev = devSnapshot();
+      devFlags[f.id] = cb.checked;
+      localStorage.setItem('devFlags', JSON.stringify(devFlags));
+      notifyDevFeatures(prev);
+    });
+    row.append(cb, document.createTextNode(f.label));
+    wrap.appendChild(row);
+    if (f.description) {
+      const d = document.createElement('p');
+      d.className = 'dev-feature-desc';
+      d.textContent = f.description;
+      wrap.appendChild(d);
+    }
+    devFeaturesEl.appendChild(wrap);
+  });
+}
+
+function applyDevMode() {
+  document.body.classList.toggle('dev-mode', devMode);
+  devBadge.classList.toggle('hidden', !devMode);
+  devUnlockForm.classList.toggle('hidden', devMode);
+  devPanel.classList.toggle('hidden', !devMode);
+  if (devMode) renderDevFeatures();
+}
+
+function setDevMode(on) {
+  const prev = devSnapshot();
+  devMode = on;
+  localStorage.setItem('devMode', on ? '1' : '0');
+  applyDevMode();
+  notifyDevFeatures(prev);
+}
+
+devUnlockForm.addEventListener('submit', e => {
+  e.preventDefault();
+  if (devPassword.value === DEV_PASSWORD) {
+    devPassword.value = '';
+    devUnlockError.textContent = '';
+    setDevMode(true);
+    devDisableBtn.focus();
+    showToast('Developer mode on');
+  } else {
+    devUnlockError.textContent = 'Incorrect password.';
+    devPassword.select();
+  }
+});
+devDisableBtn.addEventListener('click', () => {
+  setDevMode(false);
+  devPassword.focus();
+  showToast('Developer mode off');
+});
+applyDevMode();
+
 function addLabel(name, localPos, category = '', record = true) {
   if (!labelLayer) return;
   const entry = { name, position: [localPos.x, localPos.y, localPos.z], category };
