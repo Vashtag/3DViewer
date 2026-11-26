@@ -222,6 +222,14 @@
             <p class="sidebar-label">Cross-section <span class="dev-tag">DEV</span></p>
             <button id="slice-toggle" type="button" aria-pressed="false" aria-controls="slice-controls">Slice model</button>
             <div id="slice-controls" class="hidden">
+              <div id="slice-face" class="hidden">
+                <span class="slice-range-label">Cut face</span>
+                <div class="settings-seg" role="group" aria-label="Cut face">
+                  <button type="button" data-face="atlas" aria-pressed="true" title="Atlas colours">Atlas</button>
+                  <button type="button" data-face="mri" aria-pressed="false" title="The MRI scan">MRI</button>
+                  <button type="button" data-face="both" aria-pressed="false" title="The MRI with region borders">Both</button>
+                </div>
+              </div>
               <div id="slice-axes" role="radiogroup" aria-label="Cutting plane">
                 <label class="slice-axis"><input type="radio" name="slice-axis" value="coronal" checked> Coronal <span>front/back</span></label>
                 <label class="slice-axis"><input type="radio" name="slice-axis" value="sagittal"> Sagittal <span>left/right</span></label>

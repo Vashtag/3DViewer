@@ -999,5 +999,9 @@
    "color": "#231f20",
    "group": "ventricles of hindbrain"
   }
- ]
+ ],
+ "mri": {
+  "file": "brain_mri.bin.gz",
+  "description": "Allen Human Reference Atlas MRI template (T2-weighted contrast), 1 mm"
+ }
 }
