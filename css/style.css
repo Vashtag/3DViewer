@@ -339,6 +339,22 @@ body:not(.dev-mode) .dev-only { display: none !important; }
 .slice-btn-row { display: flex; gap: 6px; }
 #slice-flip:disabled { opacity: 0.4; cursor: default; }
 .anno-label.slice-hidden { display: none !important; }
+#region-tip {
+  position: absolute;
+  z-index: 6;
+  max-width: 260px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: rgba(15, 17, 23, 0.88);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.78rem;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#region-tip.hidden { display: none; }
 
 /* ── Body layout (sidebar + viewer) ── */
 #body {

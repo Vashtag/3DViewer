@@ -1,0 +1,1003 @@
+{
+ "atlas": "allen_human_500um",
+ "citation": "Ding et al 2016, https://doi.org/10.1002/cne.24080",
+ "source": "BrainGlobe Atlas API (brainglobe-atlasapi)",
+ "sections": {
+  "file": "brain_sections.bin.gz",
+  "dims": [
+   197,
+   189,
+   233
+  ],
+  "voxelMm": 1.0
+ },
+ "regions": [
+  {
+   "index": 1,
+   "acronym": "FI",
+   "name": "frontal agranular insular cortex (area FI)",
+   "color": "#c1a68f",
+   "group": "periallocortex"
+  },
+  {
+   "index": 2,
+   "acronym": "TI",
+   "name": "temporal agranular insular cortex (area TI)",
+   "color": "#b5967f",
+   "group": "periallocortex"
+  },
+  {
+   "index": 3,
+   "acronym": "OB",
+   "name": "olfactory bulb",
+   "color": "#d1cee2",
+   "group": "allocortex"
+  },
+  {
+   "index": 4,
+   "acronym": "AON",
+   "name": "anterior olfactory nucleus",
+   "color": "#aa9dc6",
+   "group": "allocortex"
+  },
+  {
+   "index": 5,
+   "acronym": "Pir",
+   "name": "piriform cortex",
+   "color": "#aa9dc6",
+   "group": "allocortex"
+  },
+  {
+   "index": 6,
+   "acronym": "AMY",
+   "name": "amygdaloid complex",
+   "color": "#c9e2b1",
+   "group": "cerebral nuclei"
+  },
+  {
+   "index": 7,
+   "acronym": "AAA",
+   "name": "anterior amygdaloid area",
+   "color": "#c0dd9d",
+   "group": "cerebral nuclei"
+  },
+  {
+   "index": 8,
+   "acronym": "CEN",
+   "name": "central nuclear group",
+   "color": "#afd58a",
+   "group": "cerebral nuclei"
+  },
+  {
+   "index": 9,
+   "acronym": "CoA",
+   "name": "anterior cortical nucleus",
+   "color": "#89ba46",
+   "group": "cerebral nuclei"
+  },
+  {
+   "index": 10,
+   "acronym": "CoP",
+   "name": "posterior cortical nucleus",
+   "color": "#92c851",
+   "group": "cerebral nuclei"
+  },
+  {
+   "index": 11,
+   "acronym": "Me",
+   "name": "medial nucleus",
+   "color": "#9ccc66",
+   "group": "cerebral nuclei"
+  },
+  {
+   "index": 12,
+   "acronym": "AHA",
+   "name": "amygdalohippocampal area",
+   "color": "#89ba46",
+   "group": "cerebral nuclei"
+  },
+  {
+   "index": 13,
+   "acronym": "La",
+   "name": "lateral nucleus",
+   "color": "#a6d17a",
+   "group": "cerebral nuclei"
+  },
+  {
+   "index": 14,
+   "acronym": "BL",
+   "name": "basolateral nucleus (basal nucleus)",
+   "color": "#89ba46",
+   "group": "cerebral nuclei"
+  },
+  {
+   "index": 15,
+   "acronym": "BM",
+   "name": "basomedial nucleus (accessory basal nucleus)",
+   "color": "#9ccc66",
+   "group": "cerebral nuclei"
+  },
+  {
+   "index": 16,
+   "acronym": "BNST",
+   "name": "bed nucleus of stria terminalis",
+   "color": "#a9d7ae",
+   "group": "cerebral nuclei"
+  },
+  {
+   "index": 17,
+   "acronym": "CaH",
+   "name": "head of caudate",
+   "color": "#91a06e",
+   "group": "cerebral nuclei"
+  },
+  {
+   "index": 18,
+   "acronym": "CaB",
+   "name": "body of caudate",
+   "color": "#99a677",
+   "group": "cerebral nuclei"
+  },
+  {
+   "index": 19,
+   "acronym": "CaT",
+   "name": "tail of caudate",
+   "color": "#91a06e",
+   "group": "cerebral nuclei"
+  },
+  {
+   "index": 20,
+   "acronym": "Pu",
+   "name": "putamen",
+   "color": "#a8b485",
+   "group": "cerebral nuclei"
+  },
+  {
+   "index": 21,
+   "acronym": "PuPV",
+   "name": "posteroventral putamen",
+   "color": "#a8b485",
+   "group": "cerebral nuclei"
+  },
+  {
+   "index": 22,
+   "acronym": "NAC",
+   "name": "nucleus accumbens",
+   "color": "#91a06e",
+   "group": "cerebral nuclei"
+  },
+  {
+   "index": 23,
+   "acronym": "GPe",
+   "name": "external segment of globus pallidus",
+   "color": "#d7e0bf",
+   "group": "cerebral nuclei"
+  },
+  {
+   "index": 24,
+   "acronym": "GPi",
+   "name": "internal segment of globus pallidus",
+   "color": "#d0d9b2",
+   "group": "cerebral nuclei"
+  },
+  {
+   "index": 25,
+   "acronym": "Cla",
+   "name": "claustrum",
+   "color": "#aadbce",
+   "group": "cerebral nuclei"
+  },
+  {
+   "index": 26,
+   "acronym": "BF",
+   "name": "basal forebrain",
+   "color": "#ddddaf",
+   "group": "cerebral nuclei"
+  },
+  {
+   "index": 27,
+   "acronym": "SEP",
+   "name": "septal nuclei",
+   "color": "#caca92",
+   "group": "cerebral nuclei"
+  },
+  {
+   "index": 28,
+   "acronym": "THM",
+   "name": "thalamus",
+   "color": "#e4cce3",
+   "group": "diencephalon"
+  },
+  {
+   "index": 29,
+   "acronym": "ANC",
+   "name": "anterior nuclear complex of thalamus",
+   "color": "#bf89bc",
+   "group": "diencephalon"
+  },
+  {
+   "index": 30,
+   "acronym": "LD",
+   "name": "lateral dorsal nucleus of thalamus",
+   "color": "#b67bb4",
+   "group": "diencephalon"
+  },
+  {
+   "index": 31,
+   "acronym": "MD",
+   "name": "mediodorsal nucleus of thalamus",
+   "color": "#b067a9",
+   "group": "diencephalon"
+  },
+  {
+   "index": 32,
+   "acronym": "Re",
+   "name": "reuniens nucleus (medioventral nucleus) of thalamus",
+   "color": "#95498a",
+   "group": "diencephalon"
+  },
+  {
+   "index": 33,
+   "acronym": "LP",
+   "name": "lateral posterior nucleus of thalamus",
+   "color": "#b067a9",
+   "group": "diencephalon"
+  },
+  {
+   "index": 34,
+   "acronym": "Pul",
+   "name": "pulvinar of thalamus",
+   "color": "#b067a9",
+   "group": "diencephalon"
+  },
+  {
+   "index": 35,
+   "acronym": "VA",
+   "name": "ventral anterior nucleus of thalamus",
+   "color": "#a554a0",
+   "group": "diencephalon"
+  },
+  {
+   "index": 36,
+   "acronym": "VL",
+   "name": "ventral lateral nucleus of thalamus",
+   "color": "#b067a9",
+   "group": "diencephalon"
+  },
+  {
+   "index": 37,
+   "acronym": "VPL",
+   "name": "ventral posterior lateral nucleus",
+   "color": "#9e4c94",
+   "group": "diencephalon"
+  },
+  {
+   "index": 38,
+   "acronym": "VPM",
+   "name": "ventral posterior medial nucleus",
+   "color": "#9e4c94",
+   "group": "diencephalon"
+  },
+  {
+   "index": 39,
+   "acronym": "DLG",
+   "name": "dorsal lateral geniculate nucleus",
+   "color": "#8c4685",
+   "group": "diencephalon"
+  },
+  {
+   "index": 40,
+   "acronym": "MG",
+   "name": "medial geniculate nuclei",
+   "color": "#b67bb4",
+   "group": "diencephalon"
+  },
+  {
+   "index": 41,
+   "acronym": "CM",
+   "name": "centromedian nucleus of thalamus",
+   "color": "#b67bb4",
+   "group": "diencephalon"
+  },
+  {
+   "index": 42,
+   "acronym": "Pf",
+   "name": "parafascicular nucleus of thalamus",
+   "color": "#b067a9",
+   "group": "diencephalon"
+  },
+  {
+   "index": 43,
+   "acronym": "MiN",
+   "name": "midline nuclear complex",
+   "color": "#a554a0",
+   "group": "diencephalon"
+  },
+  {
+   "index": 44,
+   "acronym": "HN",
+   "name": "habenular nuclei",
+   "color": "#b67bb4",
+   "group": "diencephalon"
+  },
+  {
+   "index": 45,
+   "acronym": "Pin",
+   "name": "pineal body",
+   "color": "#773671",
+   "group": "diencephalon"
+  },
+  {
+   "index": 46,
+   "acronym": "ZI",
+   "name": "zona incerta",
+   "color": "#b067a9",
+   "group": "diencephalon"
+  },
+  {
+   "index": 47,
+   "acronym": "STH",
+   "name": "subthalamic nucleus",
+   "color": "#b799c4",
+   "group": "diencephalon"
+  },
+  {
+   "index": 48,
+   "acronym": "HTH",
+   "name": "hypothalamus",
+   "color": "#e4c9d9",
+   "group": "diencephalon"
+  },
+  {
+   "index": 49,
+   "acronym": "HTHpo",
+   "name": "preoptic region of HTH",
+   "color": "#dbabc8",
+   "group": "diencephalon"
+  },
+  {
+   "index": 50,
+   "acronym": "HTHso",
+   "name": "supraoptic region of HTH",
+   "color": "#cf97b9",
+   "group": "diencephalon"
+  },
+  {
+   "index": 51,
+   "acronym": "HTHtub",
+   "name": "tuberal region of HTH",
+   "color": "#dbabc8",
+   "group": "diencephalon"
+  },
+  {
+   "index": 52,
+   "acronym": "HTHma",
+   "name": "mammillary region of HTH",
+   "color": "#c484a9",
+   "group": "diencephalon"
+  },
+  {
+   "index": 53,
+   "acronym": "FWM",
+   "name": "white matter of forebrain",
+   "color": "#f2f1f0",
+   "group": "white matter of forebrain"
+  },
+  {
+   "index": 54,
+   "acronym": "ac",
+   "name": "anterior commissure",
+   "color": "#f2f1f0",
+   "group": "white matter of forebrain"
+  },
+  {
+   "index": 55,
+   "acronym": "cc",
+   "name": "corpus callosum",
+   "color": "#f2f1f0",
+   "group": "white matter of forebrain"
+  },
+  {
+   "index": 56,
+   "acronym": "fx",
+   "name": "fornix",
+   "color": "#f2f1f0",
+   "group": "white matter of forebrain"
+  },
+  {
+   "index": 57,
+   "acronym": "mtt",
+   "name": "mammillothalamic tract",
+   "color": "#f2f1f0",
+   "group": "white matter of forebrain"
+  },
+  {
+   "index": 58,
+   "acronym": "olt",
+   "name": "olfactory tract",
+   "color": "#f2f1f0",
+   "group": "white matter of forebrain"
+  },
+  {
+   "index": 59,
+   "acronym": "or",
+   "name": "optic radiation",
+   "color": "#f2f1f0",
+   "group": "white matter of forebrain"
+  },
+  {
+   "index": 60,
+   "acronym": "ot",
+   "name": "optic tract",
+   "color": "#f2f1f0",
+   "group": "white matter of forebrain"
+  },
+  {
+   "index": 61,
+   "acronym": "aLV",
+   "name": "anterior horn of lateral ventricle",
+   "color": "#231f20",
+   "group": "ventricles of forebrain"
+  },
+  {
+   "index": 62,
+   "acronym": "bLV",
+   "name": "body of lateral ventricle",
+   "color": "#231f20",
+   "group": "ventricles of forebrain"
+  },
+  {
+   "index": 63,
+   "acronym": "xLV",
+   "name": "atrium of lateral ventricle",
+   "color": "#231f20",
+   "group": "ventricles of forebrain"
+  },
+  {
+   "index": 64,
+   "acronym": "pLV",
+   "name": "posterior horn of lateral ventricle",
+   "color": "#231f20",
+   "group": "ventricles of forebrain"
+  },
+  {
+   "index": 65,
+   "acronym": "iLV",
+   "name": "inferior horn of lateral ventricle",
+   "color": "#231f20",
+   "group": "ventricles of forebrain"
+  },
+  {
+   "index": 66,
+   "acronym": "3V",
+   "name": "third ventricle",
+   "color": "#231f20",
+   "group": "ventricles of forebrain"
+  },
+  {
+   "index": 67,
+   "acronym": "PrCG",
+   "name": "precentral gyrus",
+   "color": "#edcf37",
+   "group": "frontal lobe"
+  },
+  {
+   "index": 68,
+   "acronym": "SFG",
+   "name": "superior frontal gyrus",
+   "color": "#d4b235",
+   "group": "frontal lobe"
+  },
+  {
+   "index": 69,
+   "acronym": "MFG",
+   "name": "middle frontal gyrus",
+   "color": "#d4b235",
+   "group": "frontal lobe"
+  },
+  {
+   "index": 70,
+   "acronym": "IFGtr",
+   "name": "inferior frontal gyrus, triangular part",
+   "color": "#c2a335",
+   "group": "frontal lobe"
+  },
+  {
+   "index": 71,
+   "acronym": "IFGop",
+   "name": "inferior frontal gyrus, opercular part",
+   "color": "#c2a335",
+   "group": "frontal lobe"
+  },
+  {
+   "index": 72,
+   "acronym": "ReG",
+   "name": "gyrus rectus (straight gyrus)",
+   "color": "#b8a26d",
+   "group": "frontal lobe"
+  },
+  {
+   "index": 73,
+   "acronym": "MOrG",
+   "name": "medial orbital gyrus",
+   "color": "#cab781",
+   "group": "frontal lobe"
+  },
+  {
+   "index": 74,
+   "acronym": "AOrG",
+   "name": "anterior intermediate orbital gyrus",
+   "color": "#cab781",
+   "group": "frontal lobe"
+  },
+  {
+   "index": 75,
+   "acronym": "POrG",
+   "name": "posterior intermediate orbital gyrus",
+   "color": "#cab781",
+   "group": "frontal lobe"
+  },
+  {
+   "index": 76,
+   "acronym": "LOrG",
+   "name": "lateral orbital gyrus",
+   "color": "#ab9158",
+   "group": "frontal lobe"
+  },
+  {
+   "index": 77,
+   "acronym": "PCLr",
+   "name": "paracentral lobule, rostral part",
+   "color": "#edcf37",
+   "group": "frontal lobe"
+  },
+  {
+   "index": 78,
+   "acronym": "PaCG",
+   "name": "paracingulate gyrus",
+   "color": "#eaa6af",
+   "group": "frontal lobe"
+  },
+  {
+   "index": 79,
+   "acronym": "FrO",
+   "name": "frontal operculum",
+   "color": "#c2a335",
+   "group": "frontal lobe"
+  },
+  {
+   "index": 80,
+   "acronym": "RoG",
+   "name": "rostral gyrus",
+   "color": "#b8a26d",
+   "group": "frontal lobe"
+  },
+  {
+   "index": 81,
+   "acronym": "LOG",
+   "name": "lateral olfactory gyrus",
+   "color": "#aa9dc6",
+   "group": "frontal lobe"
+  },
+  {
+   "index": 82,
+   "acronym": "FMG",
+   "name": "frontomarginal gyrus",
+   "color": "#eecf38",
+   "group": "frontal lobe"
+  },
+  {
+   "index": 83,
+   "acronym": "FP",
+   "name": "frontal pole",
+   "color": "#ead180",
+   "group": "frontal lobe"
+  },
+  {
+   "index": 84,
+   "acronym": "PoCG",
+   "name": "postcentral gyrus",
+   "color": "#ec813b",
+   "group": "parietal lobe"
+  },
+  {
+   "index": 85,
+   "acronym": "SPL",
+   "name": "supraparietal lobule",
+   "color": "#e49c33",
+   "group": "parietal lobe"
+  },
+  {
+   "index": 86,
+   "acronym": "SMG",
+   "name": "supramarginal gyrus",
+   "color": "#d38e32",
+   "group": "parietal lobe"
+  },
+  {
+   "index": 87,
+   "acronym": "AnG",
+   "name": "angular gyrus",
+   "color": "#d38e32",
+   "group": "parietal lobe"
+  },
+  {
+   "index": 88,
+   "acronym": "PrCun",
+   "name": "precuneus",
+   "color": "#e49c33",
+   "group": "parietal lobe"
+  },
+  {
+   "index": 89,
+   "acronym": "PCLc",
+   "name": "paracentral lobule, caudal part",
+   "color": "#e49c33",
+   "group": "parietal lobe"
+  },
+  {
+   "index": 90,
+   "acronym": "PaO",
+   "name": "parietal operculum",
+   "color": "#e8af66",
+   "group": "parietal lobe"
+  },
+  {
+   "index": 91,
+   "acronym": "STG",
+   "name": "superior temporal gyrus",
+   "color": "#d670a0",
+   "group": "temporal lobe"
+  },
+  {
+   "index": 92,
+   "acronym": "MTG",
+   "name": "middle temporal gyrus",
+   "color": "#d55c92",
+   "group": "temporal lobe"
+  },
+  {
+   "index": 93,
+   "acronym": "ITG",
+   "name": "inferior temporal gyrus",
+   "color": "#d55c92",
+   "group": "temporal lobe"
+  },
+  {
+   "index": 94,
+   "acronym": "FuGt",
+   "name": "occipitotemporal (fusiform) gyrus, temporal part",
+   "color": "#d55c92",
+   "group": "temporal lobe"
+  },
+  {
+   "index": 95,
+   "acronym": "PRG",
+   "name": "perirhinal gyrus ( rostral part of FuGt)",
+   "color": "#d55c92",
+   "group": "temporal lobe"
+  },
+  {
+   "index": 96,
+   "acronym": "TTG",
+   "name": "transverse temporal gyrus (Heschl's gyrus)",
+   "color": "#d670a0",
+   "group": "temporal lobe"
+  },
+  {
+   "index": 97,
+   "acronym": "PLT",
+   "name": "planum temporale",
+   "color": "#d670a0",
+   "group": "temporal lobe"
+  },
+  {
+   "index": 98,
+   "acronym": "TP",
+   "name": "temporal pole",
+   "color": "#c8538b",
+   "group": "temporal lobe"
+  },
+  {
+   "index": 99,
+   "acronym": "PLP",
+   "name": "planum polare",
+   "color": "#d670a0",
+   "group": "temporal lobe"
+  },
+  {
+   "index": 100,
+   "acronym": "OP",
+   "name": "occipital pole",
+   "color": "#c13331",
+   "group": "occipital lobe"
+  },
+  {
+   "index": 101,
+   "acronym": "Cun",
+   "name": "cuneus",
+   "color": "#c13331",
+   "group": "occipital lobe"
+  },
+  {
+   "index": 102,
+   "acronym": "LiG",
+   "name": "lingual gyrus",
+   "color": "#c13331",
+   "group": "occipital lobe"
+  },
+  {
+   "index": 103,
+   "acronym": "FuGo",
+   "name": "occipitotemporal (fusiform) gyrus, occipital part",
+   "color": "#d14d46",
+   "group": "occipital lobe"
+  },
+  {
+   "index": 104,
+   "acronym": "IOG",
+   "name": "inferior occipital gyrus",
+   "color": "#d14d46",
+   "group": "occipital lobe"
+  },
+  {
+   "index": 105,
+   "acronym": "SOG",
+   "name": "superior occipital gyrus",
+   "color": "#d14d46",
+   "group": "occipital lobe"
+  },
+  {
+   "index": 106,
+   "acronym": "LIG",
+   "name": "long insular gyri",
+   "color": "#c45539",
+   "group": "insular lobe"
+  },
+  {
+   "index": 107,
+   "acronym": "SIG",
+   "name": "short insular gyri",
+   "color": "#d16146",
+   "group": "insular lobe"
+  },
+  {
+   "index": 108,
+   "acronym": "CgGr",
+   "name": "cingulate gyrus, rostral (anterior) part",
+   "color": "#e26880",
+   "group": "limbic lobe"
+  },
+  {
+   "index": 109,
+   "acronym": "CgGc",
+   "name": "cingulate gyrus, caudal (posterior) part",
+   "color": "#df4f72",
+   "group": "limbic lobe"
+  },
+  {
+   "index": 110,
+   "acronym": "IsCPH",
+   "name": "cingulo-parahippocampal isthmus",
+   "color": "#c4ad9a",
+   "group": "limbic lobe"
+  },
+  {
+   "index": 111,
+   "acronym": "SCG",
+   "name": "subcallosal gyrus (parolfactory gyrus)",
+   "color": "#e26880",
+   "group": "limbic lobe"
+  },
+  {
+   "index": 112,
+   "acronym": "APH",
+   "name": "anterior parahippocampal gyrus",
+   "color": "#d2bfb2",
+   "group": "limbic lobe"
+  },
+  {
+   "index": 113,
+   "acronym": "PPH",
+   "name": "posterior parahippocampal gyrus",
+   "color": "#c15184",
+   "group": "limbic lobe"
+  },
+  {
+   "index": 114,
+   "acronym": "AG",
+   "name": "ambiens gyrus",
+   "color": "#d2bfb2",
+   "group": "limbic lobe"
+  },
+  {
+   "index": 115,
+   "acronym": "HiH",
+   "name": "head of hippocampus",
+   "color": "#aa9dc6",
+   "group": "limbic lobe"
+  },
+  {
+   "index": 116,
+   "acronym": "HiB",
+   "name": "body of hippocampus",
+   "color": "#aa9dc6",
+   "group": "limbic lobe"
+  },
+  {
+   "index": 117,
+   "acronym": "HiT",
+   "name": "tail of hippocampus",
+   "color": "#aa9dc6",
+   "group": "limbic lobe"
+  },
+  {
+   "index": 118,
+   "acronym": "LI",
+   "name": "limen insula",
+   "color": "#d0d0d1",
+   "group": ""
+  },
+  {
+   "index": 119,
+   "acronym": "PTR",
+   "name": "pretectal region",
+   "color": "#a0c7d5",
+   "group": "midbrain (mesencephalon)"
+  },
+  {
+   "index": 120,
+   "acronym": "MTg",
+   "name": "midbrain tegmentum",
+   "color": "#5298ae",
+   "group": "midbrain (mesencephalon)"
+  },
+  {
+   "index": 121,
+   "acronym": "RN",
+   "name": "red nucleus",
+   "color": "#6ca9bf",
+   "group": "midbrain (mesencephalon)"
+  },
+  {
+   "index": 122,
+   "acronym": "SN",
+   "name": "substantia nigra",
+   "color": "#6ca9bf",
+   "group": "midbrain (mesencephalon)"
+  },
+  {
+   "index": 123,
+   "acronym": "SC",
+   "name": "superior colliculus",
+   "color": "#7eb3c9",
+   "group": "midbrain (mesencephalon)"
+  },
+  {
+   "index": 124,
+   "acronym": "IC",
+   "name": "inferior colliculus",
+   "color": "#7eb3c9",
+   "group": "midbrain (mesencephalon)"
+  },
+  {
+   "index": 125,
+   "acronym": "cpd",
+   "name": "cerebral peduncle (crus cerebri)",
+   "color": "#f2f1f0",
+   "group": "midbrain (mesencephalon)"
+  },
+  {
+   "index": 126,
+   "acronym": "scp",
+   "name": "superior cerebellar peduncle (brachium conjunctivum)",
+   "color": "#f2f1f0",
+   "group": "midbrain (mesencephalon)"
+  },
+  {
+   "index": 127,
+   "acronym": "Aq",
+   "name": "cerebral aqueduct",
+   "color": "#231f20",
+   "group": "midbrain (mesencephalon)"
+  },
+  {
+   "index": 128,
+   "acronym": "CBV",
+   "name": "cerebellar vermis",
+   "color": "#76a2d5",
+   "group": "cerebellum"
+  },
+  {
+   "index": 129,
+   "acronym": "CBPV",
+   "name": "paravermis of cerebellum",
+   "color": "#4a8ecc",
+   "group": "cerebellum"
+  },
+  {
+   "index": 130,
+   "acronym": "CBL",
+   "name": "lateral hemisphere of cerebellum",
+   "color": "#4a8ecc",
+   "group": "cerebellum"
+  },
+  {
+   "index": 131,
+   "acronym": "CbDN",
+   "name": "cerebellar deep nuclei",
+   "color": "#3e80ba",
+   "group": "cerebellum"
+  },
+  {
+   "index": 132,
+   "acronym": "PnBa",
+   "name": "basilar part of pons",
+   "color": "#7893c7",
+   "group": "pons"
+  },
+  {
+   "index": 133,
+   "acronym": "PnTg",
+   "name": "pontine tegmentum",
+   "color": "#6586bf",
+   "group": "pons"
+  },
+  {
+   "index": 134,
+   "acronym": "MoPy",
+   "name": "pyramidal part of medulla oblongata",
+   "color": "#979ecb",
+   "group": "myelencephalon (medulla oblongata)"
+  },
+  {
+   "index": 135,
+   "acronym": "MoTg",
+   "name": "tegmentum of medulla oblongata",
+   "color": "#838bc1",
+   "group": "myelencephalon (medulla oblongata)"
+  },
+  {
+   "index": 136,
+   "acronym": "IO",
+   "name": "inferior olive",
+   "color": "#3e4d89",
+   "group": "myelencephalon (medulla oblongata)"
+  },
+  {
+   "index": 137,
+   "acronym": "HWM",
+   "name": "white matter of hindbrain",
+   "color": "#f2f1f0",
+   "group": "white matter of hindbrain"
+  },
+  {
+   "index": 138,
+   "acronym": "icp",
+   "name": "inferior cerebellar peduncle",
+   "color": "#f2f1f0",
+   "group": "white matter of hindbrain"
+  },
+  {
+   "index": 139,
+   "acronym": "mcp",
+   "name": "middle cerebellar peduncle",
+   "color": "#f2f1f0",
+   "group": "white matter of hindbrain"
+  },
+  {
+   "index": 140,
+   "acronym": "4V",
+   "name": "fourth ventricle",
+   "color": "#231f20",
+   "group": "ventricles of hindbrain"
+  },
+  {
+   "index": 141,
+   "acronym": "cec",
+   "name": "central canal of medulla oblongata",
+   "color": "#231f20",
+   "group": "ventricles of hindbrain"
+  }
+ ]
+}
