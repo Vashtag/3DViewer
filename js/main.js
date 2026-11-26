@@ -1461,7 +1461,7 @@ slicer = {
   on: false,
   axis: 'coronal',
   pos: 0.5,          // 0..1 across the model's extent along the axis
-  face: 'atlas',     // cut face: 'atlas' colours, 'mri', or 'both' (MRI + borders)
+  face: 'atlas',     // cut face: 'atlas' colours, or 'mri' (the MRI slice alone)
   tilt: [0, 0],      // degrees about the plane's two tilt axes (SLICE_TILTS)
   samplePts: null,   // model-local vertex sample for measuring extents
   slab: false,
@@ -1477,7 +1477,6 @@ slicer = {
   outline: null,     // the model's "__outline" mesh (stencil mask source), if any
   stencils: null,    // per-cap stencil passes built from the outline
   capOn: { value: 0 },
-  capGrey: { value: 0 }, // 1 in MRI cut-face modes: inner walls drawn grey to match the scan
   helpers: null,     // THREE.Group with the plane outlines
   caps: null,        // THREE.Group with the region-coloured cut faces
   sections: null,    // { data, dims, voxelMm, regions, byAcronym, tex, pal, localToTex }
@@ -1532,13 +1531,12 @@ function prepareSliceMaterials(object, model) {
       m.onBeforeCompile = (shader, r) => {
         if (prev) prev(shader, r);
         shader.uniforms.sliceCapOn = slicer.capOn;
-        shader.uniforms.sliceCapGrey = slicer.capGrey;
         shader.uniforms.sliceCapColor = { value: capColor };
         shader.fragmentShader = shader.fragmentShader
-          .replace('void main() {', 'uniform float sliceCapOn;\nuniform float sliceCapGrey;\nuniform vec3 sliceCapColor;\nvoid main() {')
+          .replace('void main() {', 'uniform float sliceCapOn;\nuniform vec3 sliceCapColor;\nvoid main() {')
           .replace('#include <dithering_fragment>',
             '#include <dithering_fragment>\n' +
-            'if (sliceCapOn > 0.5 && !gl_FrontFacing) gl_FragColor = vec4(mix(sliceCapColor, vec3(0.62), sliceCapGrey), gl_FragColor.a);');
+            'if (sliceCapOn > 0.5 && !gl_FrontFacing) gl_FragColor = vec4(sliceCapColor, gl_FragColor.a);');
       };
       m.customProgramCacheKey = () => 'slice-cap';
       m.needsUpdate = true;
@@ -1654,7 +1652,7 @@ const SECTION_CAP_FRAG = /* glsl */`
   uniform float uHover; // region index under the pointer (0 = none)
   uniform float uSel;   // selected region index (0 = none)
   uniform sampler3D uMri; // MRI template on the same grid (MRI modes)
-  uniform float uMode;  // 0 = atlas colours, 1 = MRI, 2 = MRI + region borders
+  uniform float uMode;  // 0 = atlas colours, 1 = the MRI only
   varying vec3 vWorld;
   float regionAt(vec3 t) { return floor(texture(uVol, t).r * 255.0 + 0.5); }
   // 1 when a neighbour is a different region (not empty space: the outer
@@ -1665,30 +1663,39 @@ const SECTION_CAP_FRAG = /* glsl */`
     if (any(lessThan(t, vec3(0.0))) || any(greaterThan(t, vec3(1.0)))) discard;
     float r = regionAt(t);
     bool mri = uMode > 0.5;
-    // Atlas mode shows labelled voxels only; MRI modes also show the scan
+    // Atlas mode shows labelled voxels only; MRI mode also shows the scan
     // between them (fluid in sulci, ...) inside the outline mask.
     if (r < 0.5 && !mri) discard;
     vec4 pc = texture(uPal, vec2((r + 0.5) / 256.0, 0.5));
     if (r > 0.5 && pc.a < 0.5) discard; // region hidden in the Structures panel
-    // A voxel on a border between regions (neighbours within the plane).
+    if (mri) { gl_FragColor = vec4(vec3(texture(uMri, t).r), 1.0); return; } // just the scan
+    vec3 col = pc.rgb;
+    // Darken voxels on a border between regions (neighbours within the plane).
     float edge = border(regionAt(t + uTexU), r) + border(regionAt(t - uTexU), r)
                + border(regionAt(t + uTexV), r) + border(regionAt(t - uTexV), r);
-    bool lit = r > 0.5 && (abs(r - uHover) < 0.5 || abs(r - uSel) < 0.5);
-    vec3 col;
-    if (!mri) {
-      col = pc.rgb;
-      if (edge > 0.0) col *= 0.7;
-      if (lit) col = mix(col, vec3(1.0), 0.35);
-    } else {
-      col = vec3(texture(uMri, t).r);
-      if (uMode > 1.5 && edge > 0.0) col = mix(col, pc.rgb, 0.9); // borders in the region's colour
-      if (lit) col = mix(col, pc.rgb, 0.45);                      // hovered / selected: tinted
-    }
+    if (edge > 0.0) col *= 0.7;
+    if (r > 0.5 && (abs(r - uHover) < 0.5 || abs(r - uSel) < 0.5)) col = mix(col, vec3(1.0), 0.35);
     gl_FragColor = vec4(col, 1.0);
   }`;
 
-// ── Cut face mode: atlas colours, the MRI, or the MRI with region borders ──
-const SLICE_FACE_MODES = { atlas: 0, mri: 1, both: 2 };
+// ── Cut face mode: atlas colours, or the MRI alone ──
+// In MRI mode the 3D atlas meshes are hidden too, so only the MRI slice
+// shows (names still come from the atlas on hover / click).
+const SLICE_FACE_MODES = { atlas: 0, mri: 1 };
+
+function mriOnlyView() { return !!slicer?.on && slicer.face === 'mri'; }
+
+// Shows or hides the model's own meshes for the MRI-only view.
+function applyMriOnlyView() {
+  if (structState?.active) { applyStructures(); return; }
+  if (!currentModel) return;
+  const hide = mriOnlyView();
+  currentModel.traverse(o => {
+    if (!o.isMesh || o.userData.sliceOutline || o.userData.sliceStencil) return;
+    const m = Array.isArray(o.material) ? o.material[0] : o.material;
+    if ('sliceOrigSide' in m.userData) o.visible = !hide;
+  });
+}
 let _mriLoading = null;
 
 // Fetches the MRI template (models with `mri` in <id>_regions.json) once.
@@ -1730,13 +1737,13 @@ async function setSliceFace(face) {
     }
   }
   slicer.face = face;
-  slicer.capGrey.value = face === 'atlas' ? 0 : 1;
   sliceFace.querySelectorAll('button[data-face]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.face === face)));
   if (slicer.caps) {
     const u = slicer.caps.children[0].material.uniforms;
     u.uMri.value = slicer.sections?.mriTex ?? null;
     u.uMode.value = SLICE_FACE_MODES[face];
   }
+  applyMriOnlyView();
 }
 
 function buildSectionCaps() {
@@ -2048,6 +2055,7 @@ function setSlicing(on) {
     slicer.stencils?.forEach(g => { g.visible = false; });
     document.querySelectorAll('.anno-label.slice-hidden').forEach(el => el.classList.remove('slice-hidden'));
   }
+  applyMriOnlyView();
 }
 
 // The panel shows only for models that opt in, while their feature is on.
@@ -2115,6 +2123,7 @@ function pickRegionAt(clientX, clientY) {
     const region = sec.regions[sec.data[(z * h + y) * w + x]];
     if (!region || !regionPickable(region)) continue; // see through hidden / faded ones
     const cap = planes.some(pl => pl.distanceToPoint(_tipP) < step * 1.5);
+    if (!cap && mriOnlyView()) return null; // only the slice is visible
     return { region, cap };
   }
   return null;
@@ -2272,7 +2281,7 @@ function resetStructures() {
 function applyStructures() {
   if (!structState.active) return;
   structState.meshes.forEach((list, idx) => {
-    const visible = regionOpacity(idx) > 0;
+    const visible = regionOpacity(idx) > 0 && !mriOnlyView(); // MRI view: only the slice
     list.forEach(o => { o.visible = visible; });
   });
   const sec = slicer.sections;
