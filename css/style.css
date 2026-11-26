@@ -385,7 +385,64 @@ body:not(.dev-mode) .dev-only { display: none !important; }
   border-color: var(--accent); color: var(--text); background: #1e2540;
 }
 #slice-straighten:disabled { opacity: 0.4; cursor: default; }
-.struct-hint { margin: 10px 0 8px; font-size: 0.74rem; line-height: 1.35; color: var(--text-muted); }
+.struct-hint { margin: 0 0 4px; font-size: 0.74rem; line-height: 1.35; color: var(--text-muted); }
+.struct-hint-touch { display: none; }
+@media (pointer: coarse) { .struct-hint-mouse { display: none; } .struct-hint-touch { display: block; } }
+
+/* Floating "Show whole brain" after isolating a structure. */
+#isolate-restore {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1.5px solid var(--accent);
+  background: rgba(20, 23, 34, 0.92);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+}
+#isolate-restore:hover { background: #1e2540; }
+#isolate-restore.hidden { display: none; }
+
+/* Phones: slice controls docked on the main view while slicing. */
+#slice-bar { display: none; }
+@media (max-width: 600px) {
+  #slice-bar:not(.hidden) {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 12px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: rgba(20, 23, 34, 0.94);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.35);
+  }
+  #slice-bar .settings-seg { display: flex; }
+  #slice-bar .settings-seg.hidden { display: none; }
+  #slice-bar .settings-seg button { flex: 1; min-width: 0; padding: 9px 4px; font-size: 0.8rem; }
+  #slice-bar .settings-seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+  #slice-bar-pos { width: 100%; accent-color: var(--accent); height: 28px; }
+  .slice-bar-row { display: flex; gap: 8px; align-items: stretch; }
+  .slice-bar-row .settings-seg { flex: 1; }
+  #slice-bar-more, #slice-bar-done {
+    padding: 0 14px; border-radius: 8px; border: 1.5px solid var(--border);
+    background: transparent; color: var(--text); font-size: 0.8rem; cursor: pointer;
+  }
+  #slice-bar-done { border-color: var(--accent); background: rgba(79, 124, 255, 0.18); }
+  /* The bar takes the bottom of the screen: tuck away what lives there. */
+  #viewer-container.slicing #bottom-bar,
+  #viewer-container.slicing #model-credit { display: none; }
+}
 
 /* Isolate / hide pop-up next to the clicked structure. */
 #struct-pop {

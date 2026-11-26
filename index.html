@@ -217,9 +217,9 @@
             </div>
           </div>
 
-          <!-- Cross-section slicer (developer-mode feature "slicer") -->
-          <div id="slice-section" class="hidden dev-only">
-            <p class="sidebar-label">Cross-section <span class="dev-tag">DEV</span></p>
+          <!-- Cross-section slicer (models with slicer: true) -->
+          <div id="slice-section" class="hidden">
+            <p class="sidebar-label">Cross-section</p>
             <button id="slice-toggle" type="button" aria-pressed="false" aria-controls="slice-controls">Slice model</button>
             <div id="slice-controls" class="hidden">
               <div id="slice-face" class="hidden">
@@ -243,11 +243,6 @@
               </div>
               <label class="slice-range-label" for="slice-pos">Position <output id="slice-pos-val">50%</output></label>
               <input type="range" id="slice-pos" min="0" max="1000" value="500">
-              <label class="slice-check"><input type="checkbox" id="slice-slab"> Thin slab</label>
-              <div id="slice-thick-row" class="hidden">
-                <label class="slice-range-label" for="slice-thick">Thickness <output id="slice-thick-val">10%</output></label>
-                <input type="range" id="slice-thick" min="2" max="50" value="10">
-              </div>
               <label class="slice-check"><input type="checkbox" id="slice-plane-show" checked> Show cutting plane</label>
               <div class="slice-btn-row">
                 <button id="slice-flip" type="button">Flip side</button>
@@ -256,12 +251,11 @@
             </div>
           </div>
 
-          <!-- Structures: per-layer opacity, isolate / hide (models with regions) -->
-          <div id="struct-section" class="hidden dev-only">
-            <p class="sidebar-label">Structures <span class="dev-tag">DEV</span></p>
-            <div id="struct-layers"></div>
-            <p class="struct-hint">Click a structure on the brain to isolate or hide it.</p>
-            <button type="button" id="struct-show-all">Show all</button>
+          <!-- Structures: how to isolate one (models with region sections) -->
+          <div id="struct-section" class="hidden">
+            <p class="sidebar-label">Structures</p>
+            <p class="struct-hint struct-hint-mouse">Right-click a structure (or click and hold) to isolate it.</p>
+            <p class="struct-hint struct-hint-touch">Press and hold a structure to isolate it.</p>
           </div>
 
           <!-- Author tools (only when the page URL contains ?edit) -->
@@ -345,7 +339,28 @@
         <!-- Data source / licence for the open model (e.g. the brain atlas) -->
         <p id="model-credit" class="hidden"></p>
 
-        <!-- Isolate / hide pop-up for the clicked structure (brain model) -->
+        <!-- Back to the whole model after isolating a structure -->
+        <button type="button" id="isolate-restore" class="hidden">&#8634; Show whole brain</button>
+
+        <!-- Phones: slice controls on the main view while slicing -->
+        <div id="slice-bar" class="hidden" role="group" aria-label="Cross-section">
+          <div class="settings-seg" id="slice-bar-axes" role="group" aria-label="Cutting plane">
+            <button type="button" data-axis="coronal">Coronal</button>
+            <button type="button" data-axis="sagittal">Sagittal</button>
+            <button type="button" data-axis="transverse">Transverse</button>
+          </div>
+          <input type="range" id="slice-bar-pos" min="0" max="1000" value="500" aria-label="Slice position">
+          <div class="slice-bar-row">
+            <div class="settings-seg" id="slice-bar-face" role="group" aria-label="Cut face">
+              <button type="button" data-face="atlas">Atlas</button>
+              <button type="button" data-face="mri">MRI</button>
+            </div>
+            <button type="button" id="slice-bar-more">More</button>
+            <button type="button" id="slice-bar-done">Done</button>
+          </div>
+        </div>
+
+        <!-- Isolate pop-up for a structure (right-click / press and hold) -->
         <div id="struct-pop" class="hidden" role="dialog" aria-labelledby="struct-pop-name">
           <div class="struct-pop-head">
             <p id="struct-pop-name"></p>
@@ -353,7 +368,6 @@
           </div>
           <div class="struct-pop-btns">
             <button type="button" id="struct-pop-isolate">Isolate</button>
-            <button type="button" id="struct-pop-hide">Hide</button>
           </div>
         </div>
 
