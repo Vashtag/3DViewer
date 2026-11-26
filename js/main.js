@@ -1461,6 +1461,7 @@ slicer = {
   on: false,
   axis: 'coronal',
   pos: 0.5,          // 0..1 across the model's extent along the axis
+  face: 'atlas',     // cut face: 'atlas' colours, 'mri', or 'both' (MRI + borders)
   tilt: [0, 0],      // degrees about the plane's two tilt axes (SLICE_TILTS)
   samplePts: null,   // model-local vertex sample for measuring extents
   slab: false,
@@ -1476,6 +1477,7 @@ slicer = {
   outline: null,     // the model's "__outline" mesh (stencil mask source), if any
   stencils: null,    // per-cap stencil passes built from the outline
   capOn: { value: 0 },
+  capGrey: { value: 0 }, // 1 in MRI cut-face modes: inner walls drawn grey to match the scan
   helpers: null,     // THREE.Group with the plane outlines
   caps: null,        // THREE.Group with the region-coloured cut faces
   sections: null,    // { data, dims, voxelMm, regions, byAcronym, tex, pal, localToTex }
@@ -1495,6 +1497,7 @@ const sliceThickVal  = document.getElementById('slice-thick-val');
 const slicePlaneShow = document.getElementById('slice-plane-show');
 const sliceFlip      = document.getElementById('slice-flip');
 const sliceSweep     = document.getElementById('slice-sweep');
+const sliceFace      = document.getElementById('slice-face');
 const sliceTilt      = [document.getElementById('slice-tilt-a'), document.getElementById('slice-tilt-b')];
 const sliceTiltName  = [document.getElementById('slice-tilt-a-name'), document.getElementById('slice-tilt-b-name')];
 const sliceTiltVal   = [document.getElementById('slice-tilt-a-val'), document.getElementById('slice-tilt-b-val')];
@@ -1529,12 +1532,13 @@ function prepareSliceMaterials(object, model) {
       m.onBeforeCompile = (shader, r) => {
         if (prev) prev(shader, r);
         shader.uniforms.sliceCapOn = slicer.capOn;
+        shader.uniforms.sliceCapGrey = slicer.capGrey;
         shader.uniforms.sliceCapColor = { value: capColor };
         shader.fragmentShader = shader.fragmentShader
-          .replace('void main() {', 'uniform float sliceCapOn;\nuniform vec3 sliceCapColor;\nvoid main() {')
+          .replace('void main() {', 'uniform float sliceCapOn;\nuniform float sliceCapGrey;\nuniform vec3 sliceCapColor;\nvoid main() {')
           .replace('#include <dithering_fragment>',
             '#include <dithering_fragment>\n' +
-            'if (sliceCapOn > 0.5 && !gl_FrontFacing) gl_FragColor = vec4(sliceCapColor, gl_FragColor.a);');
+            'if (sliceCapOn > 0.5 && !gl_FrontFacing) gl_FragColor = vec4(mix(sliceCapColor, vec3(0.62), sliceCapGrey), gl_FragColor.a);');
       };
       m.customProgramCacheKey = () => 'slice-cap';
       m.needsUpdate = true;
@@ -1607,12 +1611,16 @@ async function loadSections(model) {
     slicer.sections = {
       data, dims: [w, h, d], voxelMm: v, origin, regions, tex, pal, palData, localToTex,
       byAcronym: Object.fromEntries(meta.regions.map(r => [r.acronym, r])),
+      mriUrl: meta.mri ? base + meta.mri.file : null, // loaded on first use
+      mriTex: null,
     };
     if (slicer.caps) slicer.caps.children.forEach(c => {
       c.material.uniforms.uVol.value = tex;
       c.material.uniforms.uPal.value = pal;
     });
     initStructures(model);
+    setSliceFace('atlas');
+    sliceFace.classList.toggle('hidden', !slicer.sections.mriUrl);
   } catch (e) {
     console.error('Could not load the region sections:', e);
   }
@@ -1620,7 +1628,9 @@ async function loadSections(model) {
 
 function disposeSections() {
   resetStructures();
+  sliceFace.classList.add('hidden');
   if (!slicer.sections) return;
+  slicer.sections.mriTex?.dispose();
   slicer.sections.tex.dispose();
   slicer.sections.pal.dispose();
   slicer.sections = null;
@@ -1643,6 +1653,8 @@ const SECTION_CAP_FRAG = /* glsl */`
   uniform vec3 uTexV;   // one voxel along the plane's y axis
   uniform float uHover; // region index under the pointer (0 = none)
   uniform float uSel;   // selected region index (0 = none)
+  uniform sampler3D uMri; // MRI template on the same grid (MRI modes)
+  uniform float uMode;  // 0 = atlas colours, 1 = MRI, 2 = MRI + region borders
   varying vec3 vWorld;
   float regionAt(vec3 t) { return floor(texture(uVol, t).r * 255.0 + 0.5); }
   // 1 when a neighbour is a different region (not empty space: the outer
@@ -1652,17 +1664,80 @@ const SECTION_CAP_FRAG = /* glsl */`
     vec3 t = (uWorldToTex * vec4(vWorld, 1.0)).xyz;
     if (any(lessThan(t, vec3(0.0))) || any(greaterThan(t, vec3(1.0)))) discard;
     float r = regionAt(t);
-    if (r < 0.5) discard;
+    bool mri = uMode > 0.5;
+    // Atlas mode shows labelled voxels only; MRI modes also show the scan
+    // between them (fluid in sulci, ...) inside the outline mask.
+    if (r < 0.5 && !mri) discard;
     vec4 pc = texture(uPal, vec2((r + 0.5) / 256.0, 0.5));
-    if (pc.a < 0.5) discard; // region hidden in the Structures panel
-    vec3 col = pc.rgb;
-    // Darken voxels on a border between regions (neighbours within the plane).
+    if (r > 0.5 && pc.a < 0.5) discard; // region hidden in the Structures panel
+    // A voxel on a border between regions (neighbours within the plane).
     float edge = border(regionAt(t + uTexU), r) + border(regionAt(t - uTexU), r)
                + border(regionAt(t + uTexV), r) + border(regionAt(t - uTexV), r);
-    if (edge > 0.0) col *= 0.7;
-    if (abs(r - uHover) < 0.5 || abs(r - uSel) < 0.5) col = mix(col, vec3(1.0), 0.35);
+    bool lit = r > 0.5 && (abs(r - uHover) < 0.5 || abs(r - uSel) < 0.5);
+    vec3 col;
+    if (!mri) {
+      col = pc.rgb;
+      if (edge > 0.0) col *= 0.7;
+      if (lit) col = mix(col, vec3(1.0), 0.35);
+    } else {
+      col = vec3(texture(uMri, t).r);
+      if (uMode > 1.5 && edge > 0.0) col = mix(col, pc.rgb, 0.9); // borders in the region's colour
+      if (lit) col = mix(col, pc.rgb, 0.45);                      // hovered / selected: tinted
+    }
     gl_FragColor = vec4(col, 1.0);
   }`;
+
+// ── Cut face mode: atlas colours, the MRI, or the MRI with region borders ──
+const SLICE_FACE_MODES = { atlas: 0, mri: 1, both: 2 };
+let _mriLoading = null;
+
+// Fetches the MRI template (models with `mri` in <id>_regions.json) once.
+async function loadSectionMri() {
+  const sec = slicer.sections;
+  if (!sec?.mriUrl) return null;
+  if (sec.mriTex) return sec.mriTex;
+  if (!_mriLoading) {
+    _mriLoading = (async () => {
+      const data = await fetchMaybeGzip(sec.mriUrl);
+      const [w, h, d] = sec.dims;
+      if (data.length !== w * h * d) throw new Error('MRI volume has the wrong size');
+      const tex = new THREE.Data3DTexture(data, w, h, d);
+      tex.format = THREE.RedFormat;
+      tex.type = THREE.UnsignedByteType;
+      tex.minFilter = tex.magFilter = THREE.LinearFilter; // smooth grey levels
+      tex.unpackAlignment = 1;
+      tex.needsUpdate = true;
+      if (slicer.sections === sec) sec.mriTex = tex; else tex.dispose();
+      return tex;
+    })().finally(() => { _mriLoading = null; });
+  }
+  return _mriLoading;
+}
+
+async function setSliceFace(face) {
+  if (face !== 'atlas' && !slicer.sections?.mriTex) {
+    const btn = sliceFace.querySelector(`button[data-face="${face}"]`);
+    const label = btn?.textContent;
+    if (btn) { btn.textContent = '…'; btn.disabled = true; }
+    try {
+      await loadSectionMri();
+    } catch (e) {
+      console.error('Could not load the MRI:', e);
+      showToast('Could not load the MRI', '', false);
+      face = 'atlas';
+    } finally {
+      if (btn) { btn.textContent = label; btn.disabled = false; }
+    }
+  }
+  slicer.face = face;
+  slicer.capGrey.value = face === 'atlas' ? 0 : 1;
+  sliceFace.querySelectorAll('button[data-face]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.face === face)));
+  if (slicer.caps) {
+    const u = slicer.caps.children[0].material.uniforms;
+    u.uMri.value = slicer.sections?.mriTex ?? null;
+    u.uMode.value = SLICE_FACE_MODES[face];
+  }
+}
 
 function buildSectionCaps() {
   const g = new THREE.Group();
@@ -1677,10 +1752,14 @@ function buildSectionCaps() {
       uTexV: { value: new THREE.Vector3() },
       uHover: { value: 0 },
       uSel: { value: structState.selected?.index ?? 0 },
+      uMri: { value: slicer.sections?.mriTex ?? null },
+      uMode: { value: SLICE_FACE_MODES[slicer.face] ?? 0 },
     },
     side: THREE.DoubleSide,
-    polygonOffset: true,      // in front of mesh fragments lying on the plane
-    polygonOffsetFactor: -1,
+    // In front of mesh fragments lying on the plane. The slope factor covers
+    // anti-aliasing samples of surfaces that meet the plane at a grazing angle.
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
     polygonOffsetUnits: -4,
     // Drawn only where the outline's stencil pass marked "inside the model",
     // and resets the stencil as it goes so the next cap starts clean.
@@ -2342,6 +2421,10 @@ sliceTilt.forEach((input, i) => input.addEventListener('input', () => {
   updateSlicePlanes();
 }));
 sliceStraighten.addEventListener('click', () => { slicer.tilt = [0, 0]; updateSlicePlanes(); });
+sliceFace.addEventListener('click', e => {
+  const btn = e.target.closest('button[data-face]');
+  if (btn && !btn.disabled) setSliceFace(btn.dataset.face);
+});
 slicePos.addEventListener('input', () => {
   setSliceSweep(false);
   slicer.pos = Number(slicePos.value) / 1000;

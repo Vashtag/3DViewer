@@ -338,6 +338,11 @@ body:not(.dev-mode) .dev-only { display: none !important; }
 #slice-pos, #slice-thick { width: 100%; accent-color: var(--accent); cursor: pointer; }
 .slice-btn-row { display: flex; gap: 6px; }
 #slice-tilt { display: flex; flex-direction: column; gap: 4px; }
+#slice-face { display: flex; flex-direction: column; gap: 4px; }
+#slice-face.hidden { display: none; }
+#slice-face .settings-seg { display: flex; }
+#slice-face .settings-seg button { flex: 1; min-width: 0; }
+#slice-face .settings-seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
 #slice-tilt input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
 /* Layer on/off toggles (pressed = shown), two per row. */
 #struct-layers { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }

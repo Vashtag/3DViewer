@@ -11,6 +11,8 @@ Writes to models/brain/:
   brain_regions.json     region list + section-volume metadata
   brain_sections.bin.gz  region index per voxel (uint8, 1 mm voxels), used by
                          the cross-section slicer to colour the cut face
+  brain_mri.bin.gz       the atlas's MRI template on the same 1 mm grid
+                         (uint8), shown on the cut face in MRI mode
 
 Coordinates: the atlas is "asr" in micrometres (axis 0 -> posterior,
 1 -> inferior, 2 -> left). The viewer wants millimetres with +X = patient's
@@ -21,7 +23,8 @@ pointing outward.
 
 Usage (Python 3.10+):
     pip install brainglobe-atlasapi trimesh fast-simplification networkx scipy
-    python tools/build-brain.py
+    python tools/build-brain.py [cache-dir]
+    python tools/build-brain.py [cache-dir] --mri-only   # just (re)write the MRI
     cd tools && npx gltf-pipeline -i ../models/brain/brain.plain.glb \
         -o ../models/brain/brain.glb -d --draco.compressionLevel 7
 """
@@ -34,11 +37,14 @@ import fast_simplification
 import numpy as np
 import trimesh
 from brainglobe_atlasapi import BrainGlobeAtlas
+from scipy import ndimage
 
 ATLAS = "allen_human_500um"
 REPO = Path(__file__).resolve().parent.parent
 OUT = REPO / "models" / "brain"
-CACHE = Path(sys.argv[1]) if len(sys.argv) > 1 else None
+ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
+CACHE = Path(ARGS[0]) if ARGS else None
+MRI_ONLY = "--mri-only" in sys.argv
 
 # Keep the download reasonable: big surface regions keep more detail than
 # small deep nuclei (which are only seen when sliced or isolated).
@@ -70,8 +76,37 @@ def to_viewer(points_um):
     return np.stack([r, -s, -a], axis=1) / 1000.0
 
 
+def export_mri(atlas, ann):
+    """The atlas's MRI template, averaged into the same 1 mm voxels as the
+    section volume (voxel k spans atlas voxels 2k and 2k+1), contrast-stretched
+    to uint8, and zeroed a few mm outside the brain (never shown, and it
+    compresses far better). Same (A, S, R) C-order layout as the sections."""
+    t = np.asarray(atlas.template).astype(np.float32)
+    k = VOLUME_STRIDE
+    A, S, R = (d // k * k for d in t.shape)
+    block = lambda x: x[:A, :S, :R].reshape(A // k, k, S // k, k, R // k, k)
+    mean = block(t).mean(axis=(1, 3, 5))
+    near_brain = ndimage.binary_dilation(block(ann > 0).any(axis=(1, 3, 5)), iterations=3)
+    lo, hi = np.percentile(t[ann > 0], [1, 99.7])
+    mri = np.clip((mean - lo) / (hi - lo) * 255, 0, 255).astype(np.uint8)
+    mri[~near_brain] = 0
+    with gzip.open(OUT / "brain_mri.bin.gz", "wb", compresslevel=9) as f:
+        f.write(np.ascontiguousarray(mri).tobytes())
+    print(f"MRI template {mri.shape}")
+    return {
+        "file": "brain_mri.bin.gz",
+        "description": "Allen Human Reference Atlas MRI template (T2-weighted contrast), 1 mm",
+    }
+
+
 def main():
     atlas = BrainGlobeAtlas(ATLAS, brainglobe_dir=CACHE, check_latest=False)
+    if MRI_ONLY:
+        meta_path = OUT / "brain_regions.json"
+        meta = json.loads(meta_path.read_text())
+        meta["mri"] = export_mri(atlas, np.asarray(atlas.annotation))
+        meta_path.write_text(json.dumps(meta, indent=1))
+        return
     structures = atlas.structures
     ann = np.asarray(atlas.annotation)
     res_um = float(atlas.resolution[0])
@@ -170,6 +205,7 @@ def main():
             # Voxel (r, s, a) covers viewer-space
             #   X in [r, r+1]*voxelMm, Y in -[s, s+1]*voxelMm, Z in -[a, a+1]*voxelMm
         },
+        "mri": export_mri(atlas, ann),
         "regions": regions,
     }
     (OUT / "brain_regions.json").write_text(json.dumps(meta, indent=1))
