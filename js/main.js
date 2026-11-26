@@ -177,6 +177,11 @@ shortcutsModal.addEventListener('keydown', e => {
 //   category: optional group name (e.g. "Central Nervous System") — models
 //             sharing a category are nested under one expandable region
 //             group instead of listed as a top-level region button.
+//   devFeature: optional developer-feature id; the model is only listed while
+//             that feature is switched on (Settings > Developer).
+//   slicer:   true to offer the Cross-section panel for this model.
+//   sections: optional <id>_regions.json with region names and a voxel
+//             volume used to colour the cut face by region (see the brain).
 const DEFAULT_VIEWS = [
   { label: 'Anterior',  dir: 'front' },
   { label: 'Posterior', dir: 'back'  },
@@ -228,6 +233,25 @@ const MODELS = [
     views: [
       { label: 'Anterior',  dir: 'front' },
       { label: 'Posterior', dir: 'back'  },
+    ],
+  },
+  {
+    // Allen Human Reference Atlas via BrainGlobe (built by tools/build-brain.py).
+    // One mesh per atlas region, in the atlas colours. +X is the patient's
+    // left, so the Left/Right buttons look from +X/-X respectively.
+    id: 'brain', label: 'Brain', file: 'models/brain/brain.glb',
+    category: 'CNS',
+    devFeature: 'brain',  // only listed while this developer feature is on
+    slicer: true,         // shows the Cross-section panel
+    sections: 'models/brain/brain_regions.json', // region names + section volume
+    rotation: [0, 0, 0],
+    views: [
+      { label: 'Anterior',  dir: 'front'  },
+      { label: 'Posterior', dir: 'back'   },
+      { label: 'Left',      dir: 'right'  },
+      { label: 'Right',     dir: 'left'   },
+      { label: 'Superior',  dir: 'top'    },
+      { label: 'Inferior',  dir: 'bottom' },
     ],
   },
 ];
@@ -839,6 +863,7 @@ gltfLoader.setDRACOLoader(dracoLoader);
 async function loadRegion(region) {
   const model = MODEL_BY_ID[region];
   if (!model) { console.error('Unknown model:', region); return; }
+  activeModelDef = model;
   showLoading('Loading ' + model.label + '…', posterUrl(model));
   canvas.setAttribute('aria-label', `3D model of the ${model.label}. Arrow keys rotate, plus and minus zoom.`);
   setDrawMode(false);
@@ -871,6 +896,7 @@ async function loadRegion(region) {
     clearPins();
     setPinMode(false);
     setSlicing(false);
+    disposeSections();
     scene.remove(currentModel);
     currentModel.traverse(child => {
       if (child.isMesh) {
@@ -907,7 +933,9 @@ async function loadRegion(region) {
       scene.add(object);
       currentModel = object;
       recenterModel();
-      prepareSliceMaterials(object);
+      prepareSliceMaterials(object, model);
+      applySlicerFeature();
+      if (model.sections) loadSections(model);
       fitCameraToModel(object);
       // If the first view was authored, frame the model with its saved
       // zoom and pan offset.
@@ -946,6 +974,10 @@ function makeRegionButton(model) {
   btn.className = 'region-btn';
   btn.dataset.region = model.id;
   btn.innerHTML = `<span class="region-label">${model.label}</span>`;
+  if (model.devFeature) {
+    btn.dataset.devFeature = model.devFeature;
+    btn.hidden = true; // revealed by applyDevModelButtons() once dev mode is read
+  }
   btn.addEventListener('click', () => {
     regionSelector.querySelectorAll('.region-btn').forEach(b => { b.classList.remove('active'); b.removeAttribute('aria-current'); });
     btn.classList.add('active');
@@ -1235,8 +1267,8 @@ settingsReset.addEventListener('click', () => {
 const DEV_PASSWORD = 'developer';
 const DEV_FEATURES = [
   // { id: 'example', label: 'Example feature', description: 'What it does and what to test.' },
-  { id: 'slicer', label: 'Cross-section slicer',
-    description: 'Adds a Cross-section panel to the sidebar: cut the model along a coronal, sagittal or transverse plane, view a thin slab, or sweep through it.' },
+  { id: 'brain', label: 'Human brain + cross-sections',
+    description: 'Adds a Brain model under CNS (Allen Human Reference Atlas via BrainGlobe) with a Cross-section panel: cut it along a coronal, sagittal or transverse plane, see the regions on the cut face, and hover or tap to name them.' },
 ];
 
 let devMode = localStorage.getItem('devMode') === '1';
@@ -1336,22 +1368,26 @@ devDisableBtn.addEventListener('click', () => {
 });
 applyDevMode();
 
-// ── Cross-section slicer (developer feature "slicer") ─────
+// ── Cross-section slicer ──────────────────────────────────
 // Cuts the model with a plane (or keeps a thin slab between two planes), in
-// the spirit of brainglobe-heatmap's Slicer. The plane is defined in the
+// the spirit of brainglobe-heatmap's Slicer. Only offered for models with
+// `slicer: true` (currently the dev-mode brain). The plane is defined in the
 // model's own anatomical frame (captured at load, where anterior faces +Z and
 // superior +Y), so the cut stays on the same anatomy when a preset view
 // rotates the model.
 //
 // Clipping uses renderer.clippingPlanes, so it applies to everything drawn by
-// the main renderer. The cut face is "filled" by drawing the model's back
-// faces in one flat colour: looking through the cut you see the inside of the
-// far wall, and painting it flat makes it read as a solid section. This works
-// even when a scan isn't perfectly watertight.
+// the main renderer. The cut face is filled two ways:
+//   • Back faces are drawn in a flat colour (the region's own colour on the
+//     brain), so looking through the cut the far wall reads as solid.
+//   • Models with a `sections` volume also get a "cap" plane on the cut that
+//     looks up which atlas region each point is in and paints it in that
+//     region's colour with thin borders, like an atlas section.
 //
 // State lives in one `var` so the render loop (which starts before this code
 // runs) can safely check it.
 var slicer = null;
+var activeModelDef = null; // MODELS entry of the model being shown
 
 const SLICE_AXES = {
   coronal:    new THREE.Vector3(0, 0, 1), // anterior
@@ -1376,8 +1412,10 @@ slicer = {
   localPlanes: [new THREE.Plane(), new THREE.Plane()],
   worldPlanes: [new THREE.Plane(), new THREE.Plane()],
   capOn: { value: 0 },
-  capColor: { value: SLICE_CAP_COLOR },
-  helpers: null,     // THREE.Group with the plane indicators
+  helpers: null,     // THREE.Group with the plane outlines
+  caps: null,        // THREE.Group with the region-coloured cut faces
+  sections: null,    // { data, dims, voxelMm, regions, byAcronym, tex, pal, localToTex }
+  worldToTex: new THREE.Matrix4(),
 };
 
 const sliceSection   = document.getElementById('slice-section');
@@ -1393,9 +1431,11 @@ const sliceThickVal  = document.getElementById('slice-thick-val');
 const slicePlaneShow = document.getElementById('slice-plane-show');
 const sliceFlip      = document.getElementById('slice-flip');
 const sliceSweep     = document.getElementById('slice-sweep');
+const regionTip      = document.getElementById('region-tip');
 
-// Called once per loaded model: hooks the cap colour into its materials.
-function prepareSliceMaterials(object) {
+// Called once per loaded model: hooks the back-face cap colour into its
+// materials. Models with region sections cap each region in its own colour.
+function prepareSliceMaterials(object, model) {
   slicer.baseQuat.copy(object.quaternion);
   slicer.extents = {};
   object.traverse(child => {
@@ -1403,11 +1443,14 @@ function prepareSliceMaterials(object) {
     const mats = Array.isArray(child.material) ? child.material : [child.material];
     mats.forEach(m => {
       m.userData.sliceOrigSide = m.side;
+      const capColor = model?.sections && m.color
+        ? m.color.clone().convertLinearToSRGB()
+        : SLICE_CAP_COLOR;
       const prev = m.onBeforeCompile;
       m.onBeforeCompile = (shader, r) => {
         if (prev) prev(shader, r);
         shader.uniforms.sliceCapOn = slicer.capOn;
-        shader.uniforms.sliceCapColor = slicer.capColor;
+        shader.uniforms.sliceCapColor = { value: capColor };
         shader.fragmentShader = shader.fragmentShader
           .replace('void main() {', 'uniform float sliceCapOn;\nuniform vec3 sliceCapColor;\nvoid main() {')
           .replace('#include <dithering_fragment>',
@@ -1424,7 +1467,7 @@ function prepareSliceMaterials(object) {
 function setSliceMaterialsDoubleSided(on) {
   if (!currentModel) return;
   currentModel.traverse(child => {
-    if (!child.isMesh || child.userData.sliceHelper) return;
+    if (!child.isMesh) return;
     const mats = Array.isArray(child.material) ? child.material : [child.material];
     mats.forEach(m => {
       if (!('sliceOrigSide' in m.userData)) return;
@@ -1434,24 +1477,157 @@ function setSliceMaterialsDoubleSided(on) {
   });
 }
 
+// ── Region section volume (brain) ──
+// <id>_regions.json lists the regions and points at a gzipped uint8 volume
+// holding the region index of every voxel (see tools/build-brain.py).
+async function fetchMaybeGzip(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${url}: ${res.status}`);
+  const buf = new Uint8Array(await res.arrayBuffer());
+  if (buf[0] !== 0x1f || buf[1] !== 0x8b) return buf; // already decoded by the server
+  const stream = new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+async function loadSections(model) {
+  try {
+    const base = model.sections.slice(0, model.sections.lastIndexOf('/') + 1);
+    const meta = await (await fetch(model.sections)).json();
+    const data = await fetchMaybeGzip(base + meta.sections.file);
+    if (activeModelDef !== model) return; // switched models while loading
+    const [w, h, d] = meta.sections.dims;
+    if (data.length !== w * h * d) throw new Error('Section volume has the wrong size');
+
+    const tex = new THREE.Data3DTexture(data, w, h, d);
+    tex.format = THREE.RedFormat;
+    tex.type = THREE.UnsignedByteType;
+    tex.minFilter = tex.magFilter = THREE.NearestFilter;
+    tex.unpackAlignment = 1;
+    tex.needsUpdate = true;
+
+    const palData = new Uint8Array(256 * 4);
+    const regions = [];
+    meta.regions.forEach(r => {
+      regions[r.index] = r;
+      // Store the original sRGB bytes (written to the screen unconverted).
+      const hex = parseInt(r.color.slice(1), 16);
+      palData.set([(hex >> 16) & 255, (hex >> 8) & 255, hex & 255, 255], r.index * 4);
+    });
+    const pal = new THREE.DataTexture(palData, 256, 1, THREE.RGBAFormat);
+    pal.minFilter = pal.magFilter = THREE.NearestFilter;
+    pal.needsUpdate = true;
+
+    // Model-local (mm, viewer axes) -> texture coords (0..1). The volume's
+    // texture x/y/z run along +X, -Y, -Z (left, inferior, posterior).
+    const v = meta.sections.voxelMm;
+    const localToTex = new THREE.Matrix4().makeScale(1 / (w * v), -1 / (h * v), -1 / (d * v));
+
+    slicer.sections = {
+      data, dims: [w, h, d], voxelMm: v, regions, tex, pal, localToTex,
+      byAcronym: Object.fromEntries(meta.regions.map(r => [r.acronym, r])),
+    };
+    if (slicer.caps) slicer.caps.children.forEach(c => {
+      c.material.uniforms.uVol.value = tex;
+      c.material.uniforms.uPal.value = pal;
+    });
+  } catch (e) {
+    console.error('Could not load the region sections:', e);
+  }
+}
+
+function disposeSections() {
+  if (!slicer.sections) return;
+  slicer.sections.tex.dispose();
+  slicer.sections.pal.dispose();
+  slicer.sections = null;
+  hideRegionTip();
+}
+
+const SECTION_CAP_VERT = /* glsl */`
+  varying vec3 vWorld;
+  void main() {
+    vec4 w = modelMatrix * vec4(position, 1.0);
+    vWorld = w.xyz;
+    gl_Position = projectionMatrix * viewMatrix * w;
+  }`;
+const SECTION_CAP_FRAG = /* glsl */`
+  precision highp sampler3D;
+  uniform sampler3D uVol;
+  uniform sampler2D uPal;
+  uniform mat4 uWorldToTex;
+  uniform vec3 uTexU;   // one voxel along the plane's x axis, in texture units
+  uniform vec3 uTexV;   // one voxel along the plane's y axis
+  uniform float uHover; // region index under the pointer (0 = none)
+  varying vec3 vWorld;
+  float regionAt(vec3 t) { return floor(texture(uVol, t).r * 255.0 + 0.5); }
+  void main() {
+    vec3 t = (uWorldToTex * vec4(vWorld, 1.0)).xyz;
+    if (any(lessThan(t, vec3(0.0))) || any(greaterThan(t, vec3(1.0)))) discard;
+    float r = regionAt(t);
+    if (r < 0.5) discard;
+    vec3 col = texture(uPal, vec2((r + 0.5) / 256.0, 0.5)).rgb;
+    // Darken voxels on a region border (neighbours within the plane differ).
+    float edge = step(0.5, abs(regionAt(t + uTexU) - r)) + step(0.5, abs(regionAt(t - uTexU) - r))
+               + step(0.5, abs(regionAt(t + uTexV) - r)) + step(0.5, abs(regionAt(t - uTexV) - r));
+    if (edge > 0.0) col *= 0.7;
+    if (abs(r - uHover) < 0.5) col = mix(col, vec3(1.0), 0.35);
+    gl_FragColor = vec4(col, 1.0);
+  }`;
+
+function buildSectionCaps() {
+  const g = new THREE.Group();
+  const mat = new THREE.ShaderMaterial({
+    vertexShader: SECTION_CAP_VERT,
+    fragmentShader: SECTION_CAP_FRAG,
+    uniforms: {
+      uVol: { value: slicer.sections?.tex ?? null },
+      uPal: { value: slicer.sections?.pal ?? null },
+      uWorldToTex: { value: slicer.worldToTex },
+      uTexU: { value: new THREE.Vector3() },
+      uTexV: { value: new THREE.Vector3() },
+      uHover: { value: 0 },
+    },
+    side: THREE.DoubleSide,
+  });
+  for (let i = 0; i < 2; i++) {
+    const cap = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+    cap.visible = false;
+    g.add(cap);
+  }
+  scene.add(g);
+  return g;
+}
+
+// Region at a world-space point, from the section volume (or null).
+function sectionRegionAt(p) {
+  const sec = slicer.sections;
+  if (!sec) return null;
+  const t = _sliceT.copy(p).applyMatrix4(slicer.worldToTex);
+  const [w, h, d] = sec.dims;
+  const x = Math.floor(t.x * w), y = Math.floor(t.y * h), z = Math.floor(t.z * d);
+  if (x < 0 || y < 0 || z < 0 || x >= w || y >= h || z >= d) return null;
+  return sec.regions[sec.data[(z * h + y) * w + x]] ?? null;
+}
+
 // The model's extent along an anatomical axis, in model-local space, measured
 // from the actual vertices (tighter than a bounding box for oblique axes).
 function sliceExtent(axis) {
   if (slicer.extents[axis]) return slicer.extents[axis];
   const n = sliceLocalNormal(axis);
+  currentModel.updateMatrixWorld(true);
   const inv = currentModel.matrixWorld.clone().invert();
   const m = new THREE.Matrix4();
   const v = new THREE.Vector3();
   let min = Infinity, max = -Infinity;
-  currentModel.updateMatrixWorld(true);
   currentModel.traverse(child => {
-    if (!child.isMesh || child.userData.sliceHelper || !child.geometry?.attributes?.position) return;
+    if (!child.isMesh || !child.geometry?.attributes?.position) return;
+    if (!('sliceOrigSide' in (Array.isArray(child.material) ? child.material[0] : child.material).userData)) return;
     m.multiplyMatrices(inv, child.matrixWorld);
     const pos = child.geometry.attributes.position;
     for (let i = 0; i < pos.count; i++) {
-      const d = v.fromBufferAttribute(pos, i).applyMatrix4(m).dot(n);
-      if (d < min) min = d;
-      if (d > max) max = d;
+      const dd = v.fromBufferAttribute(pos, i).applyMatrix4(m).dot(n);
+      if (dd < min) min = dd;
+      if (dd > max) max = dd;
     }
   });
   if (!isFinite(min)) { min = -1; max = 1; }
@@ -1495,7 +1671,6 @@ function buildSliceHelpers() {
     const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geo),
       new THREE.LineBasicMaterial({ color: 0x9db6ff, transparent: true, opacity: 0.7 }));
     fill.add(edge);
-    fill.userData.sliceHelper = true;
     fill.renderOrder = 2;
     g.add(fill);
   }
@@ -1503,13 +1678,22 @@ function buildSliceHelpers() {
   return g;
 }
 
-const _sliceQ = new THREE.Quaternion();
-const _sliceZ = new THREE.Vector3(0, 0, 1);
-const _sliceP = new THREE.Vector3();
+const _sliceQ   = new THREE.Quaternion();
+const _sliceZ   = new THREE.Vector3(0, 0, 1);
+const _sliceP   = new THREE.Vector3();
+const _sliceT   = new THREE.Vector3();
 const _sliceDir = new THREE.Vector3();
+const _sliceM3  = new THREE.Matrix3();
+const _sliceInv = new THREE.Matrix4();
 // Per frame: move the planes with the model and advance a sweep.
 function updateSlicer(dt) {
-  if (!slicer || !slicer.on || !currentModel) return;
+  if (!slicer || !currentModel) return;
+  currentModel.updateMatrixWorld(true);
+  if (slicer.sections) {
+    _sliceInv.copy(currentModel.matrixWorld).invert();
+    slicer.worldToTex.multiplyMatrices(slicer.sections.localToTex, _sliceInv);
+  }
+  if (!slicer.on) return;
 
   if (slicer.sweep) {
     slicer.sweep.t += dt / 6; // full pass in ~6 s
@@ -1519,30 +1703,54 @@ function updateSlicer(dt) {
     if (slicer.sweep.t >= 1) setSliceSweep(false);
   }
 
-  currentModel.updateMatrixWorld(true);
   const count = slicer.slab ? 2 : 1;
   for (let i = 0; i < count; i++) {
     slicer.worldPlanes[i].copy(slicer.localPlanes[i]).applyMatrix4(currentModel.matrixWorld);
   }
   renderer.clippingPlanes = slicer.worldPlanes.slice(0, count);
 
-  // Plane indicators sit a hair inside the kept side so they aren't clipped.
-  // They fade as they turn to face the camera, where a tint over the whole
-  // section would only get in the way; edge-on they're most useful.
-  const size = Math.max(fitRadius, 0.001) * 1.6;
+  // Outlines and caps sit a hair inside the kept side so they aren't clipped.
+  // Outlines fade as they turn to face the camera, where a tint over the
+  // whole section would only get in the way; edge-on they're most useful.
+  const outline = Math.max(fitRadius, 0.001) * 1.6;
+  const capSize = Math.max(fitRadius, 0.001) * 2.4;
   camera.getWorldDirection(_sliceDir);
-  slicer.helpers.children.forEach((h, i) => {
-    h.visible = slicer.showPlane && i < count;
-    if (!h.visible) return;
+  for (let i = 0; i < 2; i++) {
+    const active = i < count;
     const wp = slicer.worldPlanes[i];
-    wp.coplanarPoint(_sliceP).addScaledVector(wp.normal, fitRadius * 0.002);
-    h.position.copy(_sliceP);
-    h.quaternion.copy(_sliceQ.setFromUnitVectors(_sliceZ, wp.normal));
-    h.scale.setScalar(size);
-    const facing = Math.abs(_sliceDir.dot(wp.normal)); // 1 = head-on
-    h.material.opacity = 0.14 * (1 - facing * facing);
-    h.children[0].material.opacity = 0.15 + 0.6 * (1 - facing);
-  });
+    if (active) {
+      wp.coplanarPoint(_sliceP).addScaledVector(wp.normal, fitRadius * 0.002);
+      _sliceQ.setFromUnitVectors(_sliceZ, wp.normal);
+    }
+    const h = slicer.helpers.children[i];
+    h.visible = active && slicer.showPlane;
+    if (h.visible) {
+      h.position.copy(_sliceP);
+      h.quaternion.copy(_sliceQ);
+      h.scale.setScalar(outline);
+      const facing = Math.abs(_sliceDir.dot(wp.normal)); // 1 = head-on
+      h.material.opacity = 0.14 * (1 - facing * facing);
+      h.children[0].material.opacity = 0.15 + 0.6 * (1 - facing);
+    }
+    if (slicer.caps) {
+      const cap = slicer.caps.children[i];
+      cap.visible = active && !!slicer.sections;
+      if (cap.visible) {
+        cap.position.copy(_sliceP);
+        cap.quaternion.copy(_sliceQ);
+        cap.scale.setScalar(capSize);
+      }
+    }
+  }
+
+  // In-plane voxel steps (texture units) for the region-border lines.
+  if (slicer.caps && slicer.sections) {
+    const u = slicer.caps.children[0].material.uniforms;
+    _sliceM3.setFromMatrix4(slicer.worldToTex);
+    const vox = slicer.sections.voxelMm * currentModel.matrixWorld.getMaxScaleOnAxis();
+    u.uTexU.value.set(1, 0, 0).applyQuaternion(_sliceQ).multiplyScalar(vox).applyMatrix3(_sliceM3);
+    u.uTexV.value.set(0, 1, 0).applyQuaternion(_sliceQ).multiplyScalar(vox).applyMatrix3(_sliceM3);
+  }
 
   // Hide labels whose point has been cut away.
   if (labelLayer) {
@@ -1563,7 +1771,7 @@ function isPointSliced(p) {
 // pins, labels and line points can only land on what's actually visible.
 function modelHits(ray) {
   if (!currentModel) return [];
-  const hits = ray.intersectObject(currentModel, true).filter(h => !h.object.userData.sliceHelper);
+  const hits = ray.intersectObject(currentModel, true);
   return slicer && slicer.on ? hits.filter(h => !isPointSliced(h.point)) : hits;
 }
 
@@ -1583,20 +1791,91 @@ function setSlicing(on) {
   setSliceMaterialsDoubleSided(on);
   if (on) {
     if (!slicer.helpers) slicer.helpers = buildSliceHelpers();
+    if (!slicer.caps) slicer.caps = buildSectionCaps();
     updateSlicePlanes();
   } else {
     setSliceSweep(false);
     renderer.clippingPlanes = [];
-    if (slicer.helpers) slicer.helpers.children.forEach(h => { h.visible = false; });
+    [slicer.helpers, slicer.caps].forEach(g => g?.children.forEach(h => { h.visible = false; }));
     document.querySelectorAll('.anno-label.slice-hidden').forEach(el => el.classList.remove('slice-hidden'));
   }
 }
 
+// The panel shows only for models that opt in, while their feature is on.
 function applySlicerFeature() {
-  const enabled = isDevFeatureEnabled('slicer');
+  const feature = activeModelDef?.devFeature;
+  const enabled = !!activeModelDef?.slicer && (!feature || isDevFeatureEnabled(feature));
   sliceSection.classList.toggle('hidden', !enabled);
   if (!enabled && slicer.on) setSlicing(false);
 }
+
+// Models tied to a developer feature are listed only while it's on.
+function applyDevModelButtons() {
+  regionSelector.querySelectorAll('.region-btn[data-dev-feature]').forEach(btn => {
+    btn.hidden = !isDevFeatureEnabled(btn.dataset.devFeature);
+  });
+}
+
+// ── Region names under the pointer (models with sections) ──
+// Hover (mouse) or tap shows the region's name: on the cut face it comes from
+// the section volume, elsewhere from the mesh under the pointer.
+let _tipPending = null, _tipTimer = null;
+function hideRegionTip() {
+  regionTip.classList.add('hidden');
+  if (slicer.caps) slicer.caps.children[0].material.uniforms.uHover.value = 0;
+}
+function regionUnderPointer(clientX, clientY) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  _ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+  _ray.setFromCamera(_ndc, camera);
+  let best = null;
+  const meshHit = modelHits(_ray)[0];
+  if (meshHit) {
+    const acr = meshHit.object.name || meshHit.object.parent?.name;
+    const r = slicer.sections.byAcronym[acr];
+    if (r) best = { dist: meshHit.distance, region: r };
+  }
+  if (slicer.on && slicer.caps) {
+    _ray.intersectObjects(slicer.caps.children.filter(c => c.visible), false).some(h => {
+      const r = sectionRegionAt(h.point);
+      if (!r) return false; // outside the brain on the cap square: look further
+      if (!best || h.distance <= best.dist + fitRadius * 0.01) best = { dist: h.distance, region: r, cap: true };
+      return true;
+    });
+  }
+  return best;
+}
+function showRegionTip(clientX, clientY) {
+  const hit = slicer.sections && currentModel ? regionUnderPointer(clientX, clientY) : null;
+  if (slicer.caps) slicer.caps.children[0].material.uniforms.uHover.value = hit?.cap ? hit.region.index : 0;
+  if (!hit) { regionTip.classList.add('hidden'); return; }
+  const name = hit.region.name;
+  regionTip.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+  const rect = container.getBoundingClientRect();
+  regionTip.style.left = `${clientX - rect.left + 14}px`;
+  regionTip.style.top  = `${clientY - rect.top + 14}px`;
+  regionTip.classList.remove('hidden');
+}
+function regionTipAllowed() {
+  return slicer.sections && navMode === 'orbit' && currentClickMode() === null && !drawMode;
+}
+renderer.domElement.addEventListener('pointermove', e => {
+  if (e.pointerType !== 'mouse' || !regionTipAllowed()) return;
+  if (e.buttons) { hideRegionTip(); return; } // dragging the view
+  _tipPending = [e.clientX, e.clientY];
+  if (_tipTimer) return;
+  _tipTimer = setTimeout(() => { // ~12 updates a second keeps raycasts cheap
+    _tipTimer = null;
+    if (_tipPending) showRegionTip(..._tipPending);
+  }, 80);
+});
+renderer.domElement.addEventListener('pointerleave', () => { _tipPending = null; hideRegionTip(); });
+controls.addEventListener('start', hideRegionTip);           // the view is about to move
+window.addEventListener('keydown', () => { if (slicer.sections) hideRegionTip(); });
+renderer.domElement.addEventListener('click', e => {
+  if (e.pointerType === 'mouse' || !regionTipAllowed()) return;
+  showRegionTip(e.clientX, e.clientY); // tap on touch screens
+});
 
 sliceToggle.addEventListener('click', () => setSlicing(!slicer.on));
 sliceAxes.addEventListener('change', e => {
@@ -1622,8 +1901,9 @@ sliceThick.addEventListener('input', () => {
 slicePlaneShow.addEventListener('change', () => { slicer.showPlane = slicePlaneShow.checked; });
 sliceFlip.addEventListener('click', () => { slicer.flip = !slicer.flip; updateSlicePlanes(); });
 sliceSweep.addEventListener('click', () => setSliceSweep(!slicer.sweep));
-window.addEventListener('devfeaturechange', e => { if (e.detail.id === 'slicer') applySlicerFeature(); });
+window.addEventListener('devfeaturechange', () => { applySlicerFeature(); applyDevModelButtons(); });
 applySlicerFeature();
+applyDevModelButtons();
 
 function addLabel(name, localPos, category = '', record = true) {
   if (!labelLayer) return;

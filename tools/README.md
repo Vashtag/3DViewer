@@ -47,3 +47,17 @@ and push.
   surface detail — only the file size drops (typically 80–90% smaller).
 - The texture is embedded in the GLB, so you don't need to ship the JPG
   separately.
+
+## The brain model (BrainGlobe atlas)
+
+`models/brain/` is generated, not scanned. To rebuild it (Python 3.10+):
+
+```bash
+pip install brainglobe-atlasapi trimesh fast-simplification
+python tools/build-brain.py
+cd tools && npx gltf-pipeline -i ../models/brain/brain.plain.glb -o ../models/brain/brain.glb -d --draco.compressionLevel 7
+rm ../models/brain/brain.plain.glb
+```
+
+See the top of `build-brain.py` for what it writes and how the atlas axes are
+mapped to the viewer's.
