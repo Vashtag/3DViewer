@@ -12,7 +12,9 @@ Writes to models/brain/:
   brain_sections.bin.gz  region index per voxel (uint8, 1 mm voxels), used by
                          the cross-section slicer to colour the cut face
   brain_mri.bin.gz       the atlas's MRI template on the same 1 mm grid
-                         (uint8), shown on the cut face in MRI mode
+                         (uint8), shown on the cut face in MRI mode (phones)
+  brain_mri_hd.bin.gz    the same template at its full 0.5 mm resolution,
+                         cropped to the brain (computers; see export_mri)
 
 Coordinates: the atlas is "asr" in micrometres (axis 0 -> posterior,
 1 -> inferior, 2 -> left). The viewer wants millimetres with +X = patient's
@@ -93,9 +95,33 @@ def export_mri(atlas, ann):
     with gzip.open(OUT / "brain_mri.bin.gz", "wb", compresslevel=9) as f:
         f.write(np.ascontiguousarray(mri).tobytes())
     print(f"MRI template {mri.shape}")
+
+    # Full 0.5 mm version for computers, cropped to the brain (+2 mm). To keep
+    # the download small it uses 128 grey levels (invisible once the GPU
+    # interpolates) and stores each A-slice as the difference from the one
+    # before (mod 256), which gzip packs far better; the viewer undoes it with
+    # a running sum over slices.
+    near = ndimage.binary_dilation(ann > 0, iterations=4)
+    occ = np.argwhere(near)
+    c0, c1 = occ.min(axis=0), occ.max(axis=0) + 1
+    hd = np.clip((t - lo) / (hi - lo) * 255, 0, 255).astype(np.uint8)
+    hd[~near] = 0
+    hd = hd[c0[0]:c1[0], c0[1]:c1[1], c0[2]:c1[2]] // 2 * 2
+    delta = np.diff(hd.astype(np.int16), axis=0, prepend=0).astype(np.uint8)
+    with gzip.open(OUT / "brain_mri_hd.bin.gz", "wb", compresslevel=9) as f:
+        f.write(np.ascontiguousarray(delta).tobytes())
+    print(f"MRI template HD {hd.shape} from voxel {c0.tolist()}")
+    a_n, s_n, r_n = hd.shape
     return {
         "file": "brain_mri.bin.gz",
-        "description": "Allen Human Reference Atlas MRI template (T2-weighted contrast), 1 mm",
+        "description": "Allen Human Reference Atlas MRI template (T2-weighted contrast)",
+        "hd": {
+            "file": "brain_mri_hd.bin.gz",
+            "dims": [r_n, s_n, a_n],                     # texture width, height, depth
+            "voxelScale": k,                             # section voxel = k x k x k of these
+            "corner": [int(c0[2]), int(c0[1]), int(c0[0])],  # (r, s, a) of the crop, in these voxels
+            "encoding": "delta-depth",                   # slice z stores slice z minus slice z-1
+        },
     }
 
 

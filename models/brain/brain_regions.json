@@ -1002,6 +1002,21 @@
  ],
  "mri": {
   "file": "brain_mri.bin.gz",
-  "description": "Allen Human Reference Atlas MRI template (T2-weighted contrast), 1 mm"
+  "description": "Allen Human Reference Atlas MRI template (T2-weighted contrast)",
+  "hd": {
+   "file": "brain_mri_hd.bin.gz",
+   "dims": [
+    379,
+    330,
+    370
+   ],
+   "voxelScale": 2,
+   "corner": [
+    7,
+    48,
+    45
+   ],
+   "encoding": "delta-depth"
+  }
  }
 }

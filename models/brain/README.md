@@ -10,9 +10,11 @@ which packages the Allen Human Reference Atlas (3D, 2020).
 - `brain_sections.bin.gz`: the atlas annotation resampled to 1 mm voxels, one
   byte per voxel holding the region index. The cross-section slicer uses it
   to colour the cut face by region.
-- `brain_mri.bin.gz`: the atlas's MRI template (T2-weighted contrast)
-  averaged to the same 1 mm grid, shown on its own when "Cut face" is set
-  to MRI. Downloaded only when first selected.
+- `brain_mri.bin.gz` / `brain_mri_hd.bin.gz`: the atlas's MRI template
+  (T2-weighted contrast), shown on the cut face when "Cut face" is set to
+  MRI. Computers get the full 0.5 mm scan (cropped to the brain, 128 grey
+  levels, slice-difference coded); phones the 1 mm one. Downloaded only
+  when first selected.
 - `brain_view.json`: makes the Superior view show anterior at the top.
 
 ## Attribution
