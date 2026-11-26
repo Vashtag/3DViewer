@@ -182,6 +182,8 @@ shortcutsModal.addEventListener('keydown', e => {
 //   slicer:   true to offer the Cross-section panel for this model.
 //   sections: optional <id>_regions.json with region names and a voxel
 //             volume used to colour the cut face by region (see the brain).
+//   credit:   optional source/licence line shown in the viewer's corner while
+//             the model is open: [{ text, href? }, …].
 const DEFAULT_VIEWS = [
   { label: 'Anterior',  dir: 'front' },
   { label: 'Posterior', dir: 'back'  },
@@ -244,25 +246,14 @@ const MODELS = [
     devFeature: 'brain',  // only listed while this developer feature is on
     slicer: true,         // shows the Cross-section panel
     sections: 'models/brain/brain_regions.json', // region names + section volume
-    rotation: [0, 0, 0],
-    views: [
-      { label: 'Anterior',  dir: 'front'  },
-      { label: 'Posterior', dir: 'back'   },
-      { label: 'Left',      dir: 'right'  },
-      { label: 'Right',     dir: 'left'   },
-      { label: 'Superior',  dir: 'top'    },
-      { label: 'Inferior',  dir: 'bottom' },
+    // Shown in the viewer's bottom-right corner while this model is open.
+    credit: [
+      { text: 'Allen Human Reference Atlas, 3D, 2020', href: 'https://atlas.brain-map.org' },
+      { text: '© Allen Institute' },
+      { text: 'Terms of use', href: 'https://alleninstitute.org/terms-of-use/' },
+      { text: 'Ding et al. 2016', href: 'https://doi.org/10.1002/cne.24080' },
+      { text: 'via BrainGlobe', href: 'https://brainglobe.info' },
     ],
-  },
-  {
-    // A real person's brain (MGH CDMD sub_013, CC0) from Planum, reconstructed
-    // with FreeSurfer: Desikan-Killiany cortex + aseg deep structures (built by
-    // tools/build-planum-brain.py). Same axes as the Allen brain.
-    id: 'brain-planum', label: 'Brain (Planum)', file: 'models/brain-planum/brain-planum.glb',
-    category: 'CNS',
-    devFeature: 'brain',
-    slicer: true,
-    sections: 'models/brain-planum/brain-planum_regions.json',
     rotation: [0, 0, 0],
     views: [
       { label: 'Anterior',  dir: 'front'  },
@@ -658,6 +649,28 @@ function showLoading(msg = 'Loading model…', poster = null) {
 
 function hideLoading() { loadingOverlay.classList.add('hidden'); }
 
+// Source / licence line for models that need one (e.g. atlas data), shown in
+// the viewer's bottom-right corner while that model is open.
+const modelCredit = document.getElementById('model-credit');
+function showModelCredit(model) {
+  modelCredit.replaceChildren();
+  const parts = model?.credit ?? [];
+  modelCredit.classList.toggle('hidden', !parts.length);
+  parts.forEach((part, i) => {
+    if (i) modelCredit.append(' · ');
+    if (part.href) {
+      const a = document.createElement('a');
+      a.href = part.href;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = part.text;
+      modelCredit.append(a);
+    } else {
+      modelCredit.append(part.text);
+    }
+  });
+}
+
 function showViewerUI() {
   emptyState.classList.add('hidden');
   bottomBar.classList.remove('hidden');
@@ -886,6 +899,7 @@ async function loadRegion(region) {
   const model = MODEL_BY_ID[region];
   if (!model) { console.error('Unknown model:', region); return; }
   activeModelDef = model;
+  showModelCredit(model);
   showLoading('Loading ' + model.label + '…', posterUrl(model));
   canvas.setAttribute('aria-label', `3D model of the ${model.label}. Arrow keys rotate, plus and minus zoom.`);
   setDrawMode(false);
@@ -1290,7 +1304,7 @@ const DEV_PASSWORD = 'developer';
 const DEV_FEATURES = [
   // { id: 'example', label: 'Example feature', description: 'What it does and what to test.' },
   { id: 'brain', label: 'Human brain + cross-sections',
-    description: 'Adds two Brain models under CNS to compare: the Allen Human Reference Atlas (via BrainGlobe) and a real person\'s brain from Planum (FreeSurfer). Both have a Cross-section panel: cut along a coronal, sagittal or transverse plane, see the regions on the cut face, and hover or tap to name them.' },
+    description: 'Adds a Brain model under CNS (Allen Human Reference Atlas via BrainGlobe) with a Cross-section panel: cut it along a coronal, sagittal or transverse plane, see the regions on the cut face, and hover or tap to name them.' },
 ];
 
 let devMode = localStorage.getItem('devMode') === '1';
