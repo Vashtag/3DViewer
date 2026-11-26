@@ -182,8 +182,6 @@ shortcutsModal.addEventListener('keydown', e => {
 //   slicer:   true to offer the Cross-section panel for this model.
 //   sections: optional <id>_regions.json with region names and a voxel
 //             volume used to colour the cut face by region (see the brain).
-//   layers:   optional groups of regions (needs `sections`) for the Structures
-//             panel: [{ id, label, groups: [...], except?: [...], rest? }].
 //   credit:   optional source/licence line shown in the viewer's corner while
 //             the model is open: [{ text, href? }, …].
 const DEFAULT_VIEWS = [
@@ -245,20 +243,8 @@ const MODELS = [
     // left, so the Left/Right buttons look from +X/-X respectively.
     id: 'brain', label: 'Brain (Allen atlas)', file: 'models/brain/brain.glb',
     category: 'CNS',
-    devFeature: 'brain',  // only listed while this developer feature is on
     slicer: true,         // shows the Cross-section panel
     sections: 'models/brain/brain_regions.json', // region names + section volume
-    // Structures panel: each layer gets an opacity slider. Regions are matched
-    // by their `group` in brain_regions.json; `rest` takes everything else.
-    layers: [
-      { id: 'cortex', label: 'Cerebral cortex',
-        groups: ['frontal lobe', 'parietal lobe', 'temporal lobe', 'occipital lobe', 'insular lobe',
-                 'limbic lobe', 'periallocortex', 'allocortex', ''],
-        except: ['HiH', 'HiB', 'HiT'] }, // hippocampus stays with the deep structures
-      { id: 'white', label: 'White matter', groups: ['white matter of forebrain', 'white matter of hindbrain'] },
-      { id: 'cerebellum', label: 'Cerebellum', groups: ['cerebellum'] },
-      { id: 'deep', label: 'Deep structures', rest: true },
-    ],
     // Shown in the viewer's bottom-right corner while this model is open.
     credit: [
       { text: 'Allen Human Reference Atlas, 3D, 2020', href: 'https://atlas.brain-map.org' },
@@ -1316,11 +1302,13 @@ settingsReset.addEventListener('click', () => {
 const DEV_PASSWORD = 'developer';
 const DEV_FEATURES = [
   // { id: 'example', label: 'Example feature', description: 'What it does and what to test.' },
-  { id: 'brain', label: 'Human brain + cross-sections',
-    description: 'Adds a Brain model under CNS (Allen Human Reference Atlas via BrainGlobe) with a Cross-section panel: cut it along a coronal, sagittal or transverse plane, see the regions on the cut face, and hover or tap to name them.' },
 ];
 
-let devMode = localStorage.getItem('devMode') === '1';
+// Developer mode is hidden from Settings unless the page address has ?dev
+// (e.g. index.html?dev); without it, it is always off.
+const DEV_ALLOWED = new URLSearchParams(location.search).has('dev');
+let devMode = DEV_ALLOWED && localStorage.getItem('devMode') === '1';
+document.getElementById('dev-section').style.display = DEV_ALLOWED ? '' : 'none';
 let devFlags = {};
 try { devFlags = JSON.parse(localStorage.getItem('devFlags') || '{}') || {}; } catch { devFlags = {}; }
 
@@ -1418,7 +1406,7 @@ devDisableBtn.addEventListener('click', () => {
 applyDevMode();
 
 // ── Cross-section slicer ──────────────────────────────────
-// Cuts the model with a plane (or keeps a thin slab between two planes), in
+// Cuts the model with a plane, in
 // the spirit of brainglobe-heatmap's Slicer. Only offered for models with
 // `slicer: true` (currently the dev-mode brain). The plane is defined in the
 // model's own anatomical frame (captured at load, where anterior faces +Z and
@@ -1464,8 +1452,6 @@ slicer = {
   face: 'atlas',     // cut face: 'atlas' colours, or 'mri' (the plain scan)
   tilt: [0, 0],      // degrees about the plane's two tilt axes (SLICE_TILTS)
   samplePts: null,   // model-local vertex sample for measuring extents
-  slab: false,
-  thick: 0.10,       // slab thickness, fraction of the extent
   flip: false,
   showPlane: true,
   sweep: null,       // { t } while sweeping
@@ -1490,10 +1476,6 @@ const sliceControls  = document.getElementById('slice-controls');
 const sliceAxes      = document.getElementById('slice-axes');
 const slicePos       = document.getElementById('slice-pos');
 const slicePosVal    = document.getElementById('slice-pos-val');
-const sliceSlab      = document.getElementById('slice-slab');
-const sliceThickRow  = document.getElementById('slice-thick-row');
-const sliceThick     = document.getElementById('slice-thick');
-const sliceThickVal  = document.getElementById('slice-thick-val');
 const slicePlaneShow = document.getElementById('slice-plane-show');
 const sliceFlip      = document.getElementById('slice-flip');
 const sliceSweep     = document.getElementById('slice-sweep');
@@ -1625,6 +1607,7 @@ async function loadSections(model) {
     initStructures(model);
     setSliceFace('atlas');
     sliceFace.classList.toggle('hidden', !slicer.sections.mriUrl);
+    sliceBarFace.classList.toggle('hidden', !slicer.sections.mriUrl);
   } catch (e) {
     console.error('Could not load the region sections:', e);
   }
@@ -1740,9 +1723,9 @@ async function loadSectionMri() {
 
 async function setSliceFace(face) {
   if (face !== 'atlas' && !slicer.sections?.mriTex) {
-    const btn = sliceFace.querySelector(`button[data-face="${face}"]`);
-    const label = btn?.textContent;
-    if (btn) { btn.textContent = '…'; btn.disabled = true; }
+    const btns = [...document.querySelectorAll(`#slice-face button[data-face="${face}"], #slice-bar-face button[data-face="${face}"]`)];
+    const labels = btns.map(b => b.textContent);
+    btns.forEach(b => { b.textContent = '…'; b.disabled = true; });
     try {
       await loadSectionMri();
     } catch (e) {
@@ -1750,12 +1733,13 @@ async function setSliceFace(face) {
       showToast('Could not load the MRI', '', false);
       face = 'atlas';
     } finally {
-      if (btn) { btn.textContent = label; btn.disabled = false; }
+      btns.forEach((b, i) => { b.textContent = labels[i]; b.disabled = false; });
     }
   }
   slicer.face = face;
   slicer.capGrey.value = face === 'mri' ? 1 : 0;
-  sliceFace.querySelectorAll('button[data-face]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.face === face)));
+  document.querySelectorAll('#slice-face button[data-face], #slice-bar-face button[data-face]')
+    .forEach(b => b.setAttribute('aria-pressed', String(b.dataset.face === face)));
   if (slicer.caps) {
     const u = slicer.caps.children[0].material.uniforms;
     u.uMri.value = slicer.sections?.mriTex ?? null;
@@ -1911,12 +1895,8 @@ function updateSlicePlanes() {
   const { min, max } = sliceExtent();
   const span = max - min;
   const c = min + slicer.pos * span;
-  const [p0, p1] = slicer.localPlanes;
-  if (slicer.slab) {
-    const h = (slicer.thick * span) / 2;
-    p0.set(n.clone(), -(c - h));        // keep n·x >= c - h
-    p1.set(n.clone().negate(), c + h);  // keep n·x <= c + h
-  } else if (slicer.flip) {
+  const p0 = slicer.localPlanes[0];
+  if (slicer.flip) {
     p0.set(n.clone(), -c);              // keep the anterior/left/superior side
   } else {
     p0.set(n.clone().negate(), c);      // keep the posterior/right/inferior side
@@ -1928,7 +1908,7 @@ function updateSlicePlanes() {
     sliceTilt[i].value = String(slicer.tilt[i]);
   });
   sliceStraighten.disabled = !slicer.tilt[0] && !slicer.tilt[1];
-  sliceThickVal.textContent = Math.round(slicer.thick * 100) + '%';
+  syncSliceBar();
 }
 
 function buildSliceHelpers() {
@@ -1973,7 +1953,7 @@ function updateSlicer(dt) {
     if (slicer.sweep.t >= 1) setSliceSweep(false);
   }
 
-  const count = slicer.slab ? 2 : 1;
+  const count = 1; // one cutting plane (the code supports two)
   for (let i = 0; i < count; i++) {
     slicer.worldPlanes[i].copy(slicer.localPlanes[i]).applyMatrix4(currentModel.matrixWorld);
   }
@@ -2061,6 +2041,8 @@ function setSlicing(on) {
   sliceToggle.setAttribute('aria-pressed', String(on));
   sliceToggle.textContent = on ? 'Stop slicing' : 'Slice model';
   sliceControls.classList.toggle('hidden', !on);
+  sliceBar.classList.toggle('hidden', !on); // phones only (CSS)
+  container.classList.toggle('slicing', on);
   slicer.capOn.value = on ? 1 : 0;
   setSliceMaterialsDoubleSided(on);
   if (on) {
@@ -2132,7 +2114,7 @@ function pickRegionAt(clientX, clientY) {
     if (!ray.intersectBox(_tipBox, _tipP)) return null;
     t = ray.origin.distanceTo(_tipP);
   }
-  const planes = slicer.on ? slicer.localPlanes.slice(0, slicer.slab ? 2 : 1) : [];
+  const planes = slicer.on ? slicer.localPlanes.slice(0, 1) : [];
   const step = v * 0.5;
   const end = t + _tipBox.min.distanceTo(_tipBox.max);
   for (; t <= end; t += step) {
@@ -2201,77 +2183,97 @@ renderer.domElement.addEventListener('pointermove', e => {
 });
 renderer.domElement.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') hideRegionTip(); });
 
-// Touch / pen: a quick tap without moving names the region under the finger.
-// (Uses pointer events rather than "click", which touch browsers don't
-// always send after a tap on the 3D canvas.)
-let _tapStart = null;
-// On models with a Structures panel, a click or tap without dragging opens
-// the isolate / hide pop-up for the structure under it instead.
+// Pointer gestures on the 3D view (models with region sections):
+//   • tap (touch)                   → name tip for the region under the finger
+//   • right-click, or press & hold  → Isolate pop-up for that structure
+//     (mouse or finger, ~half a second without moving)
+// A plain mouse click does nothing extra (hovering already names things),
+// apart from closing an open pop-up. Pointer events are used rather than
+// "click", which touch browsers don't always send after a tap on the canvas.
+const LONG_PRESS_MS = 550;
+let _press = null; // { x, y, t, touch, button, timer, long }
+
+function cancelLongPress() {
+  if (_press?.timer) clearTimeout(_press.timer);
+  if (_press) _press.timer = null;
+}
+
 renderer.domElement.addEventListener('pointerdown', e => {
-  if (e.pointerType === 'mouse' && e.button !== 0) { _tapStart = null; return; }
-  _tapStart = e.isPrimary ? { x: e.clientX, y: e.clientY, t: performance.now() } : null;
+  cancelLongPress();
+  _press = null;
+  if (!e.isPrimary || !regionTipAllowed()) return;
+  const touch = e.pointerType !== 'mouse';
+  _press = { x: e.clientX, y: e.clientY, t: performance.now(), touch, button: e.button, timer: null, long: false };
+  if (e.button === 0 && structState.active) {
+    const press = _press;
+    press.timer = setTimeout(() => {
+      press.timer = null;
+      if (_press !== press) return;
+      press.long = true;
+      if (onStructureMenu(press.x, press.y, press.touch)) navigator.vibrate?.(12);
+    }, LONG_PRESS_MS);
+  }
+});
+renderer.domElement.addEventListener('pointermove', e => {
+  if (!_press || !e.isPrimary) return;
+  if (Math.hypot(e.clientX - _press.x, e.clientY - _press.y) > (_press.touch ? 10 : 5)) {
+    cancelLongPress();
+    _press = null; // it's a drag (rotate / pan), not a tap or press
+  }
 });
 renderer.domElement.addEventListener('pointerup', e => {
-  if (!_tapStart) return;
-  const moved = Math.hypot(e.clientX - _tapStart.x, e.clientY - _tapStart.y);
-  const quick = performance.now() - _tapStart.t < 500;
-  _tapStart = null;
-  if (moved > (e.pointerType === 'mouse' ? 4 : 10) || !quick || !regionTipAllowed()) return;
-  if (structState.active && !structSection.classList.contains('hidden')) onStructureClick(e.clientX, e.clientY, e.pointerType !== 'mouse');
-  else if (e.pointerType !== 'mouse') showRegionTipAt(e.clientX, e.clientY, true);
+  const press = _press;
+  cancelLongPress();
+  _press = null;
+  if (!press || !e.isPrimary || !regionTipAllowed()) return;
+  if (press.long) return; // the long press already opened the pop-up
+  const quick = performance.now() - press.t < LONG_PRESS_MS;
+  if (press.button === 2) { // right-click
+    if (structState.active) onStructureMenu(e.clientX, e.clientY, false);
+    return;
+  }
+  if (!quick) return;
+  if (!structPop.classList.contains('hidden')) { closeStructPop(); return; }
+  if (press.touch) showRegionTipAt(e.clientX, e.clientY, true); // tap: name it
 });
-renderer.domElement.addEventListener('pointercancel', () => { _tapStart = null; });
+renderer.domElement.addEventListener('pointercancel', () => { cancelLongPress(); _press = null; });
+// No browser menu on right-click over the model (right-click opens ours).
+renderer.domElement.addEventListener('contextmenu', e => { if (structState.active) e.preventDefault(); });
 
 controls.addEventListener('start', () => { if (slicer.sections) hideRegionTip(); }); // the view is about to move
 window.addEventListener('keydown', () => { if (slicer.sections) hideRegionTip(); });
 
-// ── Structures: show / hide layers, isolate / hide (models with `layers`) ──
-// In the spirit of brainglobe-heatmap's per-region alpha: each layer of the
-// model (cortex, white matter, ...) gets an on/off button, and clicking a
-// structure on the model opens a small pop-up to isolate or hide it. Hidden
-// structures also drop out of the cut face, and hover / click see through
-// them.
+// ── Structures: isolate (models with region sections) ──
+// Right-click or press and hold a structure on the model to open a small
+// pop-up with Isolate; "Show whole brain" (floating button, or the pop-up on
+// the isolated structure) brings everything back. Hidden structures also drop
+// out of the cut face, and hover / tap see through them.
 // `var` so code that runs before this block (render loop, caps) can check it.
 var structState = {
   active: false,
-  layers: [],          // [{ id, label, groups, except, rest, opacity (0|1), regions: [...] }]
-  regionLayer: [],     // region index -> its layer
   meshes: new Map(),   // region index -> [mesh]
-  hidden: new Set(),   // region indices hidden one by one (Hide / Isolate)
+  hidden: new Set(),   // region indices hidden by Isolate
   selected: null,      // region shown in the pop-up
 };
 
 const structSection   = document.getElementById('struct-section');
-const structLayersEl  = document.getElementById('struct-layers');
-const structShowAll   = document.getElementById('struct-show-all');
 const structPop       = document.getElementById('struct-pop');
 const structPopName   = document.getElementById('struct-pop-name');
 const structPopIsolate = document.getElementById('struct-pop-isolate');
-const structPopHide   = document.getElementById('struct-pop-hide');
 const structPopClose  = document.getElementById('struct-pop-close');
+const isolateRestore  = document.getElementById('isolate-restore');
 
 const structName = r => r.name.charAt(0).toUpperCase() + r.name.slice(1);
 
-function regionOpacity(idx) {
-  if (structState.hidden.has(idx)) return 0;
-  return structState.regionLayer[idx]?.opacity ?? 1;
-}
-// Hover and click pass through hidden structures.
+function regionOpacity(idx) { return structState.hidden.has(idx) ? 0 : 1; }
+// Hover and taps pass through hidden structures.
 function regionPickable(region) {
-  return !structState.active || regionOpacity(region.index) >= 0.5;
+  return !structState.active || regionOpacity(region.index) > 0;
 }
 
 function initStructures(model) {
   resetStructures();
-  if (!model.layers || !slicer.sections || activeModelDef !== model) return;
-  const regions = slicer.sections.regions.filter(Boolean);
-  structState.layers = model.layers.map(l => ({ ...l, opacity: 1, regions: [] }));
-  const rest = structState.layers.find(l => l.rest);
-  regions.forEach(r => {
-    const layer = structState.layers.find(l => !l.rest && l.groups?.includes(r.group) && !l.except?.includes(r.acronym)) ?? rest;
-    structState.regionLayer[r.index] = layer;
-    layer?.regions.push(r);
-  });
+  if (!slicer.sections || activeModelDef !== model) return;
   currentModel.traverse(o => {
     if (!o.isMesh || o.userData.sliceOutline || o.userData.sliceStencil) return;
     const r = slicer.sections.byAcronym[o.name];
@@ -2279,24 +2281,21 @@ function initStructures(model) {
     if (!structState.meshes.has(r.index)) structState.meshes.set(r.index, []);
     structState.meshes.get(r.index).push(o);
   });
-  structState.active = true;
-  buildLayerButtons();
+  structState.active = structState.meshes.size > 0;
+  structSection.classList.toggle('hidden', !structState.active);
   applyStructures();
-  applyStructuresFeature();
 }
 
 function resetStructures() {
   closeStructPop();
   structState.active = false;
-  structState.layers = [];
-  structState.regionLayer = [];
   structState.meshes = new Map();
   structState.hidden = new Set();
-  structLayersEl.replaceChildren();
   structSection.classList.add('hidden');
+  isolateRestore.classList.add('hidden');
 }
 
-// Pushes the current state to the meshes and the cut face.
+// Pushes the current state to the meshes, the cut face and the restore button.
 function applyStructures() {
   if (!structState.active) return;
   structState.meshes.forEach((list, idx) => {
@@ -2308,6 +2307,7 @@ function applyStructures() {
     sec.regions.forEach(r => { if (r) sec.palData[r.index * 4 + 3] = regionOpacity(r.index) > 0 ? 255 : 0; });
     sec.pal.needsUpdate = true;
   }
+  isolateRestore.classList.toggle('hidden', structState.hidden.size === 0);
 }
 
 function setEmissive(idx, on) {
@@ -2332,20 +2332,19 @@ function isIsolated(region) {
     && !structState.hidden.has(region.index);
 }
 
-// Opens the pop-up for `region` next to the click / tap point.
+// Opens the pop-up for `region` next to the pointer / finger.
 function openStructPop(region, clientX, clientY, touch) {
   setSelected(region);
   structPopName.textContent = structName(region);
   const isolated = isIsolated(region);
-  structPopIsolate.textContent = isolated ? 'Show all' : 'Isolate';
+  structPopIsolate.textContent = isolated ? 'Show whole brain' : 'Isolate';
   structPopIsolate.dataset.action = isolated ? 'show-all' : 'isolate';
   structPop.classList.remove('hidden');
-  // Same placement rules as the name tip: beside the cursor, above a finger,
-  // always inside the viewer.
+  // Beside the cursor, above a finger, always inside the viewer.
   const rect = container.getBoundingClientRect();
   const w = structPop.offsetWidth, h = structPop.offsetHeight;
-  let left = clientX - rect.left + (touch ? -w / 2 : 14);
-  let top  = clientY - rect.top  + (touch ? -h - 28 : 14);
+  const left = clientX - rect.left + (touch ? -w / 2 : 14);
+  let top = clientY - rect.top + (touch ? -h - 28 : 14);
   if (top < 8) top = clientY - rect.top + 28;
   structPop.style.left = `${Math.max(8, Math.min(left, rect.width - w - 8))}px`;
   structPop.style.top  = `${Math.max(8, Math.min(top, rect.height - h - 8))}px`;
@@ -2356,46 +2355,19 @@ function closeStructPop() {
   setSelected(null);
 }
 
-// A click or tap on the model: open the pop-up for what's under it, or close
-// it when clicking empty space.
-function onStructureClick(clientX, clientY, touch) {
+// Right-click / long press: open the pop-up for what's under the pointer.
+// Returns true when there was a structure there.
+function onStructureMenu(clientX, clientY, touch) {
   const hit = pickRegionAt(clientX, clientY);
-  if (!hit) { closeStructPop(); return; }
+  if (!hit) { closeStructPop(); return false; }
   hideRegionTip();
   openStructPop(hit.region, clientX, clientY, touch);
+  return true;
 }
 
 function showAllStructures() {
   structState.hidden.clear();
-  structState.layers.forEach(l => setLayerOpacity(l, 1));
   applyStructures();
-}
-
-// Layers are all or nothing: shown (opacity 1) or hidden (0).
-function setLayerOpacity(layer, value) {
-  layer.opacity = value;
-  const btn = structLayersEl.querySelector(`button[data-layer="${layer.id}"]`);
-  if (btn) btn.setAttribute('aria-pressed', String(value > 0));
-}
-
-function buildLayerButtons() {
-  structLayersEl.replaceChildren();
-  structState.layers.forEach(layer => {
-    // On/off toggle per layer (pressed = shown).
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'struct-layer-btn';
-    btn.id = `struct-layer-${layer.id}`;
-    btn.dataset.layer = layer.id;
-    btn.setAttribute('aria-pressed', 'true');
-    btn.textContent = layer.label;
-    btn.addEventListener('click', () => {
-      setLayerOpacity(layer, layer.opacity > 0 ? 0 : 1);
-      applyStructures();
-      announce(`${layer.label} ${layer.opacity > 0 ? 'shown' : 'hidden'}`);
-    });
-    structLayersEl.append(btn);
-  });
 }
 
 structPopIsolate.addEventListener('click', () => {
@@ -2403,41 +2375,56 @@ structPopIsolate.addEventListener('click', () => {
   if (!r) return;
   if (structPopIsolate.dataset.action === 'show-all') {
     showAllStructures();
+    announce('Showing the whole brain');
   } else {
     structState.hidden = new Set(structState.meshes.keys());
     structState.hidden.delete(r.index);
-    const layer = structState.regionLayer[r.index];
-    if (layer && layer.opacity < 1) setLayerOpacity(layer, 1);
     applyStructures();
     announce(`Showing only ${r.name}`);
   }
   closeStructPop();
 });
-structPopHide.addEventListener('click', () => {
-  const r = structState.selected;
-  if (!r) return;
-  structState.hidden.add(r.index);
-  closeStructPop();
-  applyStructures();
-  announce(`${structName(r)} hidden`);
-});
 structPopClose.addEventListener('click', closeStructPop);
-structShowAll.addEventListener('click', () => { closeStructPop(); showAllStructures(); });
+isolateRestore.addEventListener('click', () => {
+  closeStructPop();
+  showAllStructures();
+  announce('Showing the whole brain');
+});
 controls.addEventListener('start', () => { if (!structPop.classList.contains('hidden')) closeStructPop(); });
 window.addEventListener('keydown', e => { if (e.key === 'Escape' && !structPop.classList.contains('hidden')) closeStructPop(); });
 
-function applyStructuresFeature() {
-  const feature = activeModelDef?.devFeature;
-  const on = structState.active && (!feature || isDevFeatureEnabled(feature));
-  structSection.classList.toggle('hidden', !on);
-  if (!on && structState.active) { // feature switched off: put the model back to normal
-    closeStructPop();
-    showAllStructures();
-  }
-}
-window.addEventListener('devfeaturechange', applyStructuresFeature);
+sliceToggle.addEventListener('click', () => {
+  setSlicing(!slicer.on);
+  if (slicer.on && PHONE_LAYOUT.matches) closeDrawer(); // controls are on the main view
+});
 
-sliceToggle.addEventListener('click', () => setSlicing(!slicer.on));
+// ── Phones: slice bar on the main view (mirrors the sidebar controls) ──
+const PHONE_LAYOUT = window.matchMedia('(max-width: 600px)');
+const sliceBar      = document.getElementById('slice-bar');
+const sliceBarAxes  = document.getElementById('slice-bar-axes');
+const sliceBarPos   = document.getElementById('slice-bar-pos');
+const sliceBarFace  = document.getElementById('slice-bar-face');
+function syncSliceBar() {
+  sliceBarAxes.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.axis === slicer.axis)));
+  sliceBarPos.value = String(Math.round(slicer.pos * 1000));
+}
+sliceBarAxes.addEventListener('click', e => {
+  const btn = e.target.closest('button[data-axis]');
+  if (!btn) return;
+  const radio = sliceAxes.querySelector(`input[value="${btn.dataset.axis}"]`);
+  radio.checked = true;
+  radio.dispatchEvent(new Event('change', { bubbles: true }));
+});
+sliceBarPos.addEventListener('input', () => {
+  slicePos.value = sliceBarPos.value;
+  slicePos.dispatchEvent(new Event('input'));
+});
+sliceBarFace.addEventListener('click', e => {
+  const btn = e.target.closest('button[data-face]');
+  if (btn && !btn.disabled) setSliceFace(btn.dataset.face);
+});
+document.getElementById('slice-bar-more').addEventListener('click', openDrawer);
+document.getElementById('slice-bar-done').addEventListener('click', () => setSlicing(false));
 sliceAxes.addEventListener('change', e => {
   if (e.target.name !== 'slice-axis') return;
   slicer.axis = e.target.value;
@@ -2456,16 +2443,6 @@ sliceFace.addEventListener('click', e => {
 slicePos.addEventListener('input', () => {
   setSliceSweep(false);
   slicer.pos = Number(slicePos.value) / 1000;
-  updateSlicePlanes();
-});
-sliceSlab.addEventListener('change', () => {
-  slicer.slab = sliceSlab.checked;
-  sliceThickRow.classList.toggle('hidden', !slicer.slab);
-  sliceFlip.disabled = slicer.slab; // a slab has no "side" to flip
-  updateSlicePlanes();
-});
-sliceThick.addEventListener('input', () => {
-  slicer.thick = Number(sliceThick.value) / 100;
   updateSlicePlanes();
 });
 slicePlaneShow.addEventListener('change', () => { slicer.showPlane = slicePlaneShow.checked; });
