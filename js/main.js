@@ -6,6 +6,7 @@ import { PointerLockControls } from './PointerLockControls.js';
 import { CSS2DRenderer, CSS2DObject } from './CSS2DRenderer.js';
 import { scormModelOpened, scormReportInteraction, scormReportScore } from './scorm.js';
 import { createVisualPathway, LESIONS, LESION_BY_ID, fieldLoss, fieldChartSVG, PATHWAY_LABELS } from './visual-pathway.js';
+import { createEyeMovements, OCULAR_LESIONS, OCULAR_BY_ID, OCULAR_LABELS, GAZES, gazeCellSVG } from './eye-movements.js';
 
 // ── DOM refs ──────────────────────────────────────────────
 const canvas          = document.getElementById('viewer-canvas');
@@ -289,6 +290,23 @@ const MODELS = [
       { label: 'Posterior', dir: 'back'   },
     ],
   },
+  {
+    // Eye movements, CN III / IV / VI and pupils (js/eye-movements.js), built
+    // in code: pick a lesion and a gaze position, shine a penlight.
+    id: 'eye-movements', label: 'Eye Movements', build: () => buildOcularModel(),
+    devFeature: 'visual', // developer mode only, while in testing
+    noFly: true,
+    ocular: true,         // shows the lesion panel with the gaze chart
+    labels: OCULAR_LABELS,
+    views: [
+      { label: 'Anterior',  dir: 'front'  },
+      { label: 'Superior',  dir: 'top'    },
+      { label: 'Left',      dir: 'right'  },
+      { label: 'Right',     dir: 'left'   },
+      { label: 'Inferior',  dir: 'bottom' },
+      { label: 'Posterior', dir: 'back'   },
+    ],
+  },
 ];
 const MODEL_BY_ID = Object.fromEntries(MODELS.map(m => [m.id, m]));
 
@@ -371,6 +389,7 @@ const keys = { w: false, a: false, s: false, d: false, up: false, down: false };
 // Q/E roll the camera in orbit mode (rotate the view around its own axis).
 const rollKeys = { ccw: false, cw: false };
 let prevTime = performance.now();
+let ocular = null; // the Eye Movements controller while that model is open (see openOcular)
 
 function flySpeedPerSec() {
   return Math.max(fitRadius * 0.9, 1); // scale movement to model size
@@ -627,6 +646,7 @@ function animate() {
   }
 
   updateSlicer(dt); // cross-section planes follow the model (dev feature)
+  ocular?.update(dt); // eyes, lids and pupils move toward their targets
 
   // Keep the headlamp at the camera so the viewed face is always lit.
   headlamp.position.copy(camera.position);
@@ -1021,6 +1041,7 @@ async function loadRegion(region) {
       initPinLayer();
       setTimeout(() => { hideLoading(); modelArrived(); }, 300); // model on screen: the big downloads may start
       if (model.pathway) openPathway();
+      if (model.ocular) openOcular();
   };
 
   // Models made in code are built right away; the rest load from their file.
@@ -1359,8 +1380,8 @@ settingsReset.addEventListener('click', () => {
 const DEV_PASSWORD = 'developer';
 const DEV_FEATURES = [
   // { id: 'example', label: 'Example feature', description: 'What it does and what to test.' },
-  { id: 'visual', label: 'Visual pathway & lesions',
-    description: 'Adds a schematic Visual Pathway model: pick a lesion site (optic nerve to visual cortex) and see the visual field defect in each eye.' },
+  { id: 'visual', label: 'Visual pathway & eye movements',
+    description: 'Adds two schematic models. Visual Pathway: pick a lesion site (optic nerve to visual cortex) and see the visual field defect in each eye. Eye Movements: CN III, IV and VI, MLF and gaze lesions, Horner and RAPD, with a nine-gaze chart and a penlight.' },
 ];
 
 // Developer mode is hidden from Settings unless the page address has ?dev
@@ -4382,7 +4403,7 @@ function setPathwayLesion(id, side) {
 // Phones: the lesion panel is a bottom sheet, so shift the picture up (via the
 // camera's view offset) to keep the pathway in the space above it.
 function applyPathwayViewOffset() {
-  if (!pathway || !quizPanel.classList.contains('hidden')) return;
+  if (!(pathway || ocular) || !quizPanel.classList.contains('hidden')) return;
   const w = renderer.domElement.clientWidth;
   const h = renderer.domElement.clientHeight;
   if (!window.matchMedia('(max-width: 600px)').matches || !w || !h) { camera.clearViewOffset(); return; }
@@ -4405,6 +4426,9 @@ function openPathway() {
 function closePathway() {
   pathway?.dispose();
   pathway = null;
+  ocular?.dispose();
+  ocular = null;
+  lesionFields.classList.remove('eom');
   _pathwayDockObs.disconnect();
   camera.clearViewOffset();
   lesionDock.classList.add('hidden');
@@ -4413,23 +4437,106 @@ function closePathway() {
 
 lesionList.addEventListener('click', e => {
   const b = e.target.closest('button[data-lesion]');
-  if (b) setPathwayLesion(b.dataset.lesion || null);
+  if (!b) return;
+  if (ocular) setOcularLesion(b.dataset.lesion || null);
+  else setPathwayLesion(b.dataset.lesion || null);
 });
 lesionSide.addEventListener('click', e => {
   const b = e.target.closest('button[data-side]');
-  if (b && pathway) setPathwayLesion(pathway.lesion.id, b.dataset.side);
+  if (b && ocular) setOcularLesion(ocular.lesion.id, b.dataset.side);
+  else if (b && pathway) setPathwayLesion(pathway.lesion.id, b.dataset.side);
 });
 
 // Click a numbered marker on the pathway to pick that lesion.
 const _lesionRay = new THREE.Raycaster();
 const _lesionNdc = new THREE.Vector2();
 renderer.domElement.addEventListener('click', e => {
-  if (!pathway || navMode !== 'orbit' || currentClickMode() !== null) return;
+  const sim = pathway || ocular;
+  if (!sim || navMode !== 'orbit' || currentClickMode() !== null) return;
   const rect = renderer.domElement.getBoundingClientRect();
   _lesionNdc.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
   _lesionRay.setFromCamera(_lesionNdc, camera);
-  const hit = _lesionRay.intersectObjects(pathway.markers.filter(m => m.visible), false)[0];
+  const hit = _lesionRay.intersectObjects(sim.markers.filter(m => m.visible), false)[0];
   if (!hit) return;
   const { id, side } = hit.object.userData.lesion;
-  setPathwayLesion(id, side ?? pathway.lesion.side);
+  if (ocular) setOcularLesion(id, side);
+  else setPathwayLesion(id, side ?? pathway.lesion.side);
+});
+
+// ── Eye movements (dev feature 'visual') ─────────────────
+// The Eye Movements model (js/eye-movements.js) shares the lesion panel: the
+// chart area holds the nine-gaze chart (click a cell to make the patient look
+// there), Near (convergence) and the penlight.
+function buildOcularModel() {
+  ocular?.dispose();
+  ocular = createEyeMovements({ CSS2DObject });
+  return ocular.group;
+}
+
+const LIGHT_MODES = [['off', 'Off'], ['R', 'Right eye'], ['L', 'Left eye'], ['swing', 'Swing']];
+function renderOcularPanel() {
+  if (!ocular) return;
+  const { id, side } = ocular.lesion;
+  const lesion = OCULAR_BY_ID[id];
+  const g = ocular.gaze;
+  const st = ocular.state;
+  lesionSide.querySelectorAll('button[data-side]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.side === side)));
+  lesionSide.classList.remove('muted');
+  lesionList.querySelectorAll('button[data-lesion]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lesion === (id || ''))));
+  const word = h => (h > 0 ? "patient's left" : "patient's right");
+  const cellName = c => (c.h === 0 && c.v === 0) ? 'Straight ahead'
+    : [c.v > 0 ? 'Up' : c.v < 0 ? 'Down' : '', c.h ? `to the ${word(c.h)}` : ''].filter(Boolean).join(' and ').replace(/^to/, 'To');
+  const cells = GAZES.map((c, i) => {
+    const on = !g.near && c.h === g.h && c.v === g.v;
+    return `<button type="button" class="eom-cell" data-gaze="${i}" aria-pressed="${on}" title="${cellName(c)}" aria-label="Look: ${cellName(c)}">${gazeCellSVG(st, c)}</button>`;
+  }).join('');
+  lesionFields.innerHTML = `
+    <div class="eom-grid" role="group" aria-label="Gaze positions">${cells}</div>
+    <div class="eom-caption">As you face the patient (their left eye on your right). Click a position to make them look there.</div>
+    <div class="eom-row">
+      <button type="button" class="eom-near" data-gaze="near" aria-pressed="${g.near}" title="Look at a near target: both eyes turn in">Near</button>
+      <div class="dock-seg eom-light" role="group" aria-label="Penlight">
+        ${LIGHT_MODES.map(([m, t]) => `<button type="button" data-light="${m}" aria-pressed="${ocular.light === m}">${t}</button>`).join('')}
+      </div>
+    </div>`;
+  lesionDefect.textContent = lesion ? lesion.defect(side) : 'Normal eye movements and pupils';
+  lesionNote.textContent = lesion
+    ? lesion.note(side)
+    : 'Pick a lesion, or click a numbered marker. Muscles and nerves are coloured by nerve: CN III orange, CN IV purple, CN VI teal; the MLF is blue. Use the penlight to test the pupils.';
+}
+
+function setOcularLesion(id, side) {
+  if (!ocular) return;
+  ocular.setLesion(id, side ?? ocular.lesion.side);
+  renderOcularPanel();
+  const l = OCULAR_BY_ID[id];
+  if (l) announce(`${l.name}: ${l.defect(ocular.lesion.side)}`);
+}
+
+function openOcular() {
+  if (!ocular) return;
+  lesionList.innerHTML = '<button type="button" data-lesion="" aria-pressed="true">None</button>'
+    + OCULAR_LESIONS.map(l => `<button type="button" data-lesion="${l.id}"><b>${l.num}</b> ${l.name}</button>`).join('');
+  lesionFields.classList.add('eom');
+  lesionDock.classList.remove('hidden');
+  container.classList.add('pathway-open');
+  renderOcularPanel();
+  _pathwayDockObs.observe(lesionDock);
+  _pathwayDockObs.observe(container);
+  applyPathwayViewOffset();
+}
+
+lesionFields.addEventListener('click', e => {
+  if (!ocular) return;
+  const gb = e.target.closest('[data-gaze]');
+  const lb = e.target.closest('[data-light]');
+  if (gb) {
+    const g = gb.dataset.gaze === 'near'
+      ? (ocular.gaze.near ? { h: 0, v: 0 } : { near: true })
+      : GAZES[+gb.dataset.gaze];
+    ocular.setGaze(g);
+  } else if (lb) {
+    ocular.setLight(lb.dataset.light);
+  } else return;
+  renderOcularPanel();
 });

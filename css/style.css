@@ -2049,6 +2049,7 @@ body:not(.dev-mode) .dev-only { display: none !important; }
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
 }
 #lesion-dock.hidden { display: none; }
+#lesion-dock > * { flex-shrink: 0; } /* scroll the panel; never squash a row */
 .lesion-head { display: flex; align-items: center; gap: 10px; }
 .lesion-title { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
 #lesion-side { flex: 1; }
@@ -2085,6 +2086,29 @@ body:not(.dev-mode) .dev-only { display: none !important; }
 #lesion-note   { order: 3; }
 #lesion-list   { order: 4; }
 #lesion-defect, #lesion-note { margin: 0; }
+/* Eye Movements: nine-gaze chart (examiner's view), Near and penlight */
+.eom-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.eom-cell {
+  padding: 2px; border-radius: 7px; border: 1px solid var(--border, #2b2f42);
+  background: rgba(255,255,255,0.03); cursor: pointer; line-height: 0;
+}
+.eom-cell:hover { border-color: #5b6280; }
+.eom-cell[aria-pressed="true"] { border-color: var(--accent, #5b8cff); background: rgba(91,140,255,0.14); }
+.eom-cell svg { width: 100%; height: auto; display: block; }
+.eom-sclera { fill: #ece7df; }
+.eom-iris { fill: #5b7fa6; }
+.eom-pupil { fill: #07080b; }
+.eom-lid { fill: #c99a86; }
+.eom-rim { fill: none; stroke: #8f7466; stroke-width: 1; }
+.eom-caption { font-size: 0.7rem; color: var(--text-muted); line-height: 1.35; margin-top: 5px; }
+.eom-row { display: flex; gap: 6px; align-items: stretch; margin-top: 8px; }
+.eom-near {
+  padding: 4px 10px; border-radius: 7px; border: 1px solid var(--border, #2b2f42);
+  background: transparent; color: var(--text); font-size: 0.75rem; cursor: pointer;
+}
+.eom-near[aria-pressed="true"] { border-color: var(--accent, #5b8cff); background: rgba(91,140,255,0.18); }
+.eom-light { flex: 1; }
+.eom-light button { font-size: 0.72rem; padding-inline: 4px; }
 .lesion-tag {
   padding: 1px 6px; border-radius: 9px; background: rgba(15, 17, 23, 0.85); border: 1px solid #8a8fa8;
   color: #e8eaf0; font: 600 11px system-ui, sans-serif; pointer-events: none;
@@ -2096,6 +2120,7 @@ body:not(.dev-mode) .dev-only { display: none !important; }
   #lesion-dock { top: auto; left: 10px; right: 10px; bottom: 10px; width: auto; max-height: 48%; }
   #lesion-list { flex-direction: row; overflow-x: auto; }
   #lesion-list { order: 0; }
+  .eom-grid { max-width: 250px; margin: 0 auto; width: 100%; }
   #lesion-list button { white-space: nowrap; flex-shrink: 0; }
   #lesion-fields svg { max-width: 300px; margin: 0 auto; }
   #viewer-container.pathway-open #bottom-bar { display: none; }
