@@ -231,7 +231,6 @@ const MODELS = [
   },
   {
     id: 'brainstem', label: 'Brainstem', file: 'models/brainstem/brainstem.glb',
-    category: 'CNS',
     rotation: [0, 0, 0],
     brightness: 2.2,
     views: [
@@ -244,7 +243,6 @@ const MODELS = [
     // One mesh per atlas region, in the atlas colours. +X is the patient's
     // left, so the Left/Right buttons look from +X/-X respectively.
     id: 'brain', label: 'Sliceable Brain', file: 'models/brain/brain.glb',
-    category: 'CNS',
     slicer: true,         // shows the Cross-section panel
     noFly: true,          // orbit only (no Fly mode)
     sliceByDefault: true, // opens already sliced
@@ -1630,9 +1628,9 @@ function startSectionsFetch(model, modelReady = Promise.resolve()) {
     return r.json();
   });
   const vol = meta.then(m => loadVolume(base + m.sections.file));
-  // The full-resolution region map (computers only).
+  // The full-resolution region map (every device).
   const hd = Promise.all([meta, modelReady])
-    .then(([m]) => (MRI_HD && m.mri?.hd?.labels ? loadVolume(base + m.mri.hd.labels) : null));
+    .then(([m]) => (m.mri?.hd?.labels ? loadVolume(base + m.mri.hd.labels) : null));
   const entry = { base, meta, vol, hd };
   [meta, vol, hd].forEach(p => p.catch(() => { _sectionsFetch.delete(model.id); })); // retry next time
   _sectionsFetch.set(model.id, entry);
@@ -1685,17 +1683,23 @@ async function loadSections(model) {
       mriTex: null,
       mriScale: new THREE.Vector3(1, 1, 1),
       mriOffset: new THREE.Vector3(0, 0, 0),
-      labelsHdTex: null, // the 0.5 mm region map (computers), loaded after this
+      // The 0.5 mm grid (cropped), shared by the full-resolution region map
+      // (every device) and the 0.5 mm MRI (computers).
+      hdGrid: meta.mri?.hd ?? null,
+      hdScale: new THREE.Vector3(1, 1, 1),
+      hdOffset: new THREE.Vector3(0, 0, 0),
+      labelsHdTex: null, // the 0.5 mm region map, loaded after this
     };
     const sec = slicer.sections;
-    if (sec.mriHd) {
+    if (sec.hdGrid) {
       // Section texture coord t -> HD voxel t * dims * k, minus the crop corner.
-      const hd = sec.mriHd, k = hd.voxelScale, [hw, hh, hdep] = hd.dims;
-      sec.mriScale.set(w * k / hw, h * k / hh, d * k / hdep);
-      sec.mriOffset.set(-hd.corner[0] / hw, -hd.corner[1] / hh, -hd.corner[2] / hdep);
+      const hd = sec.hdGrid, k = hd.voxelScale, [hw, hh, hdep] = hd.dims;
+      sec.hdScale.set(w * k / hw, h * k / hh, d * k / hdep);
+      sec.hdOffset.set(-hd.corner[0] / hw, -hd.corner[1] / hh, -hd.corner[2] / hdep);
+      if (sec.mriHd) { sec.mriScale.copy(sec.hdScale); sec.mriOffset.copy(sec.hdOffset); }
     }
     syncCapUniforms();
-    if (sec.mriHd?.labels) loadSectionLabelsHd(sec, fetching.hd);
+    if (sec.hdGrid?.labels) loadSectionLabelsHd(sec, fetching.hd);
     initStructures(model);
     setSliceFace('atlas');
     sliceFace.classList.toggle('hidden', !slicer.sections.mriUrl);
@@ -1737,7 +1741,7 @@ const SECTION_CAP_FRAG = /* glsl */`
   uniform vec3 uMriScale;  // section texture coords -> MRI texture coords
   uniform vec3 uMriOffset; //   (the HD scan is finer and cropped)
   uniform float uMode;  // 0 = atlas colours, 1 = the MRI only
-  uniform sampler3D uVolHd; // the region map at full 0.5 mm (computers), same crop as the HD scan
+  uniform sampler3D uVolHd; // the region map at full 0.5 mm (every device)
   uniform float uUseHd;     // 1 once uVolHd is loaded
   uniform vec3 uHdScale;    // section texture coords -> HD texture coords
   uniform vec3 uHdOffset;
@@ -1830,8 +1834,9 @@ const SECTION_CAP_FRAG = /* glsl */`
 // the cut face is the scan alone (no atlas colours on it).
 const SLICE_FACE_MODES = { atlas: 0, mri: 1 };
 
-// Computers get the full 0.5 mm scan and region map; phones / tablets the
-// 1 mm ones, which need an eighth of the download and graphics memory.
+// Every device gets the full 0.5 mm region map. Computers also get the
+// 0.5 mm MRI; phones / tablets the 1 mm one (an eighth of the download and
+// graphics memory).
 const MRI_HD = !window.matchMedia('(pointer: coarse)').matches;
 // Smooth the cut face's region boundaries (see labelIn in the shader). Off:
 // voxels are drawn as they are, at full 0.5 mm resolution on computers.
@@ -1850,21 +1855,21 @@ function syncCapUniforms() {
   u.uMriOffset.value.copy(sec?.mriOffset ?? _ZERO3);
   u.uVolHd.value = sec?.labelsHdTex ?? null;
   u.uUseHd.value = sec?.labelsHdTex ? 1 : 0;
-  u.uHdScale.value.copy(sec?.mriScale ?? _ONE3); // same crop as the HD scan
-  u.uHdOffset.value.copy(sec?.mriOffset ?? _ZERO3);
+  u.uHdScale.value.copy(sec?.hdScale ?? _ONE3);
+  u.uHdOffset.value.copy(sec?.hdOffset ?? _ZERO3);
   if (sec) u.uDims.value.set(...sec.dims);
-  if (sec?.mriHd) u.uDimsHd.value.set(...sec.mriHd.dims);
+  if (sec?.hdGrid) u.uDimsHd.value.set(...sec.hdGrid.dims);
 }
 
-// The 0.5 mm region map (computers): sharper cut-face boundaries. Fetched
+// The 0.5 mm region map (every device): sharper cut-face boundaries. Fetched
 // alongside the brain (startSectionsFetch); the 1 mm map is used until it
-// arrives. Afterwards the MRI is fetched quietly in the background, so
+// arrives. Afterwards, on computers, the MRI is fetched quietly in the background, so
 // switching the cut face to MRI is near-instant.
 async function loadSectionLabelsHd(sec, pending) {
   try {
     const data = await pending;
     if (!data) return;
-    const [w, h, d] = sec.mriHd.dims;
+    const [w, h, d] = sec.hdGrid.dims;
     if (data.length !== w * h * d) throw new Error('Region map has the wrong size');
     if (slicer.sections !== sec) return; // switched models meanwhile
     const tex = new THREE.Data3DTexture(data, w, h, d);
@@ -1875,7 +1880,7 @@ async function loadSectionLabelsHd(sec, pending) {
     tex.needsUpdate = true;
     sec.labelsHdTex = tex;
     syncCapUniforms();
-    setTimeout(() => {
+    if (MRI_HD) setTimeout(() => { // computers: warm up the 0.5 mm MRI too
       if (slicer.sections !== sec) return;
       loadSectionMri({ priority: 'low' })
         .then(tex => { if (tex && slicer.sections === sec) renderer.initTexture(tex); }) // upload now, not on first use
