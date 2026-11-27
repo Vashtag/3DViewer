@@ -100,7 +100,7 @@
       "category": "nerve"
     },
     {
-      "name": "Edinger-Westphal",
+      "name": "Edinger-Westphal Nucleus",
       "position": [
         7.7015935194281075,
         27.317773561753974,
@@ -109,7 +109,7 @@
       "category": "nuclei"
     },
     {
-      "name": "Oculomotor",
+      "name": "Oculomotor Nucleus",
       "position": [
         6.3984630103897535,
         18.354113825198514,
@@ -118,7 +118,7 @@
       "category": "nuclei"
     },
     {
-      "name": "Trochlear",
+      "name": "Trochlear Nucleus",
       "position": [
         5.026363512295461,
         13.279321642957028,
@@ -127,7 +127,7 @@
       "category": "nuclei"
     },
     {
-      "name": "Trigeminal",
+      "name": "Trigeminal Nucleus",
       "position": [
         6.057121151347803,
         -4.32116662881293,
@@ -145,7 +145,7 @@
       "category": "nuclei"
     },
     {
-      "name": "Abducens",
+      "name": "Abducens Nucleus",
       "position": [
         1.0334574429654564,
         -15.947001172052287,
@@ -154,7 +154,7 @@
       "category": "nuclei"
     },
     {
-      "name": "Accessory",
+      "name": "Accessory Nucleus",
       "position": [
         -2.122199342971814,
         -59.447323472674015,
@@ -163,7 +163,7 @@
       "category": "nuclei"
     },
     {
-      "name": "Hypoglossal",
+      "name": "Hypoglossal Nucleus",
       "position": [
         -2.3662789436440375,
         -32.62564327466045,
@@ -172,7 +172,7 @@
       "category": "nuclei"
     },
     {
-      "name": "Ambiguus",
+      "name": "Ambiguus Nucleus",
       "position": [
         3.0304234244281654,
         -45.89562793397709,
@@ -199,7 +199,7 @@
       "category": "nuclei"
     },
     {
-      "name": "Spinal Trigeminal",
+      "name": "Spinal Trigeminal Nucleus",
       "position": [
         1.583179504382756,
         -56.81379295362334,
