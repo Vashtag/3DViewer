@@ -2134,9 +2134,11 @@ body:not(.dev-mode) .dev-only { display: none !important; }
   inset: 0;
   z-index: 5;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr); /* pictures | diagram */
+  gap: 20px;
+  align-items: stretch;
   background: var(--bg);
-  padding: 12px max(16px, env(safe-area-inset-right, 0px)) 14px max(16px, env(safe-area-inset-left, 0px));
+  padding: 16px max(20px, env(safe-area-inset-right, 0px)) 16px max(20px, env(safe-area-inset-left, 0px));
   overflow: auto;
 }
 #pathway-diagram.hidden { display: none; }
@@ -2147,9 +2149,14 @@ body.diagram-open #model-credit { display: none !important; }
 .vp-figure { position: relative; min-height: 0; }
 /* fills the row; the drawing scales to fit inside it */
 .vp-figure svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.vp-caption { display: grid; gap: 3px; justify-items: center; text-align: center; padding-top: 6px; }
+.vp-views { display: grid; gap: 12px; align-content: center; min-width: 0; max-width: 620px; justify-self: end; width: 100%; }
+.vp-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.vp-view { margin: 0; display: grid; gap: 5px; }
+.vp-view figcaption { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.vp-view svg { width: 100%; height: auto; display: block; border-radius: 10px; border: 1px solid var(--border); }
+.vp-caption { display: grid; gap: 3px; padding-top: 2px; }
 .vp-caption b { font-size: 1.02rem; color: var(--text); }
-.vp-caption span { font-size: 0.85rem; color: var(--text-muted); max-width: 62ch; line-height: 1.45; }
+.vp-caption span { font-size: 0.85rem; color: var(--text-muted); line-height: 1.45; }
 .vp-strand { fill: none; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
 .vp-eye { fill: #e9e4dc; stroke: #2a2e40; stroke-width: 1; }
 .vp-iris { fill: #5b7fa6; }
@@ -2169,6 +2176,9 @@ body.diagram-open #model-credit { display: none !important; }
 .vp-cutbar { stroke: #e04848; stroke-width: 4; stroke-linecap: round; }
 @media (max-width: 600px) {
   #pathway-diagram { padding-top: 64px; } /* clear the menu button */
-  #pathway-diagram { grid-template-rows: auto auto; align-content: start; }
-  .vp-figure svg { position: static; height: auto; width: 100%; }
+  #pathway-diagram { grid-template-columns: minmax(0, 1fr); align-content: start; align-items: start; }
+  #pathway-diagram { grid-auto-rows: max-content; } /* full height; the panel scrolls */
+  .vp-figure { order: -1; } /* diagram first, pictures under it */
+  .vp-views { justify-self: stretch; }
+  .vp-figure svg { position: static; width: min(100%, 46vh); height: auto; aspect-ratio: 400 / 510; margin-inline: auto; }
 }

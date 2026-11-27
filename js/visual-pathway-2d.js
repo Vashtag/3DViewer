@@ -1,8 +1,13 @@
 // Visual pathway lesions as a flat, top-down diagram (like the textbook
 // figure): eyes at the top, the patient's left on the screen's left. Both
 // sides are drawn, so a lesion is picked by clicking its numbered spot on the
-// side you want. What each eye sees is drawn above that eye; the defect is
-// named under the diagram. Fibres past the cut turn grey.
+// side you want. Fibres past the cut turn grey.
+//
+// Beside the diagram, a picture shows what the patient sees, with the lost
+// part of the visual field blacked out: once with both eyes open and once for
+// each eye. The picture is assets/visual-scene.jpg when that file exists (any
+// landscape photo, looked at through its centre), otherwise a drawn street
+// scene.
 //
 // Lesion definitions (which bundles each lesion cuts, names, defect text)
 // come from visual-pathway.js.
@@ -54,88 +59,123 @@ const el = (tag, attrs, parent) => {
   return e;
 };
 
-// One eye's field, as the patient sees it: left half = left visual field.
-function fieldCircle(g, cx, cy, r, loss, sparing, caption) {
-  const q = { 'left-upper': [-1, -1], 'right-upper': [1, -1], 'left-lower': [-1, 1], 'right-lower': [1, 1] };
-  for (const key in q) {
-    const [sx, sy] = q[key];
-    const [side, half] = key.split('-');
-    el('path', {
-      d: `M${cx},${cy} L${cx + sx * r},${cy} A${r},${r} 0 0 ${sx * sy > 0 ? 1 : 0} ${cx},${cy + sy * r} Z`,
-      fill: loss[key] ? FIELD_COLORS.lost : FIELD_COLORS[side][half],
-    }, g);
-  }
-  if (sparing && Object.keys(loss).length) el('circle', { cx, cy, r: r * 0.22, fill: FIELD_COLORS.left.upper, class: 'vp-spared' }, g);
-  el('line', { x1: cx - r, y1: cy, x2: cx + r, y2: cy, class: 'vp-axis' }, g);
-  el('line', { x1: cx, y1: cy - r, x2: cx, y2: cy + r, class: 'vp-axis' }, g);
-  el('circle', { cx, cy, r, class: 'vp-ring' }, g);
-  el('text', { x: cx, y: cy + r + 13, class: 'vp-cap' }, g).textContent = caption;
+// The picture the patient looks at. A photo at SCENE_URL is used when it
+// loads; until then (or without one) a drawn scene.
+const SCENE_URL = 'assets/visual-scene.jpg';
+let sceneOk = null; // null: not tried yet; true / false once known
+const SCENE_DEFS = `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="vp-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7fb7ea"/><stop offset="1" stop-color="#cfe6f7"/></linearGradient>
+  <filter id="vp-feather" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="3"/></filter>
+  <symbol id="vp-scene" viewBox="0 0 320 200">
+      <rect width="320" height="200" fill="url(#vp-sky)"/>
+      <circle cx="52" cy="38" r="17" fill="#ffd45c"/>
+      <g fill="none" stroke="#ffd45c" stroke-width="2.5" stroke-linecap="round">
+        <path d="M52 12v-6M52 70v-6M26 38h-6M84 38h-6M34 20l-4-4M74 60l-4-4M34 56l-4 4M74 16l-4 4"/>
+      </g>
+      <g fill="none" stroke="#2d3446" stroke-width="2" stroke-linecap="round">
+        <path d="M226 34q6-6 12 0q6-6 12 0"/><path d="M256 52q5-5 10 0q5-5 10 0"/><path d="M240 64q4-4 8 0q4-4 8 0"/>
+      </g>
+      <path d="M0 118 Q80 92 160 112 T320 106 V200 H0 Z" fill="#8fc27a"/>
+      <rect x="22" y="84" width="74" height="50" fill="#e7c9a0"/><path d="M16 86 L59 58 L102 86 Z" fill="#b8573f"/>
+      <rect x="50" y="104" width="16" height="30" fill="#6b4a33"/><rect x="28" y="96" width="14" height="12" fill="#bfe3ff"/><rect x="74" y="96" width="14" height="12" fill="#bfe3ff"/>
+      <rect x="258" y="82" width="8" height="46" fill="#7a5638"/><circle cx="262" cy="70" r="24" fill="#3f9a55"/><circle cx="246" cy="82" r="15" fill="#4fae63"/><circle cx="280" cy="82" r="15" fill="#4fae63"/>
+      <path d="M120 200 L148 120 H172 L200 200 Z" fill="#8a8f9c"/>
+      <path d="M160 132 V142 M160 154 V166 M160 180 V196" stroke="#f2f2f2" stroke-width="2.5"/>
+      <g transform="translate(26 150)"><rect x="0" y="10" width="70" height="20" rx="6" fill="#d9483b"/><path d="M12 10 L22 0 H48 L58 10 Z" fill="#d9483b"/><rect x="24" y="3" width="10" height="7" fill="#cfeaff"/><rect x="37" y="3" width="10" height="7" fill="#cfeaff"/><circle cx="16" cy="30" r="7" fill="#222"/><circle cx="54" cy="30" r="7" fill="#222"/></g>
+      <g transform="translate(236 150)" fill="#a8743e"><ellipse cx="24" cy="18" rx="20" ry="9"/><circle cx="46" cy="10" r="8"/><path d="M50 4 l6 -6 l1 8 z"/><rect x="8" y="22" width="4" height="12"/><rect x="34" y="22" width="4" height="12"/><path d="M4 16 q-8 -6 -6 -12" stroke="#a8743e" stroke-width="3" fill="none"/></g>
+    </symbol>
+</defs></svg>`;
+
+// One view: the picture, the lost quarters blacked out (soft edges), and the
+// fixation cross. loss: { 'left-upper': true, ... }; the left half of the
+// picture is the left half of the visual field.
+function paintView(svg, loss, sparing) {
+  svg.textContent = '';
+  if (sceneOk) el('image', { href: SCENE_URL, width: 320, height: 200, preserveAspectRatio: 'xMidYMid slice' }, svg);
+  else el('use', { href: '#vp-scene', width: 320, height: 200 }, svg);
+  const maskId = svg.dataset.mask;
+  const mask = el('mask', { id: maskId }, svg);
+  el('rect', { width: 320, height: 200, fill: 'white' }, mask);
+  if (sparing) el('circle', { cx: 160, cy: 100, r: 30, fill: 'black', filter: 'url(#vp-feather)' }, mask);
+  const shade = el('g', { mask: `url(#${maskId})` }, svg);
+  const dark = el('g', { filter: 'url(#vp-feather)', fill: '#05060a', opacity: 0.94 }, shade);
+  const Q = { 'left-upper': [0, 0], 'right-upper': [160, 0], 'left-lower': [0, 100], 'right-lower': [160, 100] };
+  for (const key in Q) if (loss[key]) el('rect', { x: Q[key][0] ? 160 : -8, y: Q[key][1] ? 100 : -8, width: 168, height: 108 }, dark);
+  el('path', { d: 'M160 93 V107 M153 100 H167', stroke: '#e04848', 'stroke-width': 2.5, 'stroke-linecap': 'round' }, svg);
 }
 
-const DY = 44;        // room above the eyes for the field circles
-const HEIGHT = 530 + DY;
-
-// Mounts the diagram into `host` (an element). onChange(lesion, side) is
+// Mounts the diagram and pictures into `host`. onChange(lesion, side) is
 // called after each pick. Returns { destroy, setLesion }.
 export function mountPathwayDiagram(host, { onChange } = {}) {
-  host.innerHTML = '';
-  const figure = document.createElement('div');
-  figure.className = 'vp-figure';
-  const svg = el('svg', { viewBox: `0 0 400 ${HEIGHT}`, role: 'group', 'aria-label': 'Visual pathway seen from above. Numbered spots are lesion sites.' });
-  figure.appendChild(svg);
-  const caption = document.createElement('div');
-  caption.className = 'vp-caption';
-  caption.setAttribute('aria-live', 'polite');
-  caption.innerHTML = '<b></b><span></span>';
-  host.append(figure, caption);
+  host.innerHTML = `${SCENE_DEFS}
+    <div class="vp-views">
+      <figure class="vp-view vp-both"><figcaption>Both eyes open</figcaption><svg viewBox="0 0 320 200" data-mask="vp-m-both" role="img" aria-label="What the patient sees with both eyes"></svg></figure>
+      <div class="vp-pair">
+        <figure class="vp-view"><figcaption>Left eye only</figcaption><svg viewBox="0 0 320 200" data-mask="vp-m-L" role="img" aria-label="What the left eye sees"></svg></figure>
+        <figure class="vp-view"><figcaption>Right eye only</figcaption><svg viewBox="0 0 320 200" data-mask="vp-m-R" role="img" aria-label="What the right eye sees"></svg></figure>
+      </div>
+      <div class="vp-caption" aria-live="polite"><b></b><span></span></div>
+    </div>
+    <div class="vp-figure"></div>`;
+  const [vBoth, vL, vR] = host.querySelectorAll('.vp-view svg');
+  const caption = host.querySelector('.vp-caption');
+  const svg = el('svg', { viewBox: '0 26 400 510', role: 'group', 'aria-label': 'Visual pathway seen from above. Numbered spots are lesion sites.' }, host.querySelector('.vp-figure'));
 
   let current = { id: null, side: 'R' };
+  let alive = true;
+
+  function paintViews() {
+    const l = LESION_BY_ID[current.id];
+    const loss = fieldLoss(current.id, current.side);
+    // With both eyes open, a part of the scene is lost only if both eyes lose it.
+    const both = {};
+    for (const k of ['left-upper', 'right-upper', 'left-lower', 'right-lower']) if (loss.L[k] && loss.R[k]) both[k] = true;
+    paintView(vBoth, both, l?.sparing);
+    paintView(vL, loss.L, l?.sparing);
+    paintView(vR, loss.R, l?.sparing);
+  }
 
   function render() {
     svg.textContent = '';
     const l = LESION_BY_ID[current.id];
-    const loss = fieldLoss(current.id, current.side);
-    const fields = el('g', {}, svg);
-    fieldCircle(fields, 130, 44, 32, loss.L, l?.sparing, 'Left eye sees');
-    fieldCircle(fields, 270, 44, 32, loss.R, l?.sparing, 'Right eye sees');
-
     for (const x of [130, 270]) {
-      el('circle', { cx: x, cy: 100 + DY, r: 28, class: 'vp-eye' }, svg);
-      el('ellipse', { cx: x, cy: 75 + DY, rx: 11, ry: 3.5, class: 'vp-iris' }, svg);
+      el('circle', { cx: x, cy: 100, r: 28, class: 'vp-eye' }, svg);
+      el('ellipse', { cx: x, cy: 75, rx: 11, ry: 3.5, class: 'vp-iris' }, svg);
     }
     for (const s of ['L', 'R']) {
-      el('ellipse', { cx: mx(s, [178, 0])[0], cy: 462 + DY, rx: 18, ry: 28, class: 'vp-cortex' }, svg);
-      el('ellipse', { cx: mx(s, [142, 0])[0], cy: 288 + DY, rx: 8, ry: 6, class: 'vp-lgn' }, svg);
+      el('ellipse', { cx: mx(s, [178, 0])[0], cy: 462, rx: 18, ry: 28, class: 'vp-cortex' }, svg);
+      el('ellipse', { cx: mx(s, [142, 0])[0], cy: 288, rx: 8, ry: 6, class: 'vp-lgn' }, svg);
     }
     // Fibres: coloured up to the cut, grey after it.
     const k = l ? CUT_AT[l.id] : 0;
     for (const b of BUNDLES) {
-      const p = bundlePoints(b, DY);
+      const p = bundlePoints(b, 0);
       const cut = l && l.cuts(b, current.side);
       el('path', { d: pathD(cut ? p.slice(0, k + 1) : p), class: 'vp-strand', stroke: FIELD_COLORS[b.fieldSide][b.field] }, svg);
       if (cut) el('path', { d: pathD(p.slice(k)), class: 'vp-strand', stroke: FIELD_COLORS.lost }, svg);
     }
-    [[60, 150, 'Optic nerve', 'start'], [222, 206, 'Optic chiasm', 'start'], [100, 252, 'Optic tract', 'end'],
-     [152, 300, 'LGN', 'start'], [70, 338, "Meyer's loop", 'end'], [150, 352, 'Parietal', 'start'], [200, 515, 'Visual cortex', 'middle']]
-      .forEach(([x, y, t, a]) => { el('text', { x, y: y + DY, class: 'vp-label', 'text-anchor': a }, svg).textContent = t; });
+    [[130, 60, 'Left eye', 'middle'], [270, 60, 'Right eye', 'middle'], [60, 150, 'Optic nerve', 'start'], [222, 206, 'Optic chiasm', 'start'],
+     [100, 252, 'Optic tract', 'end'], [152, 300, 'LGN', 'start'], [70, 338, "Meyer's loop", 'end'], [150, 352, 'Parietal', 'start'], [200, 515, 'Visual cortex', 'middle']]
+      .forEach(([x, y, t, a]) => { el('text', { x, y, class: 'vp-label', 'text-anchor': a }, svg).textContent = t; });
 
     // Lesion spots, both sides (the chiasm once).
     for (const les of LESIONS) for (const side of les.midline ? ['L'] : ['L', 'R']) {
       const at = CUT_AT[les.id];
       const cutB = BUNDLES.filter(b => les.cuts(b, side));
       let x = 0, y = 0;
-      cutB.forEach(b => { const p = bundlePoints(b, DY)[at]; x += p[0]; y += p[1]; });
+      cutB.forEach(b => { const p = bundlePoints(b, 0)[at]; x += p[0]; y += p[1]; });
       x /= cutB.length; y /= cutB.length;
+      const on = current.id === les.id && (les.midline || current.side === side);
+      if (on) { // the cut bar sits on the fibres
+        const spread = Math.max(...cutB.map(b => { const p = bundlePoints(b, 0)[at]; return Math.hypot(p[0] - x, p[1] - y); }));
+        el('line', { x1: x - spread - 6, y1: y, x2: x + spread + 6, y2: y, class: 'vp-cutbar' }, svg);
+      }
+      // Badges: beside the fibres on the nerves and tracts, above the chiasm,
+      // and spread apart at the cortex.
       const out = side === 'L' ? -1 : 1;
       if (les.id === 'cortex') { x += out * 24; y += 2; }
       if (les.id === 'cuneus') { x -= out * 10; y -= 6; }
       if (les.id === 'lingual') { x -= out * 10; y += 10; }
-      const on = current.id === les.id && (les.midline || current.side === side);
-      if (on) {
-        const spread = Math.max(...cutB.map(b => { const p = bundlePoints(b, DY)[at]; return Math.hypot(p[0] - x, p[1] - y); }));
-        el('line', { x1: x - spread - 6, y1: y, x2: x + spread + 6, y2: y, class: 'vp-cutbar' }, svg);
-      }
-      // The badge sits beside the fibres on the nerves and tracts, above the chiasm.
       const bx = x + (at <= 3 && !les.midline ? out * 13 : 0);
       const by = y - (les.midline ? 14 : 0);
       const where = les.midline ? '' : `, ${W[side]}`;
@@ -152,7 +192,8 @@ export function mountPathwayDiagram(host, { onChange } = {}) {
     caption.querySelector('b').textContent = l ? l.defect(current.side) : 'Normal visual fields';
     caption.querySelector('span').textContent = l
       ? l.note(current.side)
-      : 'Click a numbered spot on the pathway to place a lesion; click it again to clear it. Blue fibres carry the left half of what the patient sees, green the right.';
+      : 'Click a numbered spot on the pathway to place a lesion; click it again to clear it. The pictures show what the patient sees while looking at the red cross.';
+    paintViews();
   }
 
   function setLesion(id, side = current.side, fromClick = false) {
@@ -163,5 +204,12 @@ export function mountPathwayDiagram(host, { onChange } = {}) {
   }
 
   render();
-  return { setLesion, destroy() { host.innerHTML = ''; } };
+  // Swap in the photo once we know it exists.
+  if (sceneOk === null) {
+    const img = new Image();
+    img.onload = () => { sceneOk = true; if (alive) paintViews(); };
+    img.onerror = () => { sceneOk = false; };
+    img.src = SCENE_URL;
+  }
+  return { setLesion, destroy() { alive = false; host.innerHTML = ''; } };
 }
