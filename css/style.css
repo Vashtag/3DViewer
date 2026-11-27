@@ -2149,8 +2149,8 @@ body.diagram-open #model-credit { display: none !important; }
 .vp-figure { position: relative; min-height: 0; }
 /* fills the row; the drawing scales to fit inside it */
 .vp-figure svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-/* two pictures stacked; narrow enough that both fit the viewer's height */
-.vp-views { display: grid; gap: 12px; align-content: center; min-width: 0; max-width: min(560px, calc((100vh - 250px) / 1.25)); justify-self: end; width: 100%; }
+.vp-views { display: grid; gap: 12px; align-content: center; min-width: 0; max-width: 680px; justify-self: end; width: 100%; }
+.vp-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } /* left eye | right eye */
 .vp-view { margin: 0; display: grid; gap: 5px; }
 .vp-view figcaption { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
 .vp-view svg { width: 100%; height: auto; display: block; border-radius: 10px; border: 1px solid var(--border); }

@@ -112,8 +112,10 @@ function paintView(svg, loss, sparing) {
 export function mountPathwayDiagram(host, { onChange } = {}) {
   host.innerHTML = `${SCENE_DEFS}
     <div class="vp-views">
-      <figure class="vp-view"><figcaption>Left eye</figcaption><svg viewBox="0 0 320 200" data-mask="vp-m-L" role="img" aria-label="What the left eye sees"></svg></figure>
-      <figure class="vp-view"><figcaption>Right eye</figcaption><svg viewBox="0 0 320 200" data-mask="vp-m-R" role="img" aria-label="What the right eye sees"></svg></figure>
+      <div class="vp-pair">
+        <figure class="vp-view"><figcaption>Left eye</figcaption><svg viewBox="0 0 320 200" data-mask="vp-m-L" role="img" aria-label="What the left eye sees"></svg></figure>
+        <figure class="vp-view"><figcaption>Right eye</figcaption><svg viewBox="0 0 320 200" data-mask="vp-m-R" role="img" aria-label="What the right eye sees"></svg></figure>
+      </div>
       <div class="vp-caption" aria-live="polite"><b></b><span></span></div>
     </div>
     <div class="vp-figure"></div>`;
