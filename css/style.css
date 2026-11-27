@@ -2030,102 +2030,6 @@ body:not(.dev-mode) .dev-only { display: none !important; }
   100% { transform: scale(1.7); opacity: 0.15; }
 }
 
-/* ── Visual pathway: lesion panel ── */
-#lesion-dock {
-  position: absolute;
-  right: 12px;
-  top: 220px;             /* below the view buttons */
-  bottom: 40px;
-  z-index: 6;
-  width: 300px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: rgba(20, 23, 34, 0.94);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
-}
-#lesion-dock.hidden { display: none; }
-#lesion-dock > * { flex-shrink: 0; } /* scroll the panel; never squash a row */
-.lesion-head { display: flex; align-items: center; gap: 10px; }
-.lesion-title { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
-#lesion-side { flex: 1; }
-#lesion-side.muted { opacity: 0.55; } /* midline lesion: side applies to the next pick */
-#lesion-list { display: flex; flex-direction: column; gap: 3px; }
-#lesion-list button {
-  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 7px;
-  border: 1px solid transparent; background: transparent; color: var(--text); font-size: 0.8rem; text-align: left; cursor: pointer;
-}
-#lesion-list button b {
-  display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%;
-  background: #3a3f57; color: #fff; font-size: 0.72rem; flex-shrink: 0;
-}
-#lesion-list button:hover { background: #1e2540; }
-#lesion-list button[aria-pressed="true"] { border-color: var(--accent); background: #1e2540; }
-#lesion-list button[aria-pressed="true"] b { background: #e04848; }
-#lesion-fields svg { width: 100%; height: auto; display: block; }
-.vf-bg { fill: #0f1117; }
-.vf-ok.vf-left-upper  { fill: #6f9bff; } .vf-ok.vf-left-lower  { fill: #3f6fe0; }
-.vf-ok.vf-right-upper { fill: #7fd6a0; } .vf-ok.vf-right-lower { fill: #3fae6c; }
-.vf-ok { opacity: 0.85; }
-.vf-lost { fill: #23263a; }
-.vf-spared { fill: #9fb6ee; stroke: #0f1117; stroke-width: 0.6; }
-.vf-axis { stroke: rgba(255, 255, 255, 0.35); stroke-width: 0.8; stroke-dasharray: 2 2; }
-.vf-rim { fill: none; stroke: #8b90ab; stroke-width: 1.2; }
-.vf-fix { fill: #fff; }
-.vf-label { fill: var(--text-muted); font-size: 10px; text-anchor: middle; font-family: system-ui, sans-serif; }
-#lesion-defect { font-size: 0.92rem; font-weight: 600; color: var(--text); line-height: 1.3; }
-#lesion-note { font-size: 0.78rem; color: var(--text-muted); line-height: 1.45; }
-/* Desktop: the result (field charts, defect) sits above the list so it never
-   scrolls out of sight; the phone sheet keeps the list first. */
-#lesion-fields { order: 1; }
-#lesion-defect { order: 2; }
-#lesion-note   { order: 3; }
-#lesion-list   { order: 4; }
-#lesion-defect, #lesion-note { margin: 0; }
-/* Eye Movements: nine-gaze chart (examiner's view), Near and penlight */
-.eom-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-.eom-cell {
-  padding: 2px; border-radius: 7px; border: 1px solid var(--border, #2b2f42);
-  background: rgba(255,255,255,0.03); cursor: pointer; line-height: 0;
-}
-.eom-cell:hover { border-color: #5b6280; }
-.eom-cell[aria-pressed="true"] { border-color: var(--accent, #5b8cff); background: rgba(91,140,255,0.14); }
-.eom-cell svg { width: 100%; height: auto; display: block; }
-.eom-sclera { fill: #ece7df; }
-.eom-iris { fill: #5b7fa6; }
-.eom-pupil { fill: #07080b; }
-.eom-lid { fill: #c99a86; }
-.eom-rim { fill: none; stroke: #8f7466; stroke-width: 1; }
-.eom-caption { font-size: 0.7rem; color: var(--text-muted); line-height: 1.35; margin-top: 5px; }
-.eom-row { display: flex; gap: 6px; align-items: stretch; margin-top: 8px; }
-.eom-near {
-  padding: 4px 10px; border-radius: 7px; border: 1px solid var(--border, #2b2f42);
-  background: transparent; color: var(--text); font-size: 0.75rem; cursor: pointer;
-}
-.eom-near[aria-pressed="true"] { border-color: var(--accent, #5b8cff); background: rgba(91,140,255,0.18); }
-.eom-light { flex: 1; }
-.eom-light button { font-size: 0.72rem; padding-inline: 4px; }
-.lesion-tag {
-  padding: 1px 6px; border-radius: 9px; background: rgba(15, 17, 23, 0.85); border: 1px solid #8a8fa8;
-  color: #e8eaf0; font: 600 11px system-ui, sans-serif; pointer-events: none;
-}
-.lesion-tag.active { background: #e04848; border-color: #e04848; }
-/* The panel sits on the right; keep the credit / hints clear of it. */
-#viewer-container.pathway-open #model-credit { display: none; }
-@media (max-width: 600px) {
-  #lesion-dock { top: auto; left: 10px; right: 10px; bottom: 10px; width: auto; max-height: 48%; }
-  #lesion-list { flex-direction: row; overflow-x: auto; }
-  #lesion-list { order: 0; }
-  .eom-grid { max-width: 250px; margin: 0 auto; width: 100%; }
-  #lesion-list button { white-space: nowrap; flex-shrink: 0; }
-  #lesion-fields svg { max-width: 300px; margin: 0 auto; }
-  #viewer-container.pathway-open #bottom-bar { display: none; }
-}
-
 /* ── Visual Pathway diagram (flat, top-down; js/visual-pathway-2d.js) ──
    Shown over the viewer in place of a 3D model. The 3D tools are hidden
    while it is open. */
@@ -2247,4 +2151,76 @@ body.diagram-open #model-credit { display: none !important; }
   .mri-dock { bottom: 30px; width: calc(100% - 20px); padding: 10px; }
   .mri-planes { flex-basis: 100%; }
   .mri-credit { left: 10px; right: 10px; bottom: 6px; font-size: 0.6rem; text-align: center; }
+}
+
+/* ── Eye Movements diagram (js/eye-movements-2d.js) ── */
+#pathway-diagram.em-root { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; gap: 0; padding: 8px 0 0; }
+.em-figure { position: relative; min-height: 0; }
+.em-figure svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.em-bottom { display: flex; gap: 18px; align-items: center; justify-content: center; flex-wrap: wrap; padding: 6px 16px 14px; }
+.em-caption { display: grid; gap: 3px; max-width: 60ch; min-width: 0; flex: 1 1 320px; }
+.em-caption b { font-size: 1rem; color: var(--text); }
+.em-caption span { font-size: 0.83rem; color: var(--text-muted); line-height: 1.45; }
+.em-dock { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--border); background: rgba(20, 23, 34, 0.94); }
+.em-pad { display: grid; grid-template-columns: repeat(3, 30px); gap: 4px; }
+.em-pad button, .em-actions button {
+  height: 30px; border-radius: 7px; border: 1.5px solid var(--border); background: transparent;
+  color: var(--text-muted); font-size: 0.85rem; cursor: pointer;
+}
+.em-actions { display: grid; gap: 6px; }
+.em-actions button { padding: 0 12px; font-size: 0.78rem; }
+.em-pad button:hover, .em-actions button:hover { color: var(--text); }
+.em-pad button[aria-pressed="true"], .em-actions button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* drawing */
+.em-stem-shape { fill: #232738; stroke: #343a52; stroke-width: 1.5; }
+.em-region { fill: #6f7694; font-size: 13px; text-anchor: middle; font-family: inherit; letter-spacing: 0.04em; }
+.em-region.small { font-size: 11px; }
+.em-fef { fill: color-mix(in srgb, #ffffff calc(var(--act, 0) * 100%), #2a2f44); stroke: #6b728f; stroke-width: 1.5; filter: drop-shadow(0 0 calc(var(--act, 0) * 8px) #ffffff); }
+.em-fef-t { fill: color-mix(in srgb, #111 calc(var(--act, 0) * 100%), #d6d9e6); font-size: 13px; font-weight: 700; text-anchor: middle; dominant-baseline: central; font-family: inherit; pointer-events: none; }
+.em-side { fill: #6f7694; font-size: 10px; text-anchor: middle; font-family: inherit; }
+.em-wire { fill: none; stroke: color-mix(in srgb, #ffffff calc(var(--act, 0) * 100%), #59607a); stroke-width: calc(2.5px + var(--act, 0) * 2.5px); stroke-linecap: round; filter: drop-shadow(0 0 calc(var(--act, 0) * 6px) #ffffff); }
+.em-wire.em-branch { stroke-width: calc(1.6px + var(--act, 0) * 1.6px); }
+.em-wire.cut { stroke: #3a3e50; stroke-dasharray: 6 5; filter: none; }
+.em-nuc { fill: color-mix(in srgb, #ffffff calc(var(--act, 0) * 100%), #303651); stroke: #7a82a3; stroke-width: 1.5; filter: drop-shadow(0 0 calc(var(--act, 0) * 8px) #ffffff); }
+.em-nuc.cut { fill: #3a2a30; stroke: #e04848; }
+.em-nuc.pprf { stroke-dasharray: 3 2; }
+.em-nuc-t { fill: #c9cde0; font-size: 12px; font-weight: 700; text-anchor: middle; dominant-baseline: central; font-family: inherit; pointer-events: none; mix-blend-mode: difference; }
+.em-globe { stroke: #b88f86; stroke-width: 1; }
+.em-belly, .em-band { fill: color-mix(in srgb, #ff8a5c calc(var(--act, 0) * 100%), #9a3d36); stroke: #6e2a25; stroke-width: 1; filter: drop-shadow(0 0 calc(var(--act, 0) * 9px) #ffb27a); }
+.em-strap { fill: none; stroke: color-mix(in srgb, #ff8a5c calc(var(--act, 0) * 100%), #9a3d36); stroke-width: 15; stroke-linecap: round; filter: drop-shadow(0 0 calc(var(--act, 0) * 9px) #ffb27a); }
+.em-band { stroke: #7a2f29; stroke-width: 0.6; }
+.em-belly.dead, .em-band.dead { fill: #50535f; stroke: #3a3c46; filter: none; }
+.em-strap.dead { stroke: #50535f; filter: none; }
+.em-belly.weak, .em-band.weak { stroke: #ff3b3b; stroke-width: 3; stroke-dasharray: 5 3; }
+.em-strap.weak, .em-sotendon.weak { filter: drop-shadow(0 0 3px #ff3b3b) drop-shadow(0 0 3px #ff3b3b); }
+.em-tendon { fill: #f1e9de; stroke: #cdbfae; stroke-width: 0.6; }
+.em-fibre { stroke: rgba(255, 210, 190, 0.22); stroke-width: 1.2; fill: none; pointer-events: none; }
+.em-vessel { fill: none; stroke: rgba(196, 70, 70, 0.45); stroke-width: 0.9; stroke-linecap: round; }
+.em-iris-fibre { stroke: rgba(210, 225, 240, 0.28); stroke-width: 0.9; }
+.em-collarette { fill: none; stroke: rgba(230, 210, 170, 0.45); stroke-width: 2.2; stroke-dasharray: 3 2; }
+.em-limbus { fill: none; stroke: #1d2733; stroke-width: 2.4; }
+.em-fleck { fill: #c9a25a; }
+.em-reflex { fill: #ffffff; filter: drop-shadow(0 0 3px #ffffff); }
+.em-tilt { display: grid; gap: 4px; justify-items: center; }
+.em-tilt-l { font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.em-tilt .dock-seg button { padding: 5px 9px; font-size: 0.76rem; }
+.em-sotendon { fill: none; stroke: #efe6da; stroke-width: 5; stroke-linecap: round; }
+.em-troch { fill: #f6f2ec; stroke: #cdbfae; }
+.em-mlabel { fill: #aab0c8; font-size: 12px; font-weight: 600; text-anchor: middle; dominant-baseline: central; font-family: inherit; }
+.em-pupil { fill: #08090c; }
+.em-shine { fill: rgba(255, 255, 255, 0.75); }
+.em-lid { fill: #c89a8a; stroke: #8f6558; stroke-width: 1.5; }
+.em-eyename { fill: #8b90ab; font-size: 13px; text-anchor: middle; font-family: inherit; }
+.em-spot { cursor: pointer; }
+.em-spot:focus { outline: none; }
+.em-spot-bg { fill: #3a3f57; stroke: var(--bg); stroke-width: 2; }
+.em-spot:hover .em-spot-bg, .em-spot:focus-visible .em-spot-bg { fill: #5b8cff; }
+.em-spot.on .em-spot-bg { fill: #e04848; }
+.em-spot-t { fill: #fff; font-size: 13px; font-weight: 700; text-anchor: middle; dominant-baseline: central; pointer-events: none; font-family: inherit; }
+@media (max-width: 600px) {
+  #pathway-diagram.em-root { grid-template-rows: auto auto; align-content: start; padding-top: 56px; }
+  .em-figure svg { position: static; height: auto; aspect-ratio: 1000 / 600; }
+  .em-bottom { flex-direction: column-reverse; align-items: stretch; }
+  .em-caption { flex: none; }
+  .em-dock { justify-content: center; }
 }
