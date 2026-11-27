@@ -175,9 +175,9 @@ export function createVisualPathway({ CSS2DObject } = {}) {
     eye.position.set(s * 32, 0, 70);
     eye.add(new THREE.Mesh(new THREE.SphereGeometry(12, 48, 32), std('#e9e4dc')));
     const iris = new THREE.Mesh(new THREE.CircleGeometry(5, 40), std('#5b7fa6', { side: THREE.DoubleSide }));
-    iris.position.z = 11.6; eye.add(iris);
+    iris.position.z = 12.04; eye.add(iris);
     const pupil = new THREE.Mesh(new THREE.CircleGeometry(2.2, 32), std('#0b0c10', { side: THREE.DoubleSide }));
-    pupil.position.z = 11.75; eye.add(pupil);
+    pupil.position.z = 12.1; eye.add(pupil);
     group.add(eye);
   }
 
