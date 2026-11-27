@@ -1609,11 +1609,17 @@ async function loadSections(model) {
       mriTex: null,
       mriScale: new THREE.Vector3(1, 1, 1),
       mriOffset: new THREE.Vector3(0, 0, 0),
+      labelsHdTex: null, // the 0.5 mm region map (computers), loaded after this
     };
-    if (slicer.caps) slicer.caps.children.forEach(c => {
-      c.material.uniforms.uVol.value = tex;
-      c.material.uniforms.uPal.value = pal;
-    });
+    const sec = slicer.sections;
+    if (sec.mriHd) {
+      // Section texture coord t -> HD voxel t * dims * k, minus the crop corner.
+      const hd = sec.mriHd, k = hd.voxelScale, [hw, hh, hdep] = hd.dims;
+      sec.mriScale.set(w * k / hw, h * k / hh, d * k / hdep);
+      sec.mriOffset.set(-hd.corner[0] / hw, -hd.corner[1] / hh, -hd.corner[2] / hdep);
+    }
+    syncCapUniforms();
+    if (sec.mriHd?.labels) loadSectionLabelsHd(sec, base + sec.mriHd.labels);
     initStructures(model);
     setSliceFace('atlas');
     sliceFace.classList.toggle('hidden', !slicer.sections.mriUrl);
@@ -1627,6 +1633,7 @@ function disposeSections() {
   sliceFace.classList.add('hidden');
   if (!slicer.sections) return;
   slicer.sections.mriTex?.dispose();
+  slicer.sections.labelsHdTex?.dispose();
   slicer.sections.tex.dispose();
   slicer.sections.pal.dispose();
   slicer.sections = null;
@@ -1654,15 +1661,66 @@ const SECTION_CAP_FRAG = /* glsl */`
   uniform vec3 uMriScale;  // section texture coords -> MRI texture coords
   uniform vec3 uMriOffset; //   (the HD scan is finer and cropped)
   uniform float uMode;  // 0 = atlas colours, 1 = the MRI only
+  uniform sampler3D uVolHd; // the region map at full 0.5 mm (computers), same crop as the HD scan
+  uniform float uUseHd;     // 1 once uVolHd is loaded
+  uniform vec3 uHdScale;    // section texture coords -> HD texture coords
+  uniform vec3 uHdOffset;
+  uniform vec3 uDims;       // voxel counts of uVol / uVolHd
+  uniform vec3 uDimsHd;
+  uniform float uSmooth;    // 1 = smooth boundaries between voxels
   varying vec3 vWorld;
-  float regionAt(vec3 t) { return floor(texture(uVol, t).r * 255.0 + 0.5); }
+  float labelAt(sampler3D v, ivec3 c, ivec3 n) {
+    return floor(texelFetch(v, clamp(c, ivec3(0), n - 1), 0).r * 255.0 + 0.5);
+  }
+  // The region at texture coords tc of volume v, as vec3(region, how
+  // firmly it wins 0..1, runner-up region). Smoothing treats each region as
+  // a soft shape: the 8 voxels around the point vote with their trilinear
+  // weights and the region with the most weight wins. Boundaries then
+  // follow the curve the voxels describe (never more than half a voxel from
+  // the data) instead of a staircase; no region is invented or moved. The
+  // winning margin also says how close a boundary is, which draws the
+  // border lines without extra lookups.
+  vec3 labelIn(sampler3D v, vec3 tc, vec3 dims) {
+    if (uSmooth < 0.5) return vec3(floor(texture(v, tc).r * 255.0 + 0.5), 1.0, -1.0);
+    vec3 p = tc * dims - 0.5;
+    ivec3 b = ivec3(floor(p));
+    vec3 f = p - floor(p);
+    ivec3 n = ivec3(dims);
+    float L[8];
+    float W[8];
+    for (int i = 0; i < 8; i++) {
+      ivec3 o = ivec3(i & 1, (i >> 1) & 1, (i >> 2) & 1);
+      L[i] = labelAt(v, b + o, n);
+      vec3 w = mix(1.0 - f, f, vec3(o));
+      W[i] = w.x * w.y * w.z;
+    }
+    float S[8]; // total weight of each voxel's region
+    for (int i = 0; i < 8; i++) {
+      S[i] = 0.0;
+      for (int j = 0; j < 8; j++) S[i] += L[j] == L[i] ? W[j] : 0.0;
+    }
+    float best = L[0], bestW = S[0];
+    for (int i = 1; i < 8; i++) if (S[i] > bestW) { best = L[i]; bestW = S[i]; }
+    float second = -1.0, secondW = -1.0;
+    for (int i = 0; i < 8; i++) if (L[i] != best && S[i] > secondW) { second = L[i]; secondW = S[i]; }
+    return vec3(best, bestW, second);
+  }
+  vec3 regionAt(vec3 t) {
+    if (uUseHd > 0.5) {
+      vec3 th = t * uHdScale + uHdOffset;
+      if (any(lessThan(th, vec3(0.0))) || any(greaterThan(th, vec3(1.0)))) return vec3(0.0, 1.0, -1.0);
+      return labelIn(uVolHd, th, uDimsHd);
+    }
+    return labelIn(uVol, t, uDims);
+  }
   // 1 when a neighbour is a different region (not empty space: the outer
   // edge is trimmed smoothly by the outline stencil instead).
   float border(float n, float r) { return step(0.5, n) * step(0.5, abs(n - r)); }
   void main() {
     vec3 t = (uWorldToTex * vec4(vWorld, 1.0)).xyz;
     if (any(lessThan(t, vec3(0.0))) || any(greaterThan(t, vec3(1.0)))) discard;
-    float r = regionAt(t);
+    vec3 here = regionAt(t);
+    float r = here.x;
     bool mri = uMode > 0.5;
     // Atlas mode shows labelled voxels only; MRI mode also shows the scan
     // between them (fluid in sulci, ...) inside the outline mask.
@@ -1676,10 +1734,17 @@ const SECTION_CAP_FRAG = /* glsl */`
       return;
     }
     vec3 col = pc.rgb;
-    // Darken voxels on a border between regions (neighbours within the plane).
-    float edge = border(regionAt(t + uTexU), r) + border(regionAt(t - uTexU), r)
-               + border(regionAt(t + uTexV), r) + border(regionAt(t - uTexV), r);
-    if (edge > 0.0) col *= 0.7;
+    if (uSmooth > 0.5) {
+      // Smooth border line where the vote is close between two regions (not
+      // against empty space: the outline stencil trims the outer edge).
+      if (here.z > 0.5) col *= mix(0.66, 1.0, smoothstep(0.55, 0.9, here.y));
+    } else {
+      // Darken voxels on a border between regions (neighbours within the plane).
+      vec3 du = uTexU * (uUseHd > 0.5 ? 0.5 : 1.0), dv = uTexV * (uUseHd > 0.5 ? 0.5 : 1.0);
+      float edge = border(regionAt(t + du).x, r) + border(regionAt(t - du).x, r)
+                 + border(regionAt(t + dv).x, r) + border(regionAt(t - dv).x, r);
+      if (edge > 0.0) col *= 0.7;
+    }
     if (r > 0.5 && (abs(r - uHover) < 0.5 || abs(r - uSel) < 0.5)) col = mix(col, vec3(1.0), 0.35);
     gl_FragColor = vec4(col, 1.0);
   }`;
@@ -1689,9 +1754,51 @@ const SECTION_CAP_FRAG = /* glsl */`
 // the cut face is the scan alone (no atlas colours on it).
 const SLICE_FACE_MODES = { atlas: 0, mri: 1 };
 
-// Computers get the full 0.5 mm scan; phones / tablets the 1 mm one, which
-// needs an eighth of the download and of the graphics memory.
+// Computers get the full 0.5 mm scan and region map; phones / tablets the
+// 1 mm ones, which need an eighth of the download and graphics memory.
 const MRI_HD = !window.matchMedia('(pointer: coarse)').matches;
+// Smooth the cut face's region boundaries (see labelIn in the shader).
+const SLICE_SMOOTH = true;
+
+// Pushes the current section textures and settings to the cut-face shader.
+function syncCapUniforms() {
+  if (!slicer.caps) return;
+  const u = slicer.caps.children[0].material.uniforms;
+  const sec = slicer.sections;
+  u.uVol.value = sec?.tex ?? null;
+  u.uPal.value = sec?.pal ?? null;
+  u.uMri.value = sec?.mriTex ?? null;
+  u.uMode.value = SLICE_FACE_MODES[slicer.face] ?? 0;
+  u.uMriScale.value.copy(sec?.mriScale ?? _ONE3);
+  u.uMriOffset.value.copy(sec?.mriOffset ?? _ZERO3);
+  u.uVolHd.value = sec?.labelsHdTex ?? null;
+  u.uUseHd.value = sec?.labelsHdTex ? 1 : 0;
+  u.uHdScale.value.copy(sec?.mriScale ?? _ONE3); // same crop as the HD scan
+  u.uHdOffset.value.copy(sec?.mriOffset ?? _ZERO3);
+  if (sec) u.uDims.value.set(...sec.dims);
+  if (sec?.mriHd) u.uDimsHd.value.set(...sec.mriHd.dims);
+}
+
+// The 0.5 mm region map (computers): sharper cut-face boundaries. Loaded in
+// the background after the brain opens; the 1 mm map is used until then.
+async function loadSectionLabelsHd(sec, url) {
+  try {
+    const data = await fetchMaybeGzip(url);
+    const [w, h, d] = sec.mriHd.dims;
+    if (data.length !== w * h * d) throw new Error('Region map has the wrong size');
+    if (slicer.sections !== sec) return; // switched models meanwhile
+    const tex = new THREE.Data3DTexture(data, w, h, d);
+    tex.format = THREE.RedFormat;
+    tex.type = THREE.UnsignedByteType;
+    tex.minFilter = tex.magFilter = THREE.NearestFilter;
+    tex.unpackAlignment = 1;
+    tex.needsUpdate = true;
+    sec.labelsHdTex = tex;
+    syncCapUniforms();
+  } catch (e) {
+    console.warn('Sharper region map not loaded; using the 1 mm one.', e);
+  }
+}
 let _mriLoading = null;
 
 // Fetches the MRI template (models with `mri` in <id>_regions.json) once.
@@ -1712,10 +1819,6 @@ async function loadSectionMri() {
           const cur = z * plane, prev = cur - plane;
           for (let i = 0; i < plane; i++) data[cur + i] = (data[cur + i] + data[prev + i]) & 255;
         }
-        // Section texture coord t -> HD voxel t * dims * k, minus the crop corner.
-        const k = hd.voxelScale;
-        sec.mriScale.set(sec.dims[0] * k / w, sec.dims[1] * k / h, sec.dims[2] * k / d);
-        sec.mriOffset.set(-hd.corner[0] / w, -hd.corner[1] / h, -hd.corner[2] / d);
       }
       const tex = new THREE.Data3DTexture(data, w, h, d);
       tex.format = THREE.RedFormat;
@@ -1748,13 +1851,7 @@ async function setSliceFace(face) {
   slicer.face = face;
   slicer.capGrey.value = face === 'mri' ? 1 : 0;
   sliceFace.querySelectorAll('button[data-face]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.face === face)));
-  if (slicer.caps) {
-    const u = slicer.caps.children[0].material.uniforms;
-    u.uMri.value = slicer.sections?.mriTex ?? null;
-    u.uMode.value = SLICE_FACE_MODES[face];
-    u.uMriScale.value.copy(slicer.sections?.mriScale ?? _ONE3);
-    u.uMriOffset.value.copy(slicer.sections?.mriOffset ?? _ZERO3);
-  }
+  syncCapUniforms();
 }
 
 function buildSectionCaps() {
@@ -1774,6 +1871,13 @@ function buildSectionCaps() {
       uMriScale: { value: (slicer.sections?.mriScale ?? _ONE3).clone() },
       uMriOffset: { value: (slicer.sections?.mriOffset ?? _ZERO3).clone() },
       uMode: { value: SLICE_FACE_MODES[slicer.face] ?? 0 },
+      uVolHd: { value: null },
+      uUseHd: { value: 0 },
+      uHdScale: { value: new THREE.Vector3(1, 1, 1) },
+      uHdOffset: { value: new THREE.Vector3() },
+      uDims: { value: new THREE.Vector3(1, 1, 1) },
+      uDimsHd: { value: new THREE.Vector3(1, 1, 1) },
+      uSmooth: { value: SLICE_SMOOTH ? 1 : 0 },
     },
     side: THREE.DoubleSide,
     // In front of mesh fragments lying on the plane. The slope factor covers
@@ -2056,7 +2160,7 @@ function setSlicing(on) {
   setSliceMaterialsDoubleSided(on);
   if (on) {
     if (!slicer.helpers) slicer.helpers = buildSliceHelpers();
-    if (!slicer.caps) slicer.caps = buildSectionCaps();
+    if (!slicer.caps) { slicer.caps = buildSectionCaps(); syncCapUniforms(); }
     if (slicer.outline && !slicer.stencils) slicer.stencils = buildOutlineStencils();
     updateSlicePlanes();
   } else {

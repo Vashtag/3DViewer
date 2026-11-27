@@ -1016,7 +1016,8 @@
     48,
     45
    ],
-   "encoding": "delta-depth"
+   "encoding": "delta-depth",
+   "labels": "brain_sections_hd.bin.gz"
   }
  }
 }

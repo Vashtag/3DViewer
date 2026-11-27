@@ -15,6 +15,8 @@ Writes to models/brain/:
                          (uint8), shown on the cut face in MRI mode (phones)
   brain_mri_hd.bin.gz    the same template at its full 0.5 mm resolution,
                          cropped to the brain (computers; see export_mri)
+  brain_sections_hd.bin.gz  the region map at its full 0.5 mm resolution, same
+                         crop (computers: sharper cut-face boundaries)
 
 Coordinates: the atlas is "asr" in micrometres (axis 0 -> posterior,
 1 -> inferior, 2 -> left). The viewer wants millimetres with +X = patient's
@@ -111,6 +113,18 @@ def export_mri(atlas, ann):
     with gzip.open(OUT / "brain_mri_hd.bin.gz", "wb", compresslevel=9) as f:
         f.write(np.ascontiguousarray(delta).tobytes())
     print(f"MRI template HD {hd.shape} from voxel {c0.tolist()}")
+
+    # The region map at full 0.5 mm, same crop: the cut face draws its region
+    # boundaries from this on computers (the 1 mm map stays for phones and
+    # for naming what's under the pointer).
+    present = set(np.unique(ann).tolist()) - {0}
+    ids = [sid for sid in atlas.structures.keys() if sid in present]  # same order as the regions
+    lut = np.zeros(int(ann.max()) + 1, dtype=np.uint8)
+    for i, sid in enumerate(ids, start=1):
+        lut[sid] = i
+    labels_hd = lut[ann[c0[0]:c1[0], c0[1]:c1[1], c0[2]:c1[2]]]
+    with gzip.open(OUT / "brain_sections_hd.bin.gz", "wb", compresslevel=9) as f:
+        f.write(np.ascontiguousarray(labels_hd).tobytes())
     a_n, s_n, r_n = hd.shape
     return {
         "file": "brain_mri.bin.gz",
@@ -121,6 +135,7 @@ def export_mri(atlas, ann):
             "voxelScale": k,                             # section voxel = k x k x k of these
             "corner": [int(c0[2]), int(c0[1]), int(c0[0])],  # (r, s, a) of the crop, in these voxels
             "encoding": "delta-depth",                   # slice z stores slice z minus slice z-1
+            "labels": "brain_sections_hd.bin.gz",        # region map, same grid, plain
         },
     }
 
