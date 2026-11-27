@@ -94,17 +94,34 @@ const SCENE_DEFS = `<svg width="0" height="0" style="position:absolute" aria-hid
 // picture is the left half of the visual field.
 function paintView(svg, loss, sparing) {
   svg.textContent = '';
-  if (sceneOk) el('image', { href: SCENE_URL, width: 320, height: 200, preserveAspectRatio: 'xMidYMid slice' }, svg);
-  else el('use', { href: '#vp-scene', width: 320, height: 200 }, svg);
-  const maskId = svg.dataset.mask;
-  const mask = el('mask', { id: maskId }, svg);
-  el('rect', { width: 320, height: 200, fill: 'white' }, mask);
-  if (sparing) el('circle', { cx: 160, cy: 100, r: 30, fill: 'black', filter: 'url(#vp-feather)' }, mask);
-  const shade = el('g', { mask: `url(#${maskId})` }, svg);
+  // A circle of radius 160 around the fixation point (160, 100).
+  const id = svg.dataset.mask;
+  const clip = el('clipPath', { id: `${id}-c` }, svg);
+  el('circle', { cx: 160, cy: 100, r: 159 }, clip);
+  const view = el('g', { 'clip-path': `url(#${id}-c)` }, svg);
+  if (sceneOk) {
+    el('image', { href: SCENE_URL, x: 0, y: -60, width: 320, height: 320, preserveAspectRatio: 'xMidYMid slice' }, view);
+  } else {
+    // The drawn scene is wider than tall: carry its sky up and its grass and
+    // road down to fill the circle.
+    el('rect', { x: 0, y: -60, width: 320, height: 160, fill: '#7fb7ea' }, view);
+    el('rect', { x: 0, y: 150, width: 320, height: 110, fill: '#8fc27a' }, view);
+    el('path', { d: 'M120 199 L200 199 L222 260 L98 260 Z', fill: '#8a8f9c' }, view);
+    el('path', { d: 'M160 212 V226 M160 240 V254', stroke: '#f2f2f2', 'stroke-width': 2.5 }, view);
+    el('use', { href: '#vp-scene', width: 320, height: 200 }, view);
+  }
+  const mask = el('mask', { id }, svg);
+  el('rect', { x: 0, y: -60, width: 320, height: 320, fill: 'white' }, mask);
+  if (sparing) el('circle', { cx: 160, cy: 100, r: 34, fill: 'black', filter: 'url(#vp-feather)' }, mask);
+  const shade = el('g', { mask: `url(#${id})` }, view);
   const dark = el('g', { filter: 'url(#vp-feather)', fill: '#05060a', opacity: 0.94 }, shade);
-  const Q = { 'left-upper': [0, 0], 'right-upper': [160, 0], 'left-lower': [0, 100], 'right-lower': [160, 100] };
-  for (const key in Q) if (loss[key]) el('rect', { x: Q[key][0] ? 160 : -8, y: Q[key][1] ? 100 : -8, width: 168, height: 108 }, dark);
-  el('path', { d: 'M160 93 V107 M153 100 H167', stroke: '#e04848', 'stroke-width': 2.5, 'stroke-linecap': 'round' }, svg);
+  // Quarters: left half of the circle = left visual field.
+  const Q = { 'left-upper': [-8, -68], 'right-upper': [160, -68], 'left-lower': [-8, 100], 'right-lower': [160, 100] };
+  for (const key in Q) if (loss[key]) el('rect', { x: Q[key][0], y: Q[key][1], width: 168, height: 168 }, dark);
+  el('line', { x1: 0, y1: 100, x2: 320, y2: 100, class: 'vp-view-axis' }, view);
+  el('line', { x1: 160, y1: -60, x2: 160, y2: 260, class: 'vp-view-axis' }, view);
+  el('circle', { cx: 160, cy: 100, r: 159, class: 'vp-view-ring' }, svg);
+  el('path', { d: 'M160 92 V108 M152 100 H168', stroke: '#e04848', 'stroke-width': 3, 'stroke-linecap': 'round' }, svg);
 }
 
 // Mounts the diagram and pictures into `host`. onChange(lesion, side) is
@@ -113,8 +130,8 @@ export function mountPathwayDiagram(host, { onChange } = {}) {
   host.innerHTML = `${SCENE_DEFS}
     <div class="vp-views">
       <div class="vp-pair">
-        <figure class="vp-view"><figcaption>Left eye</figcaption><svg viewBox="0 0 320 200" data-mask="vp-m-L" role="img" aria-label="What the left eye sees"></svg></figure>
-        <figure class="vp-view"><figcaption>Right eye</figcaption><svg viewBox="0 0 320 200" data-mask="vp-m-R" role="img" aria-label="What the right eye sees"></svg></figure>
+        <figure class="vp-view"><figcaption>Left eye</figcaption><svg viewBox="-2 -62 324 324" data-mask="vp-m-L" role="img" aria-label="What the left eye sees"></svg></figure>
+        <figure class="vp-view"><figcaption>Right eye</figcaption><svg viewBox="-2 -62 324 324" data-mask="vp-m-R" role="img" aria-label="What the right eye sees"></svg></figure>
       </div>
       <div class="vp-caption" aria-live="polite"><b></b><span></span></div>
     </div>
