@@ -5,6 +5,7 @@ import { OrbitControls } from './OrbitControls.js';
 import { PointerLockControls } from './PointerLockControls.js';
 import { CSS2DRenderer, CSS2DObject } from './CSS2DRenderer.js';
 import { scormModelOpened, scormReportInteraction, scormReportScore } from './scorm.js';
+import { createVisualPathway, LESIONS, LESION_BY_ID, fieldLoss, fieldChartSVG, PATHWAY_LABELS } from './visual-pathway.js';
 
 // ── DOM refs ──────────────────────────────────────────────
 const canvas          = document.getElementById('viewer-canvas');
@@ -184,6 +185,11 @@ shortcutsModal.addEventListener('keydown', e => {
 //   sliceByDefault: true to open the model already sliced (needs slicer).
 //   sections: optional <id>_regions.json with region names and a voxel
 //             volume used to colour the cut face by region (see the brain).
+//   build:    optional function returning a THREE.Object3D, for models made
+//             in code instead of loaded from `file`.
+//   labels / savedViews: optional inline versions of <id>_labels.json and
+//             <id>_view.json (used instead of fetching them).
+//   pathway:  true for the visual pathway (shows the lesion panel).
 //   credit:   optional source/licence line shown in the viewer's corner while
 //             the model is open: [{ text, href? }, …].
 const DEFAULT_VIEWS = [
@@ -263,6 +269,24 @@ const MODELS = [
       { label: 'Right',     dir: 'left'   },
       { label: 'Superior',  dir: 'top'    },
       { label: 'Inferior',  dir: 'bottom' },
+    ],
+  },
+  {
+    // Schematic visual pathway built in code (js/visual-pathway.js): pick a
+    // lesion site, see the visual field defect.
+    id: 'visual-pathway', label: 'Visual Pathway', build: () => buildPathwayModel(),
+    devFeature: 'visual', // developer mode only, while in testing
+    noFly: true,
+    pathway: true,        // shows the lesion panel
+    labels: PATHWAY_LABELS,
+    savedViews: { top: { cameraUp: [0, 0, 1] } }, // from above, eyes at the top (like the textbook diagram)
+    views: [
+      { label: 'Superior',  dir: 'top'    },
+      { label: 'Anterior',  dir: 'front'  },
+      { label: 'Left',      dir: 'right'  },
+      { label: 'Right',     dir: 'left'   },
+      { label: 'Inferior',  dir: 'bottom' },
+      { label: 'Posterior', dir: 'back'   },
     ],
   },
 ];
@@ -414,6 +438,9 @@ labelRenderer.domElement.style.position = 'absolute';
 labelRenderer.domElement.style.top = '0';
 labelRenderer.domElement.style.left = '0';
 labelRenderer.domElement.style.pointerEvents = 'none';
+// Own stacking context: CSS2DRenderer gives each label a depth z-index, which
+// would otherwise lift labels above docked panels (e.g. the lesion sheet).
+labelRenderer.domElement.style.zIndex = '1';
 container.appendChild(labelRenderer.domElement);
 
 // ── Resize ────────────────────────────────────────────────
@@ -918,7 +945,8 @@ async function loadRegion(region) {
   // Saved per-view orientation (authored in edit mode) overrides the default.
   savedViews = {};
   _orientOffset.set(0, 0, 0);
-  try {
+  if (model.savedViews) savedViews = structuredClone(model.savedViews);
+  else try {
     const res = await fetch(`models/${model.id}/${model.id}_view.json`, { cache: 'no-store' });
     if (res.ok) {
       const cfg = await res.json();
@@ -941,6 +969,7 @@ async function loadRegion(region) {
     setPinMode(false);
     setSlicing(false);
     disposeSections();
+    closePathway();
     scene.remove(currentModel);
     currentModel.traverse(child => {
       if (child.isMesh) {
@@ -954,10 +983,7 @@ async function loadRegion(region) {
     _viewTween = null; // drop any in-progress transition from the old model
   }
 
-  gltfLoader.load(
-    model.file,
-    (gltf) => {
-      const object = gltf.scene;
+  const onModelObject = (object) => {
       setProgress(100);
       softenMaterials(object, model.brightness ?? 1);
 
@@ -994,7 +1020,17 @@ async function loadRegion(region) {
       loadLines(model);
       initPinLayer();
       setTimeout(() => { hideLoading(); modelArrived(); }, 300); // model on screen: the big downloads may start
-    },
+      if (model.pathway) openPathway();
+  };
+
+  // Models made in code are built right away; the rest load from their file.
+  if (model.build) {
+    setTimeout(() => onModelObject(model.build()), 0);
+    return;
+  }
+  gltfLoader.load(
+    model.file,
+    (gltf) => onModelObject(gltf.scene),
     (xhr) => {
       if (xhr.lengthComputable) setProgress(Math.round((xhr.loaded / xhr.total) * 100));
     },
@@ -1083,6 +1119,15 @@ function resetView() {
   if (!camera._defaultPos) return;
   _viewTween = null;
   if (navMode === 'fly') setNavMode('orbit');
+  // A model that opens on an authored view returns to it.
+  const firstDir = (activeModelDef?.views ?? DEFAULT_VIEWS)[0]?.dir;
+  if (currentModel && savedViews[firstDir]) {
+    camera.near = camera._defaultNear;
+    camera.far  = camera._defaultFar;
+    camera.updateProjectionMatrix();
+    setView(firstDir, true);
+    return;
+  }
   camera.up.set(0, 1, 0);
   camera.position.copy(camera._defaultPos);
   camera.near = camera._defaultNear;
@@ -1314,6 +1359,8 @@ settingsReset.addEventListener('click', () => {
 const DEV_PASSWORD = 'developer';
 const DEV_FEATURES = [
   // { id: 'example', label: 'Example feature', description: 'What it does and what to test.' },
+  { id: 'visual', label: 'Visual pathway & lesions',
+    description: 'Adds a schematic Visual Pathway model: pick a lesion site (optic nerve to visual cortex) and see the visual field defect in each eye.' },
 ];
 
 // Developer mode is hidden from Settings unless the page address has ?dev
@@ -1521,6 +1568,7 @@ function prepareSliceMaterials(object, model) {
     }
     const mats = Array.isArray(child.material) ? child.material : [child.material];
     mats.forEach(m => {
+      if ('sliceOrigSide' in m.userData) return; // shared material: already prepared
       m.userData.sliceOrigSide = m.side;
       const capColor = model?.sections && m.color
         ? m.color.clone().convertLinearToSRGB()
@@ -2779,7 +2827,8 @@ async function loadLabels(model) {
   currentModel.add(labelLayer);
 
   let raw = [];
-  try {
+  if (model.labels) raw = model.labels;
+  else try {
     const res = await fetch(`models/${model.id}/${model.id}_labels.json`, { cache: 'no-store' });
     if (res.ok) raw = await res.json();
   } catch (e) { /* no labels file — fine */ }
@@ -3564,6 +3613,7 @@ function updateHint(locked = flyControls.isLocked) {
 
 function setNavMode(mode) {
   if (mode === 'fly' && activeModelDef?.noFly) mode = 'orbit';
+  const wasFlying = navMode === 'fly';
   navMode = mode;
   navBtns.forEach(b => {
     b.classList.toggle('active', b.dataset.mode === mode);
@@ -3576,7 +3626,9 @@ function setNavMode(mode) {
     camera.up.set(0, 1, 0);
   } else {
     if (flyControls.isLocked) flyControls.unlock();
-    camera.up.set(0, 1, 0);
+    // Only straighten the camera when leaving fly mode: a preset view (e.g. a
+    // top view with its own "up") must survive the switch on model load.
+    if (wasFlying) camera.up.set(0, 1, 0);
     controls.enabled = true;
     controls.target.set(0, 0, 0);
     controls.update();
@@ -4017,6 +4069,7 @@ function endQuiz() {
   quizPanel.classList.add('hidden');
   container.classList.remove('quiz-active');
   camera.clearViewOffset();
+  applyPathwayViewOffset();
   if (quizMarker) {
     quizMarker.visible = false;
     if (quizMarker.parent) quizMarker.parent.remove(quizMarker);
@@ -4283,4 +4336,100 @@ document.addEventListener('keydown', e => {
 const _posterCache = [];
 (window.requestIdleCallback || (fn => setTimeout(fn, 1500)))(() => {
   MODELS.forEach(m => { const img = new Image(); img.src = posterUrl(m); _posterCache.push(img); });
+});
+
+
+// ── Visual pathway: lesion panel ──────────────────────────
+// The pathway model (js/visual-pathway.js) is built in code. This panel picks
+// the lesion site and side, and shows the visual field of each eye.
+let pathway = null;
+const lesionDock   = document.getElementById('lesion-dock');
+const lesionList   = document.getElementById('lesion-list');
+const lesionSide   = document.getElementById('lesion-side');
+const lesionFields = document.getElementById('lesion-fields');
+const lesionDefect = document.getElementById('lesion-defect');
+const lesionNote   = document.getElementById('lesion-note');
+
+function buildPathwayModel() {
+  pathway?.dispose();
+  pathway = createVisualPathway({ CSS2DObject });
+  return pathway.group;
+}
+
+function renderLesionPanel() {
+  if (!pathway) return;
+  const { id, side } = pathway.lesion;
+  const lesion = LESION_BY_ID[id];
+  // The chiasm is in the middle: the side still applies to the next pick.
+  lesionSide.querySelectorAll('button[data-side]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.side === side)));
+  lesionSide.classList.toggle('muted', !!lesion?.midline);
+  lesionList.querySelectorAll('button[data-lesion]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lesion === (id || ''))));
+  lesionFields.innerHTML = fieldChartSVG(fieldLoss(id, side), !!lesion?.sparing);
+  lesionDefect.textContent = lesion ? lesion.defect(side) : 'Normal visual fields';
+  lesionNote.textContent = lesion
+    ? lesion.note(side)
+    : 'Pick a lesion site, or click a numbered marker on the pathway. Blue fibres carry the left visual field, green the right.';
+}
+
+function setPathwayLesion(id, side) {
+  if (!pathway) return;
+  pathway.setLesion(id, side ?? pathway.lesion.side);
+  renderLesionPanel();
+  const l = LESION_BY_ID[id];
+  if (l) announce(`${l.name}: ${l.defect(pathway.lesion.side)}`);
+}
+
+// Phones: the lesion panel is a bottom sheet, so shift the picture up (via the
+// camera's view offset) to keep the pathway in the space above it.
+function applyPathwayViewOffset() {
+  if (!pathway || !quizPanel.classList.contains('hidden')) return;
+  const w = renderer.domElement.clientWidth;
+  const h = renderer.domElement.clientHeight;
+  if (!window.matchMedia('(max-width: 600px)').matches || !w || !h) { camera.clearViewOffset(); return; }
+  camera.setViewOffset(w, h, 0, Math.round(lesionDock.offsetHeight / 2), w, h);
+}
+const _pathwayDockObs = new ResizeObserver(() => applyPathwayViewOffset());
+
+function openPathway() {
+  if (!pathway) return;
+  lesionList.innerHTML = '<button type="button" data-lesion="" aria-pressed="true">None</button>'
+    + LESIONS.map(l => `<button type="button" data-lesion="${l.id}"><b>${l.num}</b> ${l.name}</button>`).join('');
+  lesionDock.classList.remove('hidden');
+  container.classList.add('pathway-open');
+  renderLesionPanel();
+  _pathwayDockObs.observe(lesionDock);
+  _pathwayDockObs.observe(container);
+  applyPathwayViewOffset();
+}
+
+function closePathway() {
+  pathway?.dispose();
+  pathway = null;
+  _pathwayDockObs.disconnect();
+  camera.clearViewOffset();
+  lesionDock.classList.add('hidden');
+  container.classList.remove('pathway-open');
+}
+
+lesionList.addEventListener('click', e => {
+  const b = e.target.closest('button[data-lesion]');
+  if (b) setPathwayLesion(b.dataset.lesion || null);
+});
+lesionSide.addEventListener('click', e => {
+  const b = e.target.closest('button[data-side]');
+  if (b && pathway) setPathwayLesion(pathway.lesion.id, b.dataset.side);
+});
+
+// Click a numbered marker on the pathway to pick that lesion.
+const _lesionRay = new THREE.Raycaster();
+const _lesionNdc = new THREE.Vector2();
+renderer.domElement.addEventListener('click', e => {
+  if (!pathway || navMode !== 'orbit' || currentClickMode() !== null) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  _lesionNdc.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+  _lesionRay.setFromCamera(_lesionNdc, camera);
+  const hit = _lesionRay.intersectObjects(pathway.markers.filter(m => m.visible), false)[0];
+  if (!hit) return;
+  const { id, side } = hit.object.userData.lesion;
+  setPathwayLesion(id, side ?? pathway.lesion.side);
 });
