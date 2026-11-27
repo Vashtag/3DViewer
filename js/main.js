@@ -905,6 +905,11 @@ async function loadRegion(region) {
   if (!model) { console.error('Unknown model:', region); return; }
   activeModelDef = model;
   showModelCredit(model);
+  // Region data downloads alongside the 3D model; the large full-resolution
+  // map waits until the model is on screen so it doesn't slow it down.
+  let modelArrived;
+  const modelReady = new Promise(r => { modelArrived = r; });
+  if (model.sections) startSectionsFetch(model, modelReady);
   showLoading('Loading ' + model.label + '…', posterUrl(model));
   canvas.setAttribute('aria-label', `3D model of the ${model.label}. Arrow keys rotate, plus and minus zoom.`);
   setDrawMode(false);
@@ -976,7 +981,9 @@ async function loadRegion(region) {
       recenterModel();
       prepareSliceMaterials(object, model);
       applySlicerFeature();
-      if (model.sections) loadSections(model);
+      // Region data (already downloading) is set up once the brain is on
+      // screen, so the model appears first and the cut's colours follow.
+      if (model.sections) modelReady.then(() => loadSections(model));
       fitCameraToModel(object);
       // If the first view was authored, frame the model with its saved
       // zoom and pan offset.
@@ -988,12 +995,12 @@ async function loadRegion(region) {
       initLineLayer();
       loadLines(model);
       initPinLayer();
-      setTimeout(hideLoading, 300);
+      setTimeout(() => { hideLoading(); modelArrived(); }, 300); // model on screen: the big downloads may start
     },
     (xhr) => {
       if (xhr.lengthComputable) setProgress(Math.round((xhr.loaded / xhr.total) * 100));
     },
-    (err) => { _loadingMsg = ''; loadingText.textContent = 'Could not load the model. Check your connection and try again.'; console.error(err); }
+    (err) => { modelArrived(); _loadingMsg = ''; loadingText.textContent = 'Could not load the model. Check your connection and try again.'; console.error(err); }
   );
 }
 
@@ -1564,11 +1571,80 @@ async function fetchMaybeGzip(url) {
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
+// Downloads + unpacks a volume in a worker (js/volume-worker.js) so the page
+// stays responsive; falls back to the main thread if workers aren't available.
+let _volWorker = null, _volSeq = 0;
+const _volJobs = new Map();
+function volumeWorker() {
+  if (_volWorker !== null) return _volWorker;
+  try {
+    _volWorker = new Worker(new URL('./volume-worker.js', import.meta.url));
+    _volWorker.onmessage = e => {
+      const job = _volJobs.get(e.data.id);
+      if (!job) return;
+      _volJobs.delete(e.data.id);
+      if (e.data.error) job.reject(new Error(e.data.error)); else job.resolve(e.data.data);
+    };
+    _volWorker.onerror = () => { // worker couldn't start: finish its jobs here instead
+      const jobs = [..._volJobs.values()];
+      _volJobs.clear();
+      _volWorker = false;
+      jobs.forEach(j => loadVolumeHere(j.opts).then(j.resolve, j.reject));
+    };
+  } catch (e) {
+    _volWorker = false;
+  }
+  return _volWorker;
+}
+async function loadVolumeHere({ url, delta, plane }) {
+  const data = await fetchMaybeGzip(url);
+  if (delta && plane > 0) {
+    for (let cur = plane; cur < data.length; cur += plane) {
+      const prev = cur - plane;
+      for (let i = 0; i < plane; i++) data[cur + i] = (data[cur + i] + data[prev + i]) & 255;
+    }
+  }
+  return data;
+}
+function loadVolume(url, { delta = false, plane = 0, priority } = {}) {
+  const opts = { url: new URL(url, location.href).href, delta, plane, priority };
+  const w = volumeWorker();
+  if (!w) return loadVolumeHere(opts);
+  return new Promise((resolve, reject) => {
+    const id = ++_volSeq;
+    _volJobs.set(id, { resolve, reject, opts });
+    w.postMessage({ id, ...opts });
+  });
+}
+
+// Starts a model's region data downloading as soon as the model is picked,
+// alongside the 3D model itself (instead of one after the other). Each part
+// is a promise; loadSections() picks them up. Kept per model so reopening
+// the brain doesn't download it again.
+const _sectionsFetch = new Map();
+function startSectionsFetch(model, modelReady = Promise.resolve()) {
+  if (_sectionsFetch.has(model.id)) return _sectionsFetch.get(model.id);
+  const base = model.sections.slice(0, model.sections.lastIndexOf('/') + 1);
+  const meta = fetch(model.sections).then(r => {
+    if (!r.ok) throw new Error(`${model.sections}: ${r.status}`);
+    return r.json();
+  });
+  const vol = meta.then(m => loadVolume(base + m.sections.file));
+  // The full-resolution region map (computers only).
+  const hd = Promise.all([meta, modelReady])
+    .then(([m]) => (MRI_HD && m.mri?.hd?.labels ? loadVolume(base + m.mri.hd.labels) : null));
+  const entry = { base, meta, vol, hd };
+  [meta, vol, hd].forEach(p => p.catch(() => { _sectionsFetch.delete(model.id); })); // retry next time
+  _sectionsFetch.set(model.id, entry);
+  return entry;
+}
+
 async function loadSections(model) {
   try {
-    const base = model.sections.slice(0, model.sections.lastIndexOf('/') + 1);
-    const meta = await (await fetch(model.sections)).json();
-    const data = await fetchMaybeGzip(base + meta.sections.file);
+    const fetching = startSectionsFetch(model);
+    const base = fetching.base;
+    const meta = await fetching.meta;
+    const data = await fetching.vol;
     if (activeModelDef !== model) return; // switched models while loading
     const [w, h, d] = meta.sections.dims;
     if (data.length !== w * h * d) throw new Error('Section volume has the wrong size');
@@ -1619,7 +1695,7 @@ async function loadSections(model) {
       sec.mriOffset.set(-hd.corner[0] / hw, -hd.corner[1] / hh, -hd.corner[2] / hdep);
     }
     syncCapUniforms();
-    if (sec.mriHd?.labels) loadSectionLabelsHd(sec, base + sec.mriHd.labels);
+    if (sec.mriHd?.labels) loadSectionLabelsHd(sec, fetching.hd);
     initStructures(model);
     setSliceFace('atlas');
     sliceFace.classList.toggle('hidden', !slicer.sections.mriUrl);
@@ -1780,11 +1856,14 @@ function syncCapUniforms() {
   if (sec?.mriHd) u.uDimsHd.value.set(...sec.mriHd.dims);
 }
 
-// The 0.5 mm region map (computers): sharper cut-face boundaries. Loaded in
-// the background after the brain opens; the 1 mm map is used until then.
-async function loadSectionLabelsHd(sec, url) {
+// The 0.5 mm region map (computers): sharper cut-face boundaries. Fetched
+// alongside the brain (startSectionsFetch); the 1 mm map is used until it
+// arrives. Afterwards the MRI is fetched quietly in the background, so
+// switching the cut face to MRI is near-instant.
+async function loadSectionLabelsHd(sec, pending) {
   try {
-    const data = await fetchMaybeGzip(url);
+    const data = await pending;
+    if (!data) return;
     const [w, h, d] = sec.mriHd.dims;
     if (data.length !== w * h * d) throw new Error('Region map has the wrong size');
     if (slicer.sections !== sec) return; // switched models meanwhile
@@ -1796,6 +1875,12 @@ async function loadSectionLabelsHd(sec, url) {
     tex.needsUpdate = true;
     sec.labelsHdTex = tex;
     syncCapUniforms();
+    setTimeout(() => {
+      if (slicer.sections !== sec) return;
+      loadSectionMri({ priority: 'low' })
+        .then(tex => { if (tex && slicer.sections === sec) renderer.initTexture(tex); }) // upload now, not on first use
+        .catch(() => {});
+    }, 1500);
   } catch (e) {
     console.warn('Sharper region map not loaded; using the 1 mm one.', e);
   }
@@ -1803,24 +1888,17 @@ async function loadSectionLabelsHd(sec, url) {
 let _mriLoading = null;
 
 // Fetches the MRI template (models with `mri` in <id>_regions.json) once.
-async function loadSectionMri() {
+async function loadSectionMri({ priority } = {}) {
   const sec = slicer.sections;
   if (!sec?.mriUrl) return null;
   if (sec.mriTex) return sec.mriTex;
   if (!_mriLoading) {
     _mriLoading = (async () => {
-      const data = await fetchMaybeGzip(sec.mriUrl);
       const hd = sec.mriHd;
       const [w, h, d] = hd ? hd.dims : sec.dims;
+      // The HD scan stores slice-to-slice differences; the worker undoes them.
+      const data = await loadVolume(sec.mriUrl, { delta: !!hd, plane: w * h, priority });
       if (data.length !== w * h * d) throw new Error('MRI volume has the wrong size');
-      if (hd) {
-        // Undo the slice-to-slice differences (running sum, mod 256).
-        const plane = w * h;
-        for (let z = 1; z < d; z++) {
-          const cur = z * plane, prev = cur - plane;
-          for (let i = 0; i < plane; i++) data[cur + i] = (data[cur + i] + data[prev + i]) & 255;
-        }
-      }
       const tex = new THREE.Data3DTexture(data, w, h, d);
       tex.format = THREE.RedFormat;
       tex.type = THREE.UnsignedByteType;
