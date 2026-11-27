@@ -6,6 +6,7 @@ import { PointerLockControls } from './PointerLockControls.js';
 import { CSS2DRenderer, CSS2DObject } from './CSS2DRenderer.js';
 import { scormModelOpened, scormReportInteraction, scormReportScore } from './scorm.js';
 import { mountPathwayDiagram } from './visual-pathway-2d.js';
+import { mountMriAtlas } from './mri-atlas.js';
 import { createEyeMovements, OCULAR_LESIONS, OCULAR_BY_ID, OCULAR_LABELS, GAZES, gazeCellSVG } from './eye-movements.js';
 
 // ── DOM refs ──────────────────────────────────────────────
@@ -280,6 +281,15 @@ const MODELS = [
     devFeature: 'visual', // developer mode only, while in testing
     noFly: true,
     diagram: true,
+    labels: [], savedViews: {},
+  },
+  {
+    // Labelled MRI slices (js/mri-atlas.js), shown over the viewer like the
+    // Visual Pathway: pick a plane, drag through the slices, labels on / off.
+    id: 'brain-mri', label: 'Brain (MRI)', build: () => diagramPlaceholder(),
+    devFeature: 'mri',    // developer mode only, while in testing
+    noFly: true,
+    diagram: 'mri',
     labels: [], savedViews: {},
   },
   {
@@ -1372,6 +1382,8 @@ settingsReset.addEventListener('click', () => {
 const DEV_PASSWORD = 'developer';
 const DEV_FEATURES = [
   // { id: 'example', label: 'Example feature', description: 'What it does and what to test.' },
+  { id: 'mri', label: 'Brain (MRI)',
+    description: 'Adds a labelled MRI slice viewer: coronal, sagittal and transverse slices with 89 hand-outlined structures you can name by hovering or tapping.' },
   { id: 'visual', label: 'Visual pathway & eye movements',
     description: 'Adds two schematic models. Visual Pathway: pick a lesion site (optic nerve to visual cortex) and see the visual field defect in each eye. Eye Movements: CN III, IV and VI, MLF and gaze lesions, Horner and RAPD, with a nine-gaze chart and a penlight.' },
 ];
@@ -4377,9 +4389,13 @@ function openDiagram() {
   diagram?.destroy();
   diagramHost.classList.remove('hidden');
   document.body.classList.add('diagram-open');
-  diagram = mountPathwayDiagram(diagramHost, {
-    onChange: (lesion, side) => { if (lesion) announce(lesion.defect(side)); },
-  });
+  const kind = activeModelDef?.diagram;
+  diagramHost.classList.toggle('mri', kind === 'mri');
+  diagram = kind === 'mri'
+    ? mountMriAtlas(diagramHost, { base: 'models/brain-mri/', credit: 'MRI and outlines: bmy \u00a9 headneckbrainspine.com \u00b7 Scan: OASIS' })
+    : mountPathwayDiagram(diagramHost, {
+      onChange: (lesion, side) => { if (lesion) announce(lesion.defect(side)); },
+    });
 }
 
 // Phones: the lesion panel is a bottom sheet, so shift the picture up (via the
@@ -4397,6 +4413,7 @@ function closePathway() {
   diagram?.destroy();
   diagram = null;
   diagramHost.classList.add('hidden');
+  diagramHost.classList.remove('mri');
   document.body.classList.remove('diagram-open');
   ocular?.dispose();
   ocular = null;
