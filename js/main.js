@@ -181,6 +181,7 @@ shortcutsModal.addEventListener('keydown', e => {
 //             that feature is switched on (Settings > Developer).
 //   slicer:   true to offer the Cross-section panel for this model.
 //   noFly:    true to hide the Orbit / Fly switch (orbit only).
+//   sliceByDefault: true to open the model already sliced (needs slicer).
 //   sections: optional <id>_regions.json with region names and a voxel
 //             volume used to colour the cut face by region (see the brain).
 //   credit:   optional source/licence line shown in the viewer's corner while
@@ -242,10 +243,11 @@ const MODELS = [
     // Allen Human Reference Atlas via BrainGlobe (built by tools/build-brain.py).
     // One mesh per atlas region, in the atlas colours. +X is the patient's
     // left, so the Left/Right buttons look from +X/-X respectively.
-    id: 'brain', label: 'Brain (Allen atlas)', file: 'models/brain/brain.glb',
+    id: 'brain', label: 'Sliceable Brain', file: 'models/brain/brain.glb',
     category: 'CNS',
     slicer: true,         // shows the Cross-section panel
     noFly: true,          // orbit only (no Fly mode)
+    sliceByDefault: true, // opens already sliced
     sections: 'models/brain/brain_regions.json', // region names + section volume
     // Shown in the viewer's bottom-right corner while this model is open.
     credit: [
@@ -980,6 +982,7 @@ async function loadRegion(region) {
       // zoom and pan offset.
       if (savedViews[firstDir]) setView(firstDir);
       showViewerUI();
+      if (model.slicer && model.sliceByDefault) setSlicing(true);
       scormModelOpened(); // count toward SCORM completion (no-op outside an LMS)
       loadLabels(model);
       initLineLayer();
@@ -1476,7 +1479,10 @@ slicer = {
 
 const sliceSection   = document.getElementById('slice-section');
 const sliceToggle    = document.getElementById('slice-toggle');
-const sliceControls  = document.getElementById('slice-controls');
+const sliceDock      = document.getElementById('slice-dock');
+const sliceStart     = document.getElementById('slice-start');
+const sliceMore      = document.getElementById('slice-more');
+const sliceExtras    = document.getElementById('slice-extras');
 const sliceAxes      = document.getElementById('slice-axes');
 const slicePos       = document.getElementById('slice-pos');
 const slicePosVal    = document.getElementById('slice-pos-val');
@@ -1611,7 +1617,6 @@ async function loadSections(model) {
     initStructures(model);
     setSliceFace('atlas');
     sliceFace.classList.toggle('hidden', !slicer.sections.mriUrl);
-    sliceBarFace.classList.toggle('hidden', !slicer.sections.mriUrl);
   } catch (e) {
     console.error('Could not load the region sections:', e);
   }
@@ -1727,7 +1732,7 @@ async function loadSectionMri() {
 
 async function setSliceFace(face) {
   if (face !== 'atlas' && !slicer.sections?.mriTex) {
-    const btns = [...document.querySelectorAll(`#slice-face button[data-face="${face}"], #slice-bar-face button[data-face="${face}"]`)];
+    const btns = [...sliceFace.querySelectorAll(`button[data-face="${face}"]`)];
     const labels = btns.map(b => b.textContent);
     btns.forEach(b => { b.textContent = '…'; b.disabled = true; });
     try {
@@ -1742,8 +1747,7 @@ async function setSliceFace(face) {
   }
   slicer.face = face;
   slicer.capGrey.value = face === 'mri' ? 1 : 0;
-  document.querySelectorAll('#slice-face button[data-face], #slice-bar-face button[data-face]')
-    .forEach(b => b.setAttribute('aria-pressed', String(b.dataset.face === face)));
+  sliceFace.querySelectorAll('button[data-face]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.face === face)));
   if (slicer.caps) {
     const u = slicer.caps.children[0].material.uniforms;
     u.uMri.value = slicer.sections?.mriTex ?? null;
@@ -1912,7 +1916,8 @@ function updateSlicePlanes() {
     sliceTilt[i].value = String(slicer.tilt[i]);
   });
   sliceStraighten.disabled = !slicer.tilt[0] && !slicer.tilt[1];
-  syncSliceBar();
+  sliceAxes.querySelectorAll('button[data-axis]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.axis === slicer.axis)));
+  slicePos.value = String(Math.round(slicer.pos * 1000));
 }
 
 function buildSliceHelpers() {
@@ -2044,8 +2049,8 @@ function setSlicing(on) {
   slicer.on = on;
   sliceToggle.setAttribute('aria-pressed', String(on));
   sliceToggle.textContent = on ? 'Stop slicing' : 'Slice model';
-  sliceControls.classList.toggle('hidden', !on);
-  sliceBar.classList.toggle('hidden', !on); // phones only (CSS)
+  sliceDock.classList.toggle('hidden', !on);
+  sliceStart.classList.toggle('hidden', on || !activeModelDef?.slicer);
   container.classList.toggle('slicing', on);
   slicer.capOn.value = on ? 1 : 0;
   setSliceMaterialsDoubleSided(on);
@@ -2069,6 +2074,7 @@ function applySlicerFeature() {
   const feature = activeModelDef?.devFeature;
   const enabled = !!activeModelDef?.slicer && (!feature || isDevFeatureEnabled(feature));
   sliceSection.classList.toggle('hidden', !enabled);
+  sliceStart.classList.toggle('hidden', !enabled || slicer.on);
   if (!enabled && slicer.on) setSlicing(false);
 }
 
@@ -2397,41 +2403,23 @@ isolateRestore.addEventListener('click', () => {
 controls.addEventListener('start', () => { if (!structPop.classList.contains('hidden')) closeStructPop(); });
 window.addEventListener('keydown', e => { if (e.key === 'Escape' && !structPop.classList.contains('hidden')) closeStructPop(); });
 
+// ── Slice dock (the controls on the 3D view) ──
+const PHONE_LAYOUT = window.matchMedia('(max-width: 600px)');
 sliceToggle.addEventListener('click', () => {
   setSlicing(!slicer.on);
-  if (slicer.on && PHONE_LAYOUT.matches) closeDrawer(); // controls are on the main view
+  if (slicer.on && PHONE_LAYOUT.matches) closeDrawer(); // the dock is on the main view
 });
-
-// ── Phones: slice bar on the main view (mirrors the sidebar controls) ──
-const PHONE_LAYOUT = window.matchMedia('(max-width: 600px)');
-const sliceBar      = document.getElementById('slice-bar');
-const sliceBarAxes  = document.getElementById('slice-bar-axes');
-const sliceBarPos   = document.getElementById('slice-bar-pos');
-const sliceBarFace  = document.getElementById('slice-bar-face');
-function syncSliceBar() {
-  sliceBarAxes.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.axis === slicer.axis)));
-  sliceBarPos.value = String(Math.round(slicer.pos * 1000));
-}
-sliceBarAxes.addEventListener('click', e => {
+sliceStart.addEventListener('click', () => setSlicing(true));
+document.getElementById('slice-close').addEventListener('click', () => setSlicing(false));
+sliceMore.addEventListener('click', () => {
+  const open = sliceExtras.hidden;
+  sliceExtras.hidden = !open;
+  sliceMore.setAttribute('aria-expanded', String(open));
+});
+sliceAxes.addEventListener('click', e => {
   const btn = e.target.closest('button[data-axis]');
-  if (!btn) return;
-  const radio = sliceAxes.querySelector(`input[value="${btn.dataset.axis}"]`);
-  radio.checked = true;
-  radio.dispatchEvent(new Event('change', { bubbles: true }));
-});
-sliceBarPos.addEventListener('input', () => {
-  slicePos.value = sliceBarPos.value;
-  slicePos.dispatchEvent(new Event('input'));
-});
-sliceBarFace.addEventListener('click', e => {
-  const btn = e.target.closest('button[data-face]');
-  if (btn && !btn.disabled) setSliceFace(btn.dataset.face);
-});
-document.getElementById('slice-bar-more').addEventListener('click', openDrawer);
-document.getElementById('slice-bar-done').addEventListener('click', () => setSlicing(false));
-sliceAxes.addEventListener('change', e => {
-  if (e.target.name !== 'slice-axis') return;
-  slicer.axis = e.target.value;
+  if (!btn || btn.dataset.axis === slicer.axis) return;
+  slicer.axis = btn.dataset.axis;
   slicer.tilt = [0, 0]; // a new plane starts straight
   updateSlicePlanes();
 });
