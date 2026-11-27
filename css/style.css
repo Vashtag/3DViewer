@@ -2125,3 +2125,50 @@ body:not(.dev-mode) .dev-only { display: none !important; }
   #lesion-fields svg { max-width: 300px; margin: 0 auto; }
   #viewer-container.pathway-open #bottom-bar { display: none; }
 }
+
+/* ── Visual Pathway diagram (flat, top-down; js/visual-pathway-2d.js) ──
+   Shown over the viewer in place of a 3D model. The 3D tools are hidden
+   while it is open. */
+#pathway-diagram {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  background: var(--bg);
+  padding: 12px max(16px, env(safe-area-inset-right, 0px)) 14px max(16px, env(safe-area-inset-left, 0px));
+  overflow: auto;
+}
+#pathway-diagram.hidden { display: none; }
+body.diagram-open #viewer-toolbar,
+body.diagram-open #bottom-bar,
+body.diagram-open #display-controls,
+body.diagram-open #model-credit { display: none !important; }
+.vp-figure { position: relative; min-height: 0; }
+/* fills the row; the drawing scales to fit inside it */
+.vp-figure svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.vp-caption { display: grid; gap: 3px; justify-items: center; text-align: center; padding-top: 6px; }
+.vp-caption b { font-size: 1.02rem; color: var(--text); }
+.vp-caption span { font-size: 0.85rem; color: var(--text-muted); max-width: 62ch; line-height: 1.45; }
+.vp-strand { fill: none; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+.vp-eye { fill: #e9e4dc; stroke: #2a2e40; stroke-width: 1; }
+.vp-iris { fill: #5b7fa6; }
+.vp-lgn { fill: #c9883a; }
+.vp-cortex { fill: #b98fd6; opacity: 0.35; }
+.vp-label { fill: var(--text-muted); font-size: 10px; font-family: inherit; }
+.vp-ring { fill: none; stroke: var(--text-muted); stroke-width: 1.2; }
+.vp-axis { stroke: var(--text-muted); stroke-width: 0.6; stroke-dasharray: 2 2; }
+.vp-cap { fill: var(--text-muted); font-size: 10px; text-anchor: middle; font-family: inherit; }
+.vp-spot { cursor: pointer; }
+.vp-spot:focus { outline: none; }
+.vp-hit { fill: transparent; }
+.vp-badge { fill: #3a3f57; stroke: var(--bg); stroke-width: 1.5; }
+.vp-spot:hover .vp-badge, .vp-spot:focus-visible .vp-badge { fill: #5b8cff; }
+.vp-spot.on .vp-badge { fill: #e04848; }
+.vp-num { fill: #fff; font-size: 10px; font-weight: 700; text-anchor: middle; dominant-baseline: central; pointer-events: none; font-family: inherit; }
+.vp-cutbar { stroke: #e04848; stroke-width: 4; stroke-linecap: round; }
+@media (max-width: 600px) {
+  #pathway-diagram { padding-top: 64px; } /* clear the menu button */
+  #pathway-diagram { grid-template-rows: auto auto; align-content: start; }
+  .vp-figure svg { position: static; height: auto; width: 100%; }
+}

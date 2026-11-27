@@ -5,7 +5,7 @@ import { OrbitControls } from './OrbitControls.js';
 import { PointerLockControls } from './PointerLockControls.js';
 import { CSS2DRenderer, CSS2DObject } from './CSS2DRenderer.js';
 import { scormModelOpened, scormReportInteraction, scormReportScore } from './scorm.js';
-import { createVisualPathway, LESIONS, LESION_BY_ID, fieldLoss, fieldChartSVG, PATHWAY_LABELS } from './visual-pathway.js';
+import { mountPathwayDiagram } from './visual-pathway-2d.js';
 import { createEyeMovements, OCULAR_LESIONS, OCULAR_BY_ID, OCULAR_LABELS, GAZES, gazeCellSVG } from './eye-movements.js';
 
 // ── DOM refs ──────────────────────────────────────────────
@@ -190,7 +190,7 @@ shortcutsModal.addEventListener('keydown', e => {
 //             in code instead of loaded from `file`.
 //   labels / savedViews: optional inline versions of <id>_labels.json and
 //             <id>_view.json (used instead of fetching them).
-//   pathway:  true for the visual pathway (shows the lesion panel).
+//   diagram:  true for a flat diagram shown over the viewer (the visual pathway).
 //   credit:   optional source/licence line shown in the viewer's corner while
 //             the model is open: [{ text, href? }, …].
 const DEFAULT_VIEWS = [
@@ -273,22 +273,14 @@ const MODELS = [
     ],
   },
   {
-    // Schematic visual pathway built in code (js/visual-pathway.js): pick a
-    // lesion site, see the visual field defect.
-    id: 'visual-pathway', label: 'Visual Pathway', build: () => buildPathwayModel(),
+    // Visual pathway lesions as a flat, top-down diagram (js/visual-pathway-2d.js)
+    // shown over the viewer instead of a 3D model: click a lesion site, see the
+    // visual field of each eye.
+    id: 'visual-pathway', label: 'Visual Pathway', build: () => diagramPlaceholder(),
     devFeature: 'visual', // developer mode only, while in testing
     noFly: true,
-    pathway: true,        // shows the lesion panel
-    labels: PATHWAY_LABELS,
-    savedViews: { top: { cameraUp: [0, 0, 1] } }, // from above, eyes at the top (like the textbook diagram)
-    views: [
-      { label: 'Superior',  dir: 'top'    },
-      { label: 'Anterior',  dir: 'front'  },
-      { label: 'Left',      dir: 'right'  },
-      { label: 'Right',     dir: 'left'   },
-      { label: 'Inferior',  dir: 'bottom' },
-      { label: 'Posterior', dir: 'back'   },
-    ],
+    diagram: true,
+    labels: [], savedViews: {},
   },
   {
     // Eye movements, CN III / IV / VI and pupils (js/eye-movements.js), built
@@ -1040,7 +1032,7 @@ async function loadRegion(region) {
       loadLines(model);
       initPinLayer();
       setTimeout(() => { hideLoading(); modelArrived(); }, 300); // model on screen: the big downloads may start
-      if (model.pathway) openPathway();
+      if (model.diagram) openDiagram();
       if (model.ocular) openOcular();
   };
 
@@ -4360,50 +4352,40 @@ const _posterCache = [];
 });
 
 
-// ── Visual pathway: lesion panel ──────────────────────────
-// The pathway model (js/visual-pathway.js) is built in code. This panel picks
-// the lesion site and side, and shows the visual field of each eye.
-let pathway = null;
+// ── Lesion panel (Eye Movements) and the Visual Pathway diagram ──
+// The Visual Pathway is a flat diagram over the viewer (js/visual-pathway-2d.js);
+// the Eye Movements model uses the lesion panel below.
 const lesionDock   = document.getElementById('lesion-dock');
 const lesionList   = document.getElementById('lesion-list');
 const lesionSide   = document.getElementById('lesion-side');
 const lesionFields = document.getElementById('lesion-fields');
 const lesionDefect = document.getElementById('lesion-defect');
 const lesionNote   = document.getElementById('lesion-note');
+const diagramHost  = document.getElementById('pathway-diagram');
+let diagram = null;
 
-function buildPathwayModel() {
-  pathway?.dispose();
-  pathway = createVisualPathway({ CSS2DObject });
-  return pathway.group;
+// A diagram "model" still goes through the normal loading path, so it gets a
+// tiny invisible stand-in object for the 3D scene.
+function diagramPlaceholder() {
+  const g = new THREE.Group();
+  const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ visible: false }));
+  g.add(m);
+  return g;
 }
 
-function renderLesionPanel() {
-  if (!pathway) return;
-  const { id, side } = pathway.lesion;
-  const lesion = LESION_BY_ID[id];
-  // The chiasm is in the middle: the side still applies to the next pick.
-  lesionSide.querySelectorAll('button[data-side]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.side === side)));
-  lesionSide.classList.toggle('muted', !!lesion?.midline);
-  lesionList.querySelectorAll('button[data-lesion]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lesion === (id || ''))));
-  lesionFields.innerHTML = fieldChartSVG(fieldLoss(id, side), !!lesion?.sparing);
-  lesionDefect.textContent = lesion ? lesion.defect(side) : 'Normal visual fields';
-  lesionNote.textContent = lesion
-    ? lesion.note(side)
-    : 'Pick a lesion site, or click a numbered marker on the pathway. Blue fibres carry the left visual field, green the right.';
-}
-
-function setPathwayLesion(id, side) {
-  if (!pathway) return;
-  pathway.setLesion(id, side ?? pathway.lesion.side);
-  renderLesionPanel();
-  const l = LESION_BY_ID[id];
-  if (l) announce(`${l.name}: ${l.defect(pathway.lesion.side)}`);
+function openDiagram() {
+  diagram?.destroy();
+  diagramHost.classList.remove('hidden');
+  document.body.classList.add('diagram-open');
+  diagram = mountPathwayDiagram(diagramHost, {
+    onChange: (lesion, side) => { if (lesion) announce(lesion.defect(side)); },
+  });
 }
 
 // Phones: the lesion panel is a bottom sheet, so shift the picture up (via the
-// camera's view offset) to keep the pathway in the space above it.
+// camera's view offset) to keep the eyes in the space above it.
 function applyPathwayViewOffset() {
-  if (!(pathway || ocular) || !quizPanel.classList.contains('hidden')) return;
+  if (!ocular || !quizPanel.classList.contains('hidden')) return;
   const w = renderer.domElement.clientWidth;
   const h = renderer.domElement.clientHeight;
   if (!window.matchMedia('(max-width: 600px)').matches || !w || !h) { camera.clearViewOffset(); return; }
@@ -4411,21 +4393,11 @@ function applyPathwayViewOffset() {
 }
 const _pathwayDockObs = new ResizeObserver(() => applyPathwayViewOffset());
 
-function openPathway() {
-  if (!pathway) return;
-  lesionList.innerHTML = '<button type="button" data-lesion="" aria-pressed="true">None</button>'
-    + LESIONS.map(l => `<button type="button" data-lesion="${l.id}"><b>${l.num}</b> ${l.name}</button>`).join('');
-  lesionDock.classList.remove('hidden');
-  container.classList.add('pathway-open');
-  renderLesionPanel();
-  _pathwayDockObs.observe(lesionDock);
-  _pathwayDockObs.observe(container);
-  applyPathwayViewOffset();
-}
-
 function closePathway() {
-  pathway?.dispose();
-  pathway = null;
+  diagram?.destroy();
+  diagram = null;
+  diagramHost.classList.add('hidden');
+  document.body.classList.remove('diagram-open');
   ocular?.dispose();
   ocular = null;
   lesionFields.classList.remove('eom');
@@ -4439,19 +4411,17 @@ lesionList.addEventListener('click', e => {
   const b = e.target.closest('button[data-lesion]');
   if (!b) return;
   if (ocular) setOcularLesion(b.dataset.lesion || null);
-  else setPathwayLesion(b.dataset.lesion || null);
 });
 lesionSide.addEventListener('click', e => {
   const b = e.target.closest('button[data-side]');
   if (b && ocular) setOcularLesion(ocular.lesion.id, b.dataset.side);
-  else if (b && pathway) setPathwayLesion(pathway.lesion.id, b.dataset.side);
 });
 
 // Click a numbered marker on the pathway to pick that lesion.
 const _lesionRay = new THREE.Raycaster();
 const _lesionNdc = new THREE.Vector2();
 renderer.domElement.addEventListener('click', e => {
-  const sim = pathway || ocular;
+  const sim = ocular;
   if (!sim || navMode !== 'orbit' || currentClickMode() !== null) return;
   const rect = renderer.domElement.getBoundingClientRect();
   _lesionNdc.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
@@ -4459,8 +4429,7 @@ renderer.domElement.addEventListener('click', e => {
   const hit = _lesionRay.intersectObjects(sim.markers.filter(m => m.visible), false)[0];
   if (!hit) return;
   const { id, side } = hit.object.userData.lesion;
-  if (ocular) setOcularLesion(id, side);
-  else setPathwayLesion(id, side ?? pathway.lesion.side);
+  setOcularLesion(id, side);
 });
 
 // ── Eye movements (dev feature 'visual') ─────────────────
