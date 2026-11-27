@@ -56,7 +56,7 @@ export function mountMriAtlas(host, { base = 'models/brain-mri/', credit = '' } 
       <div class="mri-views">
         ${PANEL_ORDER.map(id => {
           const p = PLANES.find(x => x.id === id);
-          return `<figure class="mri-view" data-view="${id}" style="--plane:${p.color}"><figcaption><span class="mri-view-name">${p.label}</span> <span class="mri-view-n"></span></figcaption><svg class="mri-svg" role="img" aria-label="${p.label} MRI slice"></svg><input type="range" class="mri-view-pos" min="0" max="0" value="0" aria-label="${p.label} slice"></figure>`;
+          return `<figure class="mri-view" data-view="${id}" style="--plane:${p.color}"><figcaption><span class="mri-view-name">${p.label}</span> <span class="mri-view-n"></span></figcaption><svg class="mri-svg" role="img" aria-label="${p.label} MRI slice"></svg></figure>`;
         }).join('')}
       </div>
       <div class="mri-tip" hidden></div>
@@ -161,11 +161,7 @@ export function mountMriAtlas(host, { base = 'models/brain-mri/', credit = '' } 
       }
     }
     const n = count(id);
-    const fig = host.querySelector(`[data-view="${id}"]`);
-    fig.querySelector('.mri-view-n').textContent = `${sliderOf(id) + 1} / ${n}`;
-    const vp = fig.querySelector('.mri-view-pos');
-    vp.max = String(n - 1);
-    vp.value = String(sliderOf(id));
+    host.querySelector(`[data-view="${id}"] .mri-view-n`).textContent = `${sliderOf(id) + 1} / ${n}`;
   }
 
   function draw() {
@@ -267,8 +263,8 @@ export function mountMriAtlas(host, { base = 'models/brain-mri/', credit = '' } 
     });
   }
 
-  // In All views each view has its own slider (and the wheel over a view
-  // scrubs it); that view becomes the one the dock controls.
+  // In All views the mouse wheel over a view scrubs it; that view becomes the
+  // one the dock controls.
   function scrubView(id, v) {
     if (!ready(id)) return;
     setSweep(false);
@@ -280,8 +276,6 @@ export function mountMriAtlas(host, { base = 'models/brain-mri/', credit = '' } 
     draw();
   }
   for (const id of PANEL_ORDER) {
-    const fig = host.querySelector(`[data-view="${id}"]`);
-    fig.querySelector('.mri-view-pos').addEventListener('input', e => scrubView(id, Number(e.target.value)));
     svgs[id].addEventListener('wheel', e => {
       if (!state.all || !ready(id)) return;
       e.preventDefault();
