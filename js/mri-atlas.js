@@ -56,7 +56,7 @@ export function mountMriAtlas(host, { base = 'models/brain-mri/', credit = '' } 
       <div class="mri-views">
         ${PANEL_ORDER.map(id => {
           const p = PLANES.find(x => x.id === id);
-          return `<figure class="mri-view" data-view="${id}" style="--plane:${p.color}"><figcaption><span class="mri-view-name">${p.label}</span> <span class="mri-view-n"></span></figcaption><svg class="mri-svg" role="img" aria-label="${p.label} MRI slice"></svg></figure>`;
+          return `<figure class="mri-view" data-view="${id}" style="--plane:${p.color}"><figcaption><span class="mri-view-name">${p.label}</span> <span class="mri-view-n"></span></figcaption><svg class="mri-svg" role="img" aria-label="${p.label} MRI slice"></svg><input type="range" class="mri-view-pos" min="0" max="0" value="0" aria-label="${p.label} slice"></figure>`;
         }).join('')}
       </div>
       <div class="mri-tip" hidden></div>
@@ -88,6 +88,12 @@ export function mountMriAtlas(host, { base = 'models/brain-mri/', credit = '' } 
   const allBtn = host.querySelector('.mri-all');
   const pickedBtn = host.querySelector('.mri-picked');
   host.querySelector('.mri-credit').textContent = credit;
+  // Keep the views clear of the dock, however tall it wraps (phones).
+  const dock = host.querySelector('.mri-dock');
+  const fitDock = () => host.style.setProperty('--mri-dock', `${dock.offsetHeight + (parseFloat(getComputedStyle(dock).bottom) || 0) + 8}px`);
+  const dockObs = new ResizeObserver(fitDock);
+  dockObs.observe(dock);
+  fitDock();
 
   const cache = {};          // plane id -> data (or a promise of it)
   const state = { plane: 'cor', index: {}, labels: true, all: false, picked: null };
@@ -114,39 +120,52 @@ export function mountMriAtlas(host, { base = 'models/brain-mri/', credit = '' } 
   }
   const jpg = (id, k) => `${base}${id}/${String(k + 1).padStart(3, '0')}.jpg`;
 
+  // Draws one view. The picture and outlines are rebuilt only when that view's
+  // slice (or what is shown) changed; the crosshair lines are always updated.
   function drawView(id) {
     if (!ready(id)) return;
     const d = cache[id], svg = svgs[id];
     const k = sliceOf(id);
-    svg.setAttribute('viewBox', `0 0 ${d.w} ${d.h}`);
-    svg.textContent = '';
-    el('image', { href: jpg(id, k), width: d.w, height: d.h }, svg);
-    if (state.labels) {
-      for (const [li, parts] of d.slices[k]) {
-        const name = d.names[li];
-        if (state.picked && name !== state.picked) continue;
-        const g = el('g', { class: 'mri-st' + (state.picked ? ' picked' : ''), 'data-name': name }, svg);
-        for (const [kind, color, val, path] of parts) {
-          if (kind === 'f') el('path', { d: path, fill: `#${color}`, 'fill-opacity': val }, g);
-          else el('path', { d: path, fill: 'none', stroke: `#${color}`, 'stroke-width': val }, g);
+    const key = `${k}|${state.labels}|${state.picked}`;
+    if (svg.dataset.key !== key) {
+      svg.dataset.key = key;
+      svg.setAttribute('viewBox', `0 0 ${d.w} ${d.h}`);
+      svg.textContent = '';
+      el('image', { href: jpg(id, k), width: d.w, height: d.h }, svg);
+      if (state.labels) {
+        for (const [li, parts] of d.slices[k]) {
+          const name = d.names[li];
+          if (state.picked && name !== state.picked) continue;
+          const g = el('g', { class: 'mri-st' + (state.picked ? ' picked' : ''), 'data-name': name }, svg);
+          for (const [kind, color, val, path] of parts) {
+            if (kind === 'f') el('path', { d: path, fill: `#${color}`, 'fill-opacity': val }, g);
+            else el('path', { d: path, fill: 'none', stroke: `#${color}`, 'stroke-width': val }, g);
+          }
         }
       }
+      el('g', { class: 'mri-crosses' }, svg);
+      // Warm up the neighbouring slices so dragging stays smooth.
+      for (const dk of [-2, -1, 1, 2]) new Image().src = jpg(id, Math.min(count(id) - 1, Math.max(0, k + dk)));
     }
     // Where the other two planes cut this one.
+    const crosses = svg.querySelector('.mri-crosses');
+    crosses.textContent = '';
     if (state.all) {
       for (const other of PANEL_ORDER) {
         if (other === id || !ready(other)) continue;
         const [axis, a, b] = MAP[other][id];
         const v = a * sliceOf(other) + b;
         const c = planeOf(other).color;
-        if (axis === 'x') el('line', { x1: v, y1: 0, x2: v, y2: d.h, stroke: c, class: 'mri-cross' }, svg);
-        else el('line', { x1: 0, y1: v, x2: d.w, y2: v, stroke: c, class: 'mri-cross' }, svg);
+        if (axis === 'x') el('line', { x1: v, y1: 0, x2: v, y2: d.h, stroke: c, class: 'mri-cross' }, crosses);
+        else el('line', { x1: 0, y1: v, x2: d.w, y2: v, stroke: c, class: 'mri-cross' }, crosses);
       }
     }
     const n = count(id);
-    host.querySelector(`[data-view="${id}"] .mri-view-n`).textContent = `${sliderOf(id) + 1} / ${n}`;
-    // Warm up the neighbouring slices so dragging stays smooth.
-    for (const dk of [-2, -1, 1, 2]) new Image().src = jpg(id, Math.min(n - 1, Math.max(0, k + dk)));
+    const fig = host.querySelector(`[data-view="${id}"]`);
+    fig.querySelector('.mri-view-n').textContent = `${sliderOf(id) + 1} / ${n}`;
+    const vp = fig.querySelector('.mri-view-pos');
+    vp.max = String(n - 1);
+    vp.value = String(sliderOf(id));
   }
 
   function draw() {
@@ -248,6 +267,28 @@ export function mountMriAtlas(host, { base = 'models/brain-mri/', credit = '' } 
     });
   }
 
+  // In All views each view has its own slider (and the wheel over a view
+  // scrubs it); that view becomes the one the dock controls.
+  function scrubView(id, v) {
+    if (!ready(id)) return;
+    setSweep(false);
+    state.index[id] = Math.max(0, Math.min(count(id) - 1, v));
+    if (state.plane !== id) {
+      state.plane = id;
+      host.querySelectorAll('[data-plane]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.plane === id)));
+    }
+    draw();
+  }
+  for (const id of PANEL_ORDER) {
+    const fig = host.querySelector(`[data-view="${id}"]`);
+    fig.querySelector('.mri-view-pos').addEventListener('input', e => scrubView(id, Number(e.target.value)));
+    svgs[id].addEventListener('wheel', e => {
+      if (!state.all || !ready(id)) return;
+      e.preventDefault();
+      scrubView(id, sliderOf(id) + (e.deltaY > 0 ? -1 : 1));
+    }, { passive: false });
+  }
+
   // Sweep: one pass from here to the end in about 6 s (from the start if
   // already at the end), like the Brain (3D) slice dock. Any manual change stops it.
   const sweepBtn = host.querySelector('.mri-sweep');
@@ -288,5 +329,5 @@ export function mountMriAtlas(host, { base = 'models/brain-mri/', credit = '' } 
     if (alive) PLANES.forEach(p => load(p.id).catch(() => {}));
   });
 
-  return { destroy() { alive = false; setSweep(false); host.innerHTML = ''; } };
+  return { destroy() { alive = false; setSweep(false); dockObs.disconnect(); host.innerHTML = ''; } };
 }
