@@ -3,10 +3,13 @@
 // sides are drawn, so a lesion is picked by clicking its numbered spot on the
 // side you want. Fibres past the cut turn grey.
 //
-// In front of each eye a triangle shows its visual field (left half blue,
+// Drawn roughly to scale with faint context (orbits, lobes, midbrain,
+// ventricles, pituitary, calcarine cortex). In front of each eye a wedge
+// shows its visual field, ~95° temporal and ~60° nasal (left half blue,
 // right half green; greyed when lost, striped when only the upper or lower
 // quarter of that half is lost). Beside the diagram, a picture shows what
-// each eye sees, with the lost part of the visual field blacked out. The picture is assets/visual-scene.jpg when that file exists (any
+// each eye sees, with the lost part of the visual field blacked out. The
+// picture is assets/visual-scene.jpg when that file exists (any
 // landscape photo, looked at through its centre), otherwise a drawn street
 // scene.
 //
@@ -20,7 +23,7 @@ const OTHER = { L: 'R', R: 'L' };
 const W = { L: 'left', R: 'right' };
 
 // Where along a bundle each lesion cuts (index into bundlePoints()).
-const CUT_AT = { 'optic-nerve': 1, chiasm: 2, tract: 3, meyer: 5, parietal: 5, cortex: 7, cuneus: 7, lingual: 7 };
+const CUT_AT = { 'optic-nerve': 1, chiasm: 3, tract: 4, meyer: 7, parietal: 8, cortex: 10, cuneus: 10, lingual: 10 };
 
 // Fibre bundles: eye × retina half × field half.
 const BUNDLES = [];
@@ -29,19 +32,93 @@ for (const eye of ['L', 'R']) for (const retina of ['nasal', 'temporal']) for (c
   BUNDLES.push({ eye, retina, field, fieldSide: (eye === 'L') === crosses ? 'left' : 'right', tract: crosses ? OTHER[eye] : eye });
 }
 
-// Geometry is written for the left side and mirrored for the right (x -> 400 - x).
+// Drawn roughly to scale (about 2.3 units per mm), as on an axial scan at the
+// level of the orbits, seen from above: optic nerve ~50 mm, chiasm ~13 mm
+// wide, optic tract ~25 mm round the cerebral peduncle to the LGN, Meyer's
+// loop tip ~28 mm behind the temporal pole, radiation lateral to the
+// ventricle, ending along the calcarine cortex with the macula at the pole.
+// Geometry is written for the left side and mirrored for the right.
 const mx = (side, [x, y]) => [side === 'L' ? x : 400 - x, y];
-function bundlePoints(b, dy) {
+function bundlePoints(b) {
   const n = b.retina === 'nasal', up = b.field === 'upper';
-  const o = (n ? 3 : -3) + (up ? -1.2 : 1.2);
-  const pre = [[130 + o * 1.4, 129], [158 + o, 166], n ? [200 + (b.eye === 'L' ? -2 : 2) + (up ? -1 : 1), 203] : [184 + o * 0.6, 207]]
+  const o = (n ? 2.2 : -2.2) + (up ? -0.9 : 0.9);
+  const pre = [[131 + o, 131], [150 + o * 0.9, 160], [165 + o * 0.6, 188],
+    n ? [200 + (b.eye === 'L' ? -1.5 : 1.5) + (up ? -0.8 : 0.8), 218] : [185 + o * 0.4, 221]]
     .map(p => mx(b.eye, p));
-  const oo = up ? -1.6 : 1.6;
-  const post = (up // upper field: lower fibres, through Meyer's loop to the lingual gyrus
-    ? [[168 + oo, 246], [142, 288], [96, 306], [86, 372], [148, 442], [176, 470]]
-    : [[168 + oo, 246], [142, 288], [126, 330], [136, 396], [160, 436], [178, 454]]
+  const oo = up ? -1.4 : 1.4;
+  const post = (up // upper field: lower retina, forward round Meyer's loop, to the lower bank
+    ? [[171 + oo, 257], [156, 302], [134, 288], [104, 272], [88, 312], [86, 405], [140, 508], [182, 540]]
+    : [[171 + oo, 257], [156, 302], [140, 328], [114, 368], [104, 420], [116, 470], [160, 512], [188, 526]]
   ).map(p => mx(b.tract, p));
-  return [...pre, ...post].map(([x, y]) => [x, y + dy]);
+  return [...pre, ...post];
+}
+
+// Faint context: brain outline, orbits, ventricles, midbrain, pituitary, V1.
+function drawContext(svg) {
+  const both = (fn) => { fn('L'); fn('R'); };
+  const P = (side, pts) => pts.map(p => mx(side, p));
+  both(s => {
+    // Cerebral hemisphere at this level: temporal lobe in front, occipital behind.
+    el('path', { d: pathD(P(s, [[118, 286], [124, 240], [104, 206], [72, 206], [48, 244], [38, 320], [40, 420], [62, 512], [110, 574], [186, 594], [196, 590], [194, 470], [176, 400], [150, 350], [128, 318], [118, 286]])), class: 'vp-brain' }, svg);
+    // Orbit: walls converging on the optic canal.
+    el('path', { d: `M${mx(s, [84, 96]).join(',')} L${mx(s, [159, 186]).join(',')} L${mx(s, [173, 96]).join(',')}`, class: 'vp-orbit' }, svg);
+    // Lateral ventricle: temporal horn, atrium, occipital horn.
+    el('path', { d: pathD(P(s, [[114, 292], [116, 340], [126, 395], [146, 440], [168, 482]])), class: 'vp-vent' }, svg);
+    // Primary visual cortex along the calcarine sulcus (medial occipital lobe).
+    el('path', { d: pathD(P(s, [[178, 490], [176, 530], [180, 566], [190, 584], [196, 580], [196, 530], [195, 490], [178, 490]])), class: 'vp-v1' }, svg);
+    // Pupil-reflex fibres leave the tract for the pretectum before the LGN.
+    el('path', { d: pathD(P(s, [[166, 276], [180, 304], [192, 326]])), class: 'vp-pretect' }, svg);
+  });
+  // Midbrain: two cerebral peduncles in front, tegmentum and aqueduct behind.
+  el('circle', { cx: 186, cy: 292, r: 13, class: 'vp-midbrain' }, svg);
+  el('circle', { cx: 214, cy: 292, r: 13, class: 'vp-midbrain' }, svg);
+  el('ellipse', { cx: 200, cy: 312, rx: 20, ry: 17, class: 'vp-midbrain' }, svg);
+  el('circle', { cx: 200, cy: 318, r: 2.2, class: 'vp-aqueduct' }, svg);
+  // Pituitary, below the chiasm; the chiasm itself.
+  el('ellipse', { cx: 200, cy: 234, rx: 11, ry: 8, class: 'vp-pit' }, svg);
+  el('path', { d: 'M184,206 Q200,214 216,206 L224,230 Q200,222 176,230 Z', class: 'vp-chiasm' }, svg);
+}
+
+// One eye: globe, cornea, lens, and the retina halves coloured by the half of
+// the visual field they see (greyed when that half is lost).
+function drawEye(svg, eye, x, loss) {
+  const y = 108, r = 23;
+  el('circle', { cx: x, cy: y, r, class: 'vp-eye' }, svg);
+  el('path', { d: `M${x - 10},${y - r + 2} Q${x},${y - r - 9} ${x + 10},${y - r + 2}`, class: 'vp-cornea' }, svg);
+  el('ellipse', { cx: x, cy: y - 14, rx: 8, ry: 3.6, class: 'vp-lens' }, svg);
+  // Retina: the half nearer the nose is nasal. Left eye's nasal retina sees the left field.
+  for (const half of ['left', 'right']) {
+    const lost = loss[`${half}-upper`] && loss[`${half}-lower`];
+    const nasalSide = eye === 'L' ? 1 : -1;         // +x is toward the nose for the left eye
+    const seesLeft = (eye === 'L');                  // nasal retina of the left eye sees the left field
+    const nasal = (half === 'left') === seesLeft;
+    const sx = nasal ? nasalSide : -nasalSide;
+    const a0 = Math.PI / 2, a1 = Math.PI / 2 + sx * -1.25; // from the back of the globe toward the side
+    const rr = r - 3;
+    const p0 = [x + Math.cos(a0) * rr, y + Math.sin(a0) * rr], p1 = [x + Math.cos(a1) * rr, y + Math.sin(a1) * rr];
+    el('path', { d: `M${p0[0]},${p0[1]} A${rr},${rr} 0 0 ${sx > 0 ? 0 : 1} ${p1[0]},${p1[1]}`, class: 'vp-retina', stroke: lost ? FIELD_COLORS.lost : FIELD_COLORS[half].upper }, svg);
+  }
+}
+
+// Each eye's visual field seen from above: ~95° to the temporal side, ~60° to
+// the nasal side. Halves are coloured by side; striped when one quarter of a
+// half is lost, grey when both are.
+function drawField(svg, eye, x, loss) {
+  const cy = 86, R = 74;
+  const temporal = eye === 'L' ? 'left' : 'right';
+  for (const half of ['left', 'right']) {
+    const deg = half === temporal ? 95 : 60;
+    const dir = half === 'left' ? -1 : 1;
+    const steps = 12, pts = [[x, cy]];
+    for (let i = 0; i <= steps; i++) {
+      const a = (deg * i / steps) * Math.PI / 180;
+      pts.push([x + dir * Math.sin(a) * R, cy - Math.cos(a) * R]);
+    }
+    const up = loss[`${half}-upper`], lo = loss[`${half}-lower`];
+    const fill = up && lo ? FIELD_COLORS.lost : up || lo ? `url(#vp-part-${half})` : FIELD_COLORS[half].upper;
+    el('path', { d: 'M' + pts.map(p => p.join(',')).join(' L') + ' Z', fill, class: 'vp-field' + (up && lo ? ' lost' : '') }, svg);
+  }
+  el('line', { x1: x, y1: cy, x2: x, y2: cy - R, class: 'vp-field-mid' }, svg);
 }
 
 // Smooth path through points (Catmull-Rom as cubic Béziers).
@@ -138,7 +215,7 @@ export function mountPathwayDiagram(host, { onChange } = {}) {
     <div class="vp-figure"></div>`;
   const [vL, vR] = host.querySelectorAll('.vp-view svg');
   const caption = host.querySelector('.vp-caption');
-  const svg = el('svg', { viewBox: '0 -44 400 580', role: 'group', 'aria-label': 'Visual pathway seen from above. Numbered spots are lesion sites.' }, host.querySelector('.vp-figure'));
+  const svg = el('svg', { viewBox: '0 6 400 606', role: 'group', 'aria-label': 'Visual pathway seen from above. Numbered spots are lesion sites.' }, host.querySelector('.vp-figure'));
 
   let current = { id: null, side: 'R' };
   let alive = true;
@@ -153,49 +230,49 @@ export function mountPathwayDiagram(host, { onChange } = {}) {
   function render() {
     svg.textContent = '';
     const l = LESION_BY_ID[current.id];
-    // Visual field triangles in front of the eyes. Seen from above only the
-    // left / right halves show; a half missing one quarter is striped.
     const loss = fieldLoss(current.id, current.side);
-    for (const [eye, x] of [['L', 130], ['R', 270]]) {
-      for (const half of ['left', 'right']) {
-        const up = loss[eye][`${half}-upper`], lo = loss[eye][`${half}-lower`];
-        const fill = up && lo ? FIELD_COLORS.lost : up || lo ? `url(#vp-part-${half})` : FIELD_COLORS[half].upper;
-        const edge = half === 'left' ? x - 58 : x + 58;
-        el('path', { d: `M${x},70 L${edge},-34 L${x},-34 Z`, fill, class: 'vp-field' + (up && lo ? ' lost' : '') }, svg);
-      }
-      el('line', { x1: x, y1: 70, x2: x, y2: -34, class: 'vp-field-mid' }, svg);
-    }
-    for (const x of [130, 270]) {
-      el('circle', { cx: x, cy: 100, r: 28, class: 'vp-eye' }, svg);
-      el('ellipse', { cx: x, cy: 75, rx: 11, ry: 3.5, class: 'vp-iris' }, svg);
-    }
-    for (const s of ['L', 'R']) {
-      el('ellipse', { cx: mx(s, [178, 0])[0], cy: 462, rx: 18, ry: 28, class: 'vp-cortex' }, svg);
-      el('ellipse', { cx: mx(s, [142, 0])[0], cy: 288, rx: 8, ry: 6, class: 'vp-lgn' }, svg);
+    drawContext(svg);
+    drawField(svg, 'L', 128, loss.L);
+    drawField(svg, 'R', 272, loss.R);
+    drawEye(svg, 'L', 128, loss.L);
+    drawEye(svg, 'R', 272, loss.R);
+    for (const s of ['L', 'R']) el('ellipse', { cx: mx(s, [156, 0])[0], cy: 302, rx: 8.5, ry: 6, class: 'vp-lgn' }, svg);
+    // Optic radiation: a faint band under the fibres, as it is a broad sheet.
+    for (const s of ['L', 'R']) for (const field of ['upper', 'lower']) {
+      const b = BUNDLES.find(x => x.tract === s && x.field === field);
+      el('path', { d: pathD(bundlePoints(b).slice(5)), class: 'vp-sheet' }, svg);
     }
     // Fibres: coloured up to the cut, grey after it.
     const k = l ? CUT_AT[l.id] : 0;
     for (const b of BUNDLES) {
-      const p = bundlePoints(b, 0);
+      const p = bundlePoints(b);
       const cut = l && l.cuts(b, current.side);
       el('path', { d: pathD(cut ? p.slice(0, k + 1) : p), class: 'vp-strand', stroke: FIELD_COLORS[b.fieldSide][b.field] }, svg);
       if (cut) el('path', { d: pathD(p.slice(k)), class: 'vp-strand', stroke: FIELD_COLORS.lost }, svg);
     }
-    [[96, 104, 'Left eye', 'end'], [304, 104, 'Right eye', 'start'], [60, 150, 'Optic nerve', 'start'], [222, 206, 'Optic chiasm', 'start'],
-     [100, 252, 'Optic tract', 'end'], [152, 300, 'LGN', 'start'], [70, 338, "Meyer's loop", 'end'], [150, 352, 'Parietal', 'start'], [200, 515, 'Visual cortex', 'middle']]
+    [[98, 112, 'Left eye', 'end'], [302, 112, 'Right eye', 'start'],
+     [124, 150, 'Optic nerve', 'end'], [228, 212, 'Optic chiasm', 'start'], [150, 242, 'Optic tract', 'end'],
+     [258, 306, 'LGN', 'start'], [96, 266, "Meyer's loop", 'end'], [78, 432, 'Optic radiation', 'end'],
+     [200, 482, 'Visual cortex (V1)', 'middle'], [200, 606, 'Occipital pole (macula)', 'middle']]
       .forEach(([x, y, t, a]) => { el('text', { x, y, class: 'vp-label', 'text-anchor': a }, svg).textContent = t; });
+    [[244, 236, 'Pituitary (below)', 'start'], [200, 344, 'Midbrain', 'middle'], [216, 330, 'Pupil fibres', 'start'],
+     [178, 452, 'Ventricle', 'start'], [60, 222, 'Temporal lobe', 'start'], [70, 548, 'Occipital lobe', 'start']]
+      .forEach(([x, y, t, a]) => { el('text', { x, y, class: 'vp-label faint', 'text-anchor': a }, svg).textContent = t; });
 
     // Lesion spots, both sides (the chiasm once).
     for (const les of LESIONS) for (const side of les.midline ? ['L'] : ['L', 'R']) {
       const at = CUT_AT[les.id];
       const cutB = BUNDLES.filter(b => les.cuts(b, side));
       let x = 0, y = 0;
-      cutB.forEach(b => { const p = bundlePoints(b, 0)[at]; x += p[0]; y += p[1]; });
+      cutB.forEach(b => { const p = bundlePoints(b)[at]; x += p[0]; y += p[1]; });
       x /= cutB.length; y /= cutB.length;
       const on = current.id === les.id && (les.midline || current.side === side);
-      if (on) { // the cut bar sits on the fibres
-        const spread = Math.max(...cutB.map(b => { const p = bundlePoints(b, 0)[at]; return Math.hypot(p[0] - x, p[1] - y); }));
-        el('line', { x1: x - spread - 6, y1: y, x2: x + spread + 6, y2: y, class: 'vp-cutbar' }, svg);
+      if (on) { // the cut bar sits across the fibres
+        const spread = Math.max(...cutB.map(b => { const p = bundlePoints(b)[at]; return Math.hypot(p[0] - x, p[1] - y); }));
+        let tx = 0, ty = 0;
+        cutB.forEach(b => { const p = bundlePoints(b); tx += p[at + 1][0] - p[at - 1][0]; ty += p[at + 1][1] - p[at - 1][1]; });
+        const len = Math.hypot(tx, ty) || 1, nx = -ty / len, ny = tx / len, h = spread + 6;
+        el('line', { x1: x - nx * h, y1: y - ny * h, x2: x + nx * h, y2: y + ny * h, class: 'vp-cutbar' }, svg);
       }
       // Badges: beside the fibres on the nerves and tracts, above the chiasm,
       // and spread apart at the cortex.
@@ -203,7 +280,7 @@ export function mountPathwayDiagram(host, { onChange } = {}) {
       if (les.id === 'cortex') { x += out * 24; y += 2; }
       if (les.id === 'cuneus') { x -= out * 10; y -= 6; }
       if (les.id === 'lingual') { x -= out * 10; y += 10; }
-      const bx = x + (at <= 3 && !les.midline ? out * 13 : 0);
+      const bx = x + (at <= 4 && !les.midline ? out * 12 : 0);
       const by = y - (les.midline ? 14 : 0);
       const where = les.midline ? '' : `, ${W[side]}`;
       const g = el('g', { class: 'vp-spot' + (on ? ' on' : ''), tabindex: 0, role: 'button', 'aria-pressed': String(on), 'aria-label': `${les.num}. ${les.name}${where}` }, svg);

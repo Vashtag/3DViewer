@@ -2163,7 +2163,7 @@ body.diagram-open #model-credit { display: none !important; }
 .vp-caption { grid-row: 3; align-self: start; display: grid; gap: 3px; padding-top: 2px; }
 .vp-caption b { font-size: 1.02rem; color: var(--text); }
 .vp-caption span { font-size: 0.85rem; color: var(--text-muted); line-height: 1.45; }
-.vp-strand { fill: none; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+.vp-strand { fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .vp-eye { fill: #e9e4dc; stroke: #2a2e40; stroke-width: 1; }
 .vp-iris { fill: #5b7fa6; }
 .vp-lgn { fill: #c9883a; }
@@ -2182,6 +2182,20 @@ body.diagram-open #model-credit { display: none !important; }
 .vp-field { opacity: 0.55; }
 .vp-field.lost { opacity: 0.8; }
 .vp-field-mid { stroke: var(--text-muted); stroke-width: 0.8; stroke-dasharray: 3 3; }
+.vp-brain { fill: rgba(185, 143, 214, 0.05); stroke: rgba(185, 143, 214, 0.32); stroke-width: 1; }
+.vp-orbit { fill: none; stroke: rgba(201, 205, 222, 0.22); stroke-width: 1.2; stroke-linejoin: round; }
+.vp-vent { fill: none; stroke: rgba(110, 160, 200, 0.13); stroke-width: 7; stroke-linecap: round; }
+.vp-v1 { fill: rgba(185, 143, 214, 0.28); stroke: rgba(185, 143, 214, 0.55); stroke-width: 0.8; }
+.vp-pretect { fill: none; stroke: rgba(232, 216, 112, 0.6); stroke-width: 1.1; stroke-dasharray: 2 2.5; }
+.vp-midbrain { fill: rgba(201, 205, 222, 0.08); stroke: rgba(201, 205, 222, 0.3); stroke-width: 0.8; }
+.vp-aqueduct { fill: rgba(110, 160, 200, 0.5); }
+.vp-chiasm { fill: rgba(232, 216, 112, 0.16); stroke: rgba(232, 216, 112, 0.4); stroke-width: 0.8; }
+.vp-pit { fill: rgba(232, 160, 120, 0.12); stroke: rgba(232, 160, 120, 0.5); stroke-width: 0.8; stroke-dasharray: 2 2; }
+.vp-cornea { fill: none; stroke: #c9d6e6; stroke-width: 1.4; }
+.vp-lens { fill: rgba(220, 232, 245, 0.85); stroke: #9fb3c8; stroke-width: 0.6; }
+.vp-retina { fill: none; stroke-width: 2.6; stroke-linecap: round; }
+.vp-sheet { fill: none; stroke: rgba(160, 170, 210, 0.08); stroke-width: 16; stroke-linecap: round; stroke-linejoin: round; }
+.vp-label.faint { opacity: 0.6; font-style: italic; font-size: 9px; }
 .vp-cutbar { stroke: #e04848; stroke-width: 4; stroke-linecap: round; }
 @media (max-width: 600px) {
   #pathway-diagram { padding-top: 64px; } /* clear the menu button */
@@ -2190,5 +2204,5 @@ body.diagram-open #model-credit { display: none !important; }
   .vp-figure { order: -1; } /* diagram first, pictures under it */
   .vp-views { justify-self: stretch; max-width: none; grid-template-rows: none; }
   .vp-pair, .vp-caption { grid-row: auto; }
-  .vp-figure svg { position: static; width: min(100%, 44vh); height: auto; aspect-ratio: 400 / 580; margin-inline: auto; }
+  .vp-figure svg { position: static; width: min(100%, 44vh); height: auto; aspect-ratio: 400 / 606; margin-inline: auto; }
 }
