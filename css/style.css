@@ -2149,7 +2149,9 @@ body.diagram-open #model-credit { display: none !important; }
 .vp-figure { position: relative; min-height: 0; }
 /* fills the row; the drawing scales to fit inside it */
 .vp-figure svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.vp-views { display: grid; gap: 12px; align-content: center; min-width: 0; max-width: 560px; justify-self: end; width: 100%; }
+/* The pictures sit in the middle row, centred on their own; the text hangs
+   below them, so its length never moves them. */
+.vp-views { display: grid; grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr); gap: 12px; min-width: 0; max-width: 560px; justify-self: end; width: 100%; }
 .vp-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } /* left eye | right eye */
 .vp-view { margin: 0; display: grid; gap: 5px; }
 .vp-view figcaption { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
@@ -2157,7 +2159,8 @@ body.diagram-open #model-credit { display: none !important; }
 .vp-view figcaption { text-align: center; }
 .vp-view-ring { fill: none; stroke: var(--text-muted); stroke-width: 2; }
 .vp-view-axis { stroke: rgba(255,255,255,0.35); stroke-width: 1; stroke-dasharray: 4 4; }
-.vp-caption { display: grid; gap: 3px; padding-top: 2px; }
+.vp-pair { grid-row: 2; }
+.vp-caption { grid-row: 3; align-self: start; display: grid; gap: 3px; padding-top: 2px; }
 .vp-caption b { font-size: 1.02rem; color: var(--text); }
 .vp-caption span { font-size: 0.85rem; color: var(--text-muted); line-height: 1.45; }
 .vp-strand { fill: none; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
@@ -2185,6 +2188,7 @@ body.diagram-open #model-credit { display: none !important; }
   #pathway-diagram { grid-template-columns: minmax(0, 1fr); align-content: start; align-items: start; }
   #pathway-diagram { grid-auto-rows: max-content; } /* full height; the panel scrolls */
   .vp-figure { order: -1; } /* diagram first, pictures under it */
-  .vp-views { justify-self: stretch; max-width: none; }
+  .vp-views { justify-self: stretch; max-width: none; grid-template-rows: none; }
+  .vp-pair, .vp-caption { grid-row: auto; }
   .vp-figure svg { position: static; width: min(100%, 44vh); height: auto; aspect-ratio: 400 / 580; margin-inline: auto; }
 }
