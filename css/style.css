@@ -2116,7 +2116,24 @@ body.diagram-open #model-credit { display: none !important; }
    like the Sliceable Brain's slice dock. */
 #pathway-diagram.mri { display: block; padding: 0; background: #000; overflow: hidden; }
 .mri-stage { position: absolute; inset: 0 0 118px 0; display: grid; place-items: center; }
+.mri-views { position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
+/* All views: transverse | sagittal | coronal, widths in the images' proportions so heights match. */
+.mri-views.all { grid-template-columns: minmax(0, 320fr) minmax(0, 512fr) minmax(0, 320fr); gap: 10px; padding: 8px 10px 0; }
+.mri-view { margin: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; min-height: 0; }
+.mri-view[hidden] { display: none; }
+.mri-view figcaption { color: var(--plane); font-size: 0.78rem; font-weight: 600; text-align: center; padding: 2px 0 4px; font-variant-numeric: tabular-nums; }
+.mri-view figcaption .mri-view-n { color: var(--text-muted); font-weight: 400; }
+.mri-views:not(.all) figcaption { display: none; }
+.mri-view.active figcaption .mri-view-name { text-decoration: underline; text-underline-offset: 3px; }
 .mri-svg { width: 100%; height: 100%; display: block; }
+.mri-cross { stroke-width: 1.3; opacity: 0.9; pointer-events: none; vector-effect: non-scaling-stroke; }
+.mri-st.picked path[fill-opacity] { fill-opacity: 0.5; }
+.mri-picked {
+  position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); z-index: 2;
+  padding: 5px 12px; border-radius: 999px; border: 1px solid var(--accent);
+  background: rgba(20, 23, 34, 0.94); color: var(--text); font-size: 0.82rem; cursor: pointer;
+}
+.mri-picked[hidden] { display: none; }
 .mri-st { cursor: pointer; }
 .mri-st.hl path[fill-opacity] { fill-opacity: 0.62; }
 .mri-st.hl path[stroke-width] { stroke-width: 2.2; }
@@ -2133,11 +2150,11 @@ body.diagram-open #model-credit { display: none !important; }
   background: rgba(20, 23, 34, 0.94); box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
 }
 .mri-planes { flex: 1; min-width: 0; }
-.mri-labels {
+.mri-labels, .mri-all {
   padding: 7px 12px; border-radius: 8px; border: 1.5px solid var(--border);
   background: transparent; color: var(--text-muted); font-size: 0.8rem; cursor: pointer;
 }
-.mri-labels[aria-pressed="true"], .mri-sweep[aria-pressed="true"] { border-color: var(--accent); color: var(--text); background: #1e2540; }
+.mri-labels[aria-pressed="true"], .mri-sweep[aria-pressed="true"], .mri-all[aria-pressed="true"] { border-color: var(--accent); color: var(--text); background: #1e2540; }
 .mri-sweep { padding: 6px 10px; border-radius: 8px; border: 1.5px solid var(--border); background: transparent; color: var(--text-muted); font-size: 0.78rem; cursor: pointer; }
 .mri-sweep:hover { color: var(--text); }
 .mri-pos { flex: 1; min-width: 120px; accent-color: var(--accent); cursor: pointer; height: 24px; }
@@ -2150,6 +2167,7 @@ body.diagram-open #model-credit { display: none !important; }
   .mri-stage { inset: 56px 0 150px 0; } /* clear the menu button and the dock */
   .mri-dock { bottom: 30px; width: calc(100% - 20px); padding: 10px; }
   .mri-planes { flex-basis: 100%; }
+  .mri-views.all { grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 0 8px; }
   .mri-credit { left: 10px; right: 10px; bottom: 6px; font-size: 0.6rem; text-align: center; }
 }
 
