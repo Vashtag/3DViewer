@@ -217,38 +217,10 @@
             </div>
           </div>
 
-          <!-- Cross-section slicer (models with slicer: true) -->
+          <!-- Cross-section slicer (models with slicer: true); controls are in the dock -->
           <div id="slice-section" class="hidden">
             <p class="sidebar-label">Cross-section</p>
-            <button id="slice-toggle" type="button" aria-pressed="false" aria-controls="slice-controls">Slice model</button>
-            <div id="slice-controls" class="hidden">
-              <div id="slice-face" class="hidden">
-                <span class="slice-range-label">Cut face</span>
-                <div class="settings-seg" role="group" aria-label="Cut face">
-                  <button type="button" data-face="atlas" aria-pressed="true" title="Atlas colours">Atlas</button>
-                  <button type="button" data-face="mri" aria-pressed="false" title="The MRI scan">MRI</button>
-                </div>
-              </div>
-              <div id="slice-axes" role="radiogroup" aria-label="Cutting plane">
-                <label class="slice-axis"><input type="radio" name="slice-axis" value="coronal" checked> Coronal <span>front/back</span></label>
-                <label class="slice-axis"><input type="radio" name="slice-axis" value="sagittal"> Sagittal <span>left/right</span></label>
-                <label class="slice-axis"><input type="radio" name="slice-axis" value="transverse"> Transverse <span>top/bottom</span></label>
-              </div>
-              <div id="slice-tilt">
-                <label class="slice-range-label" for="slice-tilt-a"><span id="slice-tilt-a-name">Pitch</span> <output id="slice-tilt-a-val">0°</output></label>
-                <input type="range" id="slice-tilt-a" min="-60" max="60" value="0">
-                <label class="slice-range-label" for="slice-tilt-b"><span id="slice-tilt-b-name">Yaw</span> <output id="slice-tilt-b-val">0°</output></label>
-                <input type="range" id="slice-tilt-b" min="-60" max="60" value="0">
-                <button type="button" id="slice-straighten" disabled>Straighten</button>
-              </div>
-              <label class="slice-range-label" for="slice-pos">Position <output id="slice-pos-val">50%</output></label>
-              <input type="range" id="slice-pos" min="0" max="1000" value="500">
-              <label class="slice-check"><input type="checkbox" id="slice-plane-show" checked> Show cutting plane</label>
-              <div class="slice-btn-row">
-                <button id="slice-flip" type="button">Flip side</button>
-                <button id="slice-sweep" type="button" aria-pressed="false">Sweep</button>
-              </div>
-            </div>
+            <button id="slice-toggle" type="button" aria-pressed="false" aria-controls="slice-dock">Slice model</button>
           </div>
 
           <!-- Structures: how to isolate one (models with region sections) -->
@@ -342,23 +314,42 @@
         <!-- Back to the whole model after isolating a structure -->
         <button type="button" id="isolate-restore" class="hidden">&#8634; Show whole brain</button>
 
-        <!-- Phones: slice controls on the main view while slicing -->
-        <div id="slice-bar" class="hidden" role="group" aria-label="Cross-section">
-          <div class="settings-seg" id="slice-bar-axes" role="group" aria-label="Cutting plane">
-            <button type="button" data-axis="coronal">Coronal</button>
-            <button type="button" data-axis="sagittal">Sagittal</button>
-            <button type="button" data-axis="transverse">Transverse</button>
-          </div>
-          <input type="range" id="slice-bar-pos" min="0" max="1000" value="500" aria-label="Slice position">
-          <div class="slice-bar-row">
-            <div class="settings-seg" id="slice-bar-face" role="group" aria-label="Cut face">
-              <button type="button" data-face="atlas">Atlas</button>
-              <button type="button" data-face="mri">MRI</button>
+        <!-- Slice dock: cross-section controls on the 3D view (all screen sizes) -->
+        <div id="slice-dock" class="hidden" role="group" aria-label="Cross-section">
+          <div class="dock-row">
+            <div class="dock-seg" id="slice-axes" role="group" aria-label="Cutting plane">
+              <button type="button" data-axis="coronal" aria-pressed="true" title="Coronal: front / back"><svg class="plane-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 4v16"/></svg><span>Coronal</span></button>
+              <button type="button" data-axis="sagittal" aria-pressed="false" title="Sagittal: left / right"><svg class="plane-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M6 15 18 9"/></svg><span>Sagittal</span></button>
+              <button type="button" data-axis="transverse" aria-pressed="false" title="Transverse: top / bottom"><svg class="plane-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M4 12h16"/></svg><span>Transverse</span></button>
             </div>
-            <button type="button" id="slice-bar-more">More</button>
-            <button type="button" id="slice-bar-done">Done</button>
+            <div class="dock-seg hidden" id="slice-face" role="group" aria-label="Cut face">
+              <button type="button" data-face="atlas" aria-pressed="true" title="Atlas colours">Atlas</button>
+              <button type="button" data-face="mri" aria-pressed="false" title="The MRI scan">MRI</button>
+            </div>
+          </div>
+          <div class="dock-row">
+            <input type="range" id="slice-pos" min="0" max="1000" value="500" aria-label="Slice position">
+            <output id="slice-pos-val" for="slice-pos">50%</output>
+            <button type="button" id="slice-more" class="dock-icon" aria-expanded="false" aria-controls="slice-extras" title="More: tilt, flip, sweep">&#9881;</button>
+            <button type="button" id="slice-close" class="dock-icon" title="Stop slicing" aria-label="Stop slicing">&#10005;</button>
+          </div>
+          <div id="slice-extras" hidden>
+            <div id="slice-tilt">
+              <label class="slice-range-label" for="slice-tilt-a"><span id="slice-tilt-a-name">Pitch</span> <output id="slice-tilt-a-val">0°</output></label>
+              <input type="range" id="slice-tilt-a" min="-60" max="60" value="0">
+              <label class="slice-range-label" for="slice-tilt-b"><span id="slice-tilt-b-name">Yaw</span> <output id="slice-tilt-b-val">0°</output></label>
+              <input type="range" id="slice-tilt-b" min="-60" max="60" value="0">
+            </div>
+            <div class="dock-row dock-actions">
+              <button type="button" id="slice-straighten" disabled>Straighten</button>
+              <button id="slice-flip" type="button">Flip side</button>
+              <button id="slice-sweep" type="button" aria-pressed="false">Sweep</button>
+              <label class="slice-check"><input type="checkbox" id="slice-plane-show" checked> Show plane</label>
+            </div>
           </div>
         </div>
+        <!-- Shown in the dock's place when slicing is off -->
+        <button type="button" id="slice-start" class="hidden">&#9986; Slice</button>
 
         <!-- Isolate pop-up for a structure (right-click / press and hold) -->
         <div id="struct-pop" class="hidden" role="dialog" aria-labelledby="struct-pop-name">

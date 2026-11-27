@@ -281,8 +281,8 @@ body:not(.dev-mode) .dev-only { display: none !important; }
   font-weight: 700;
   letter-spacing: 0.04em;
 }
-#slice-section.hidden, #slice-controls.hidden, #slice-thick-row.hidden { display: none; }
-#slice-toggle, #slice-flip, #slice-sweep {
+#slice-section.hidden { display: none; }
+#slice-toggle {
   width: 100%;
   padding: 8px 8px;
   border-radius: 8px;
@@ -294,56 +294,94 @@ body:not(.dev-mode) .dev-only { display: none !important; }
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
-#slice-toggle:hover, #slice-flip:hover, #slice-sweep:hover {
-  border-color: var(--accent);
-  color: var(--text);
-  background: #1e2540;
-}
-#slice-toggle[aria-pressed="true"], #slice-sweep[aria-pressed="true"] {
-  border-color: var(--accent);
-  background: #1e2540;
-  color: var(--text);
-}
-#slice-controls {
+#slice-toggle:hover { border-color: var(--accent); color: var(--text); background: #1e2540; }
+#slice-toggle[aria-pressed="true"] { border-color: var(--accent); background: #1e2540; color: var(--text); }
+.slice-check { display: flex; align-items: center; gap: 7px; font-size: 0.8rem; color: var(--text); cursor: pointer; }
+.slice-check input { accent-color: var(--accent); cursor: pointer; }
+.slice-range-label { display: flex; justify-content: space-between; font-size: 0.76rem; color: var(--text-muted); }
+.slice-range-label output { color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* ── Slice dock: floats at the bottom of the 3D view ── */
+#slice-dock {
+  position: absolute;
+  left: 50%;
+  bottom: 40px; /* clears the one-line credit under it */
+  transform: translateX(-50%);
+  z-index: 6;
+  width: min(560px, calc(100% - 24px));
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 10px;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(20, 23, 34, 0.94);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
 }
-#slice-axes { display: flex; flex-direction: column; gap: 2px; }
-.slice-axis, .slice-check {
-  display: flex;
+#slice-dock.hidden, #slice-start.hidden { display: none; }
+.dock-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dock-seg { display: inline-flex; border: 1.5px solid var(--border); border-radius: 8px; overflow: hidden; }
+.dock-seg.hidden { display: none; }
+#slice-axes { flex: 1; min-width: 0; }
+.dock-seg button {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
   align-items: center;
-  gap: 7px;
-  min-height: 26px;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
   font-size: 0.8rem;
-  color: var(--text);
   cursor: pointer;
-}
-.slice-axis span {
-  margin-left: auto;
   white-space: nowrap;
-  font-size: 0.66rem;
-  color: var(--text-muted);
 }
-.slice-axis input, .slice-check input { accent-color: var(--accent); cursor: pointer; }
-.slice-range-label {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.76rem;
-  color: var(--text-muted);
-  margin-top: 2px;
+.dock-seg button + button { border-left: 1.5px solid var(--border); }
+.dock-seg button:hover { color: var(--text); }
+.dock-seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.plane-ico { width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.plane-ico path { stroke-width: 2.6; }
+#slice-pos { flex: 1; min-width: 120px; accent-color: var(--accent); cursor: pointer; height: 24px; }
+#slice-pos-val { min-width: 3ch; font-size: 0.78rem; color: var(--text-muted); text-align: right; font-variant-numeric: tabular-nums; }
+.dock-icon {
+  width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid var(--border);
+  background: transparent; color: var(--text-muted); font-size: 0.95rem; cursor: pointer;
 }
-.slice-range-label output { color: var(--text); font-variant-numeric: tabular-nums; }
-#slice-pos, #slice-thick { width: 100%; accent-color: var(--accent); cursor: pointer; }
+.dock-icon:hover, .dock-icon[aria-expanded="true"] { border-color: var(--accent); color: var(--text); background: #1e2540; }
+#slice-extras { display: flex; flex-direction: column; gap: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+#slice-extras[hidden] { display: none; }
+#slice-tilt { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; }
+#slice-tilt label { grid-row: 1; }
+#slice-tilt input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; grid-row: 2; }
+.dock-actions button {
+  padding: 6px 10px; border-radius: 8px; border: 1.5px solid var(--border);
+  background: transparent; color: var(--text-muted); font-size: 0.78rem; cursor: pointer;
+}
+.dock-actions button:hover:not(:disabled), #slice-sweep[aria-pressed="true"] { border-color: var(--accent); color: var(--text); background: #1e2540; }
+.dock-actions button:disabled { opacity: 0.4; cursor: default; }
+.dock-actions .slice-check { margin-left: auto; }
+/* "Slice" pill in the dock's place when slicing is off */
+#slice-start {
+  position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 6;
+  padding: 9px 18px; border-radius: 999px; border: 1.5px solid var(--accent);
+  background: rgba(20, 23, 34, 0.92); color: var(--text); font-size: 0.85rem; font-weight: 600; cursor: pointer;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+}
+#slice-start:hover { background: #1e2540; }
+/* While slicing, the dock takes the bottom: tuck the hint away. */
+#viewer-container.slicing #bottom-bar { display: none; }
+@media (max-width: 600px) {
+  #slice-dock { bottom: 10px; width: calc(100% - 20px); padding: 10px; }
+  #slice-start { bottom: 16px; }
+  .dock-seg button { padding: 9px 6px; }
+  .dock-seg button span { font-size: 0.78rem; }
+  #slice-axes { flex-basis: 100%; }   /* planes get their own full-width row */
+  #slice-face { flex: 1; }
+  #viewer-container.slicing #model-credit { display: none; }
+}
 .slice-btn-row { display: flex; gap: 6px; }
-#slice-tilt { display: flex; flex-direction: column; gap: 4px; }
-#slice-face { display: flex; flex-direction: column; gap: 4px; }
-#slice-face.hidden { display: none; }
-#slice-face .settings-seg { display: flex; }
-#slice-face .settings-seg button { flex: 1; min-width: 0; }
-#slice-face .settings-seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
-#slice-tilt input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
 /* Layer on/off toggles (pressed = shown), two per row. */
 #struct-layers { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .struct-layer-btn {
@@ -365,11 +403,10 @@ body:not(.dev-mode) .dev-only { display: none !important; }
   text-decoration: none;
 }
 .struct-layer-btn:hover { border-color: var(--accent); color: var(--text); }
-#slice-straighten { align-self: flex-start; padding: 4px 10px; margin-top: 2px; }
 
 /* ── Structures panel (dev feature) ── */
 #struct-section.hidden { display: none; }
-#struct-show-all, #slice-straighten {
+#struct-show-all {
   width: 100%;
   padding: 7px 8px;
   border-radius: 8px;
@@ -380,11 +417,9 @@ body:not(.dev-mode) .dev-only { display: none !important; }
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
-#slice-straighten { width: auto; }
-#struct-show-all:hover, #slice-straighten:hover:not(:disabled) {
+#struct-show-all:hover {
   border-color: var(--accent); color: var(--text); background: #1e2540;
 }
-#slice-straighten:disabled { opacity: 0.4; cursor: default; }
 .struct-hint { margin: 0 0 4px; font-size: 0.74rem; line-height: 1.35; color: var(--text-muted); }
 .struct-hint-touch { display: none; }
 @media (pointer: coarse) { .struct-hint-mouse { display: none; } .struct-hint-touch { display: block; } }
@@ -409,40 +444,7 @@ body:not(.dev-mode) .dev-only { display: none !important; }
 #isolate-restore:hover { background: #1e2540; }
 #isolate-restore.hidden { display: none; }
 
-/* Phones: slice controls docked on the main view while slicing. */
-#slice-bar { display: none; }
-@media (max-width: 600px) {
-  #slice-bar:not(.hidden) {
-    position: absolute;
-    left: 10px;
-    right: 10px;
-    bottom: 10px;
-    z-index: 6;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 10px 12px 12px;
-    border-radius: 12px;
-    border: 1px solid var(--border);
-    background: rgba(20, 23, 34, 0.94);
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.35);
-  }
-  #slice-bar .settings-seg { display: flex; }
-  #slice-bar .settings-seg.hidden { display: none; }
-  #slice-bar .settings-seg button { flex: 1; min-width: 0; padding: 9px 4px; font-size: 0.8rem; }
-  #slice-bar .settings-seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
-  #slice-bar-pos { width: 100%; accent-color: var(--accent); height: 28px; }
-  .slice-bar-row { display: flex; gap: 8px; align-items: stretch; }
-  .slice-bar-row .settings-seg { flex: 1; }
-  #slice-bar-more, #slice-bar-done {
-    padding: 0 14px; border-radius: 8px; border: 1.5px solid var(--border);
-    background: transparent; color: var(--text); font-size: 0.8rem; cursor: pointer;
-  }
-  #slice-bar-done { border-color: var(--accent); background: rgba(79, 124, 255, 0.18); }
-  /* The bar takes the bottom of the screen: tuck away what lives there. */
-  #viewer-container.slicing #bottom-bar,
-  #viewer-container.slicing #model-credit { display: none; }
-}
+
 
 /* Isolate / hide pop-up next to the clicked structure. */
 #struct-pop {
@@ -471,7 +473,6 @@ body:not(.dev-mode) .dev-only { display: none !important; }
 #struct-pop-isolate { border-color: var(--accent); background: rgba(79, 124, 255, 0.18); }
 .struct-pop-btns button:hover { border-color: var(--accent); background: #1e2540; }
 @media (pointer: coarse) { .struct-pop-btns button { padding: 10px 6px; } }
-#slice-flip:disabled { opacity: 0.4; cursor: default; }
 .anno-label.slice-hidden { display: none !important; }
 #region-tip {
   position: absolute;
