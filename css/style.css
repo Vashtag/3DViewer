@@ -2115,11 +2115,13 @@ body.diagram-open #model-credit { display: none !important; }
    Uses the diagram layer; the scan fills it and the dock sits at the bottom
    like the Sliceable Brain's slice dock. */
 #pathway-diagram.mri { display: block; padding: 0; background: #000; overflow: hidden; }
-.mri-stage { position: absolute; inset: 0 0 118px 0; display: grid; place-items: center; }
+.mri-stage { position: absolute; inset: 0 0 var(--mri-dock, 118px) 0; display: grid; place-items: center; }
 .mri-views { position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
 /* All views: transverse | sagittal | coronal, widths in the images' proportions so heights match. */
 .mri-views.all { grid-template-columns: minmax(0, 320fr) minmax(0, 512fr) minmax(0, 320fr); gap: 10px; padding: 8px 10px 0; }
-.mri-view { margin: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; min-height: 0; }
+.mri-view { margin: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-width: 0; min-height: 0; }
+.mri-view-pos { width: 90%; justify-self: center; margin: 4px 0 2px; accent-color: var(--plane); cursor: pointer; }
+.mri-views:not(.all) .mri-view-pos { display: none; }
 .mri-view[hidden] { display: none; }
 .mri-view figcaption { color: var(--plane); font-size: 0.78rem; font-weight: 600; text-align: center; padding: 2px 0 4px; font-variant-numeric: tabular-nums; }
 .mri-view figcaption .mri-view-n { color: var(--text-muted); font-weight: 400; }
@@ -2164,7 +2166,7 @@ body.diagram-open #model-credit { display: none !important; }
   color: var(--text-muted); font-size: 0.68rem; background: rgba(15, 17, 23, 0.6); padding: 3px 8px; border-radius: 6px;
 }
 @media (max-width: 600px) {
-  .mri-stage { inset: 56px 0 150px 0; } /* clear the menu button and the dock */
+  .mri-stage { inset: 56px 0 var(--mri-dock, 150px) 0; } /* clear the menu button and the dock */
   .mri-dock { bottom: 30px; width: calc(100% - 20px); padding: 10px; }
   .mri-planes { flex-basis: 100%; }
   .mri-views.all { grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 0 8px; }
