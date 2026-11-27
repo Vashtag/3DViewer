@@ -3,9 +3,10 @@
 // sides are drawn, so a lesion is picked by clicking its numbered spot on the
 // side you want. Fibres past the cut turn grey.
 //
-// Beside the diagram, a picture shows what the patient sees, with the lost
-// part of the visual field blacked out: once with both eyes open and once for
-// each eye. The picture is assets/visual-scene.jpg when that file exists (any
+// In front of each eye a triangle shows its visual field (left half blue,
+// right half green; greyed when lost, striped when only the upper or lower
+// quarter of that half is lost). Beside the diagram, a picture shows what
+// each eye sees, with the lost part of the visual field blacked out. The picture is assets/visual-scene.jpg when that file exists (any
 // landscape photo, looked at through its centre), otherwise a drawn street
 // scene.
 //
@@ -65,6 +66,8 @@ const SCENE_URL = 'assets/visual-scene.jpg';
 let sceneOk = null; // null: not tried yet; true / false once known
 const SCENE_DEFS = `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
   <linearGradient id="vp-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7fb7ea"/><stop offset="1" stop-color="#cfe6f7"/></linearGradient>
+  <pattern id="vp-part-left" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="${FIELD_COLORS.lost}"/><rect width="3" height="6" fill="${FIELD_COLORS.left.upper}"/></pattern>
+  <pattern id="vp-part-right" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="${FIELD_COLORS.lost}"/><rect width="3" height="6" fill="${FIELD_COLORS.right.upper}"/></pattern>
   <filter id="vp-feather" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="3"/></filter>
   <symbol id="vp-scene" viewBox="0 0 320 200">
       <rect width="320" height="200" fill="url(#vp-sky)"/>
@@ -109,17 +112,14 @@ function paintView(svg, loss, sparing) {
 export function mountPathwayDiagram(host, { onChange } = {}) {
   host.innerHTML = `${SCENE_DEFS}
     <div class="vp-views">
-      <figure class="vp-view vp-both"><figcaption>Both eyes open</figcaption><svg viewBox="0 0 320 200" data-mask="vp-m-both" role="img" aria-label="What the patient sees with both eyes"></svg></figure>
-      <div class="vp-pair">
-        <figure class="vp-view"><figcaption>Left eye only</figcaption><svg viewBox="0 0 320 200" data-mask="vp-m-L" role="img" aria-label="What the left eye sees"></svg></figure>
-        <figure class="vp-view"><figcaption>Right eye only</figcaption><svg viewBox="0 0 320 200" data-mask="vp-m-R" role="img" aria-label="What the right eye sees"></svg></figure>
-      </div>
+      <figure class="vp-view"><figcaption>Left eye</figcaption><svg viewBox="0 0 320 200" data-mask="vp-m-L" role="img" aria-label="What the left eye sees"></svg></figure>
+      <figure class="vp-view"><figcaption>Right eye</figcaption><svg viewBox="0 0 320 200" data-mask="vp-m-R" role="img" aria-label="What the right eye sees"></svg></figure>
       <div class="vp-caption" aria-live="polite"><b></b><span></span></div>
     </div>
     <div class="vp-figure"></div>`;
-  const [vBoth, vL, vR] = host.querySelectorAll('.vp-view svg');
+  const [vL, vR] = host.querySelectorAll('.vp-view svg');
   const caption = host.querySelector('.vp-caption');
-  const svg = el('svg', { viewBox: '0 26 400 510', role: 'group', 'aria-label': 'Visual pathway seen from above. Numbered spots are lesion sites.' }, host.querySelector('.vp-figure'));
+  const svg = el('svg', { viewBox: '0 -44 400 580', role: 'group', 'aria-label': 'Visual pathway seen from above. Numbered spots are lesion sites.' }, host.querySelector('.vp-figure'));
 
   let current = { id: null, side: 'R' };
   let alive = true;
@@ -127,10 +127,6 @@ export function mountPathwayDiagram(host, { onChange } = {}) {
   function paintViews() {
     const l = LESION_BY_ID[current.id];
     const loss = fieldLoss(current.id, current.side);
-    // With both eyes open, a part of the scene is lost only if both eyes lose it.
-    const both = {};
-    for (const k of ['left-upper', 'right-upper', 'left-lower', 'right-lower']) if (loss.L[k] && loss.R[k]) both[k] = true;
-    paintView(vBoth, both, l?.sparing);
     paintView(vL, loss.L, l?.sparing);
     paintView(vR, loss.R, l?.sparing);
   }
@@ -138,6 +134,18 @@ export function mountPathwayDiagram(host, { onChange } = {}) {
   function render() {
     svg.textContent = '';
     const l = LESION_BY_ID[current.id];
+    // Visual field triangles in front of the eyes. Seen from above only the
+    // left / right halves show; a half missing one quarter is striped.
+    const loss = fieldLoss(current.id, current.side);
+    for (const [eye, x] of [['L', 130], ['R', 270]]) {
+      for (const half of ['left', 'right']) {
+        const up = loss[eye][`${half}-upper`], lo = loss[eye][`${half}-lower`];
+        const fill = up && lo ? FIELD_COLORS.lost : up || lo ? `url(#vp-part-${half})` : FIELD_COLORS[half].upper;
+        const edge = half === 'left' ? x - 58 : x + 58;
+        el('path', { d: `M${x},70 L${edge},-34 L${x},-34 Z`, fill, class: 'vp-field' + (up && lo ? ' lost' : '') }, svg);
+      }
+      el('line', { x1: x, y1: 70, x2: x, y2: -34, class: 'vp-field-mid' }, svg);
+    }
     for (const x of [130, 270]) {
       el('circle', { cx: x, cy: 100, r: 28, class: 'vp-eye' }, svg);
       el('ellipse', { cx: x, cy: 75, rx: 11, ry: 3.5, class: 'vp-iris' }, svg);
@@ -154,7 +162,7 @@ export function mountPathwayDiagram(host, { onChange } = {}) {
       el('path', { d: pathD(cut ? p.slice(0, k + 1) : p), class: 'vp-strand', stroke: FIELD_COLORS[b.fieldSide][b.field] }, svg);
       if (cut) el('path', { d: pathD(p.slice(k)), class: 'vp-strand', stroke: FIELD_COLORS.lost }, svg);
     }
-    [[130, 60, 'Left eye', 'middle'], [270, 60, 'Right eye', 'middle'], [60, 150, 'Optic nerve', 'start'], [222, 206, 'Optic chiasm', 'start'],
+    [[96, 104, 'Left eye', 'end'], [304, 104, 'Right eye', 'start'], [60, 150, 'Optic nerve', 'start'], [222, 206, 'Optic chiasm', 'start'],
      [100, 252, 'Optic tract', 'end'], [152, 300, 'LGN', 'start'], [70, 338, "Meyer's loop", 'end'], [150, 352, 'Parietal', 'start'], [200, 515, 'Visual cortex', 'middle']]
       .forEach(([x, y, t, a]) => { el('text', { x, y, class: 'vp-label', 'text-anchor': a }, svg).textContent = t; });
 

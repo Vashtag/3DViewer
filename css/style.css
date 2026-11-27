@@ -2149,8 +2149,8 @@ body.diagram-open #model-credit { display: none !important; }
 .vp-figure { position: relative; min-height: 0; }
 /* fills the row; the drawing scales to fit inside it */
 .vp-figure svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.vp-views { display: grid; gap: 12px; align-content: center; min-width: 0; max-width: 620px; justify-self: end; width: 100%; }
-.vp-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+/* two pictures stacked; narrow enough that both fit the viewer's height */
+.vp-views { display: grid; gap: 12px; align-content: center; min-width: 0; max-width: min(560px, calc((100vh - 250px) / 1.25)); justify-self: end; width: 100%; }
 .vp-view { margin: 0; display: grid; gap: 5px; }
 .vp-view figcaption { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
 .vp-view svg { width: 100%; height: auto; display: block; border-radius: 10px; border: 1px solid var(--border); }
@@ -2173,12 +2173,15 @@ body.diagram-open #model-credit { display: none !important; }
 .vp-spot:hover .vp-badge, .vp-spot:focus-visible .vp-badge { fill: #5b8cff; }
 .vp-spot.on .vp-badge { fill: #e04848; }
 .vp-num { fill: #fff; font-size: 10px; font-weight: 700; text-anchor: middle; dominant-baseline: central; pointer-events: none; font-family: inherit; }
+.vp-field { opacity: 0.55; }
+.vp-field.lost { opacity: 0.8; }
+.vp-field-mid { stroke: var(--text-muted); stroke-width: 0.8; stroke-dasharray: 3 3; }
 .vp-cutbar { stroke: #e04848; stroke-width: 4; stroke-linecap: round; }
 @media (max-width: 600px) {
   #pathway-diagram { padding-top: 64px; } /* clear the menu button */
   #pathway-diagram { grid-template-columns: minmax(0, 1fr); align-content: start; align-items: start; }
   #pathway-diagram { grid-auto-rows: max-content; } /* full height; the panel scrolls */
   .vp-figure { order: -1; } /* diagram first, pictures under it */
-  .vp-views { justify-self: stretch; }
-  .vp-figure svg { position: static; width: min(100%, 46vh); height: auto; aspect-ratio: 400 / 510; margin-inline: auto; }
+  .vp-views { justify-self: stretch; max-width: none; }
+  .vp-figure svg { position: static; width: min(100%, 44vh); height: auto; aspect-ratio: 400 / 580; margin-inline: auto; }
 }
