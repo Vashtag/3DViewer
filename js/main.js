@@ -1757,8 +1757,9 @@ const SLICE_FACE_MODES = { atlas: 0, mri: 1 };
 // Computers get the full 0.5 mm scan and region map; phones / tablets the
 // 1 mm ones, which need an eighth of the download and graphics memory.
 const MRI_HD = !window.matchMedia('(pointer: coarse)').matches;
-// Smooth the cut face's region boundaries (see labelIn in the shader).
-const SLICE_SMOOTH = true;
+// Smooth the cut face's region boundaries (see labelIn in the shader). Off:
+// voxels are drawn as they are, at full 0.5 mm resolution on computers.
+const SLICE_SMOOTH = false;
 
 // Pushes the current section textures and settings to the cut-face shader.
 function syncCapUniforms() {
