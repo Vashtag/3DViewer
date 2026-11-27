@@ -250,7 +250,7 @@ const MODELS = [
     // Allen Human Reference Atlas via BrainGlobe (built by tools/build-brain.py).
     // One mesh per atlas region, in the atlas colours. +X is the patient's
     // left, so the Left/Right buttons look from +X/-X respectively.
-    id: 'brain', label: 'Sliceable Brain', file: 'models/brain/brain.glb',
+    id: 'brain', label: 'Brain (3D)', file: 'models/brain/brain.glb',
     slicer: true,         // shows the Cross-section panel
     noFly: true,          // orbit only (no Fly mode)
     sliceByDefault: true, // opens already sliced
@@ -274,6 +274,15 @@ const MODELS = [
     ],
   },
   {
+    // Labelled MRI slices (js/mri-atlas.js), shown over the viewer like the
+    // Visual Pathway: pick a plane, drag through the slices, labels on / off.
+    id: 'brain-mri', label: 'Brain (MRI)', build: () => diagramPlaceholder(),
+    devFeature: 'mri',    // developer mode only, while in testing
+    noFly: true,
+    diagram: 'mri',
+    labels: [], savedViews: {},
+  },
+  {
     // Visual pathway lesions as a flat, top-down diagram (js/visual-pathway-2d.js)
     // shown over the viewer instead of a 3D model: click a lesion site, see the
     // visual field of each eye.
@@ -281,15 +290,6 @@ const MODELS = [
     devFeature: 'visual', // developer mode only, while in testing
     noFly: true,
     diagram: true,
-    labels: [], savedViews: {},
-  },
-  {
-    // Labelled MRI slices (js/mri-atlas.js), shown over the viewer like the
-    // Visual Pathway: pick a plane, drag through the slices, labels on / off.
-    id: 'brain-mri', label: 'Brain (MRI)', build: () => diagramPlaceholder(),
-    devFeature: 'mri',    // developer mode only, while in testing
-    noFly: true,
-    diagram: 'mri',
     labels: [], savedViews: {},
   },
   {

@@ -2233,7 +2233,9 @@ body.diagram-open #model-credit { display: none !important; }
   padding: 7px 12px; border-radius: 8px; border: 1.5px solid var(--border);
   background: transparent; color: var(--text-muted); font-size: 0.8rem; cursor: pointer;
 }
-.mri-labels[aria-pressed="true"] { border-color: var(--accent); color: var(--text); background: #1e2540; }
+.mri-labels[aria-pressed="true"], .mri-sweep[aria-pressed="true"] { border-color: var(--accent); color: var(--text); background: #1e2540; }
+.mri-sweep { padding: 6px 10px; border-radius: 8px; border: 1.5px solid var(--border); background: transparent; color: var(--text-muted); font-size: 0.78rem; cursor: pointer; }
+.mri-sweep:hover { color: var(--text); }
 .mri-pos { flex: 1; min-width: 120px; accent-color: var(--accent); cursor: pointer; height: 24px; }
 .mri-pos-val { min-width: 6ch; font-size: 0.78rem; color: var(--text-muted); text-align: right; font-variant-numeric: tabular-nums; }
 .mri-credit {

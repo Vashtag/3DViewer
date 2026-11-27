@@ -2,13 +2,13 @@
 // Visual Pathway diagram. Data from tools/extract-brain-mri.py:
 //   models/brain-mri/{cor,sag,ax}/NNN.jpg     the slices
 //   models/brain-mri/{cor,sag,ax}.json.gz     per slice, the outlined structures
-// The dock at the bottom works like the Sliceable Brain's: pick the plane,
+// The dock at the bottom works like the Brain (3D)'s: pick the plane,
 // drag the slider. Labels can be turned off; with them on, hovering (or
 // tapping) a coloured region names it.
 
 const NS = 'http://www.w3.org/2000/svg';
 
-// The slider runs like the Sliceable Brain's: right = anterior / patient's
+// The slider runs like the Brain (3D)'s: right = anterior / patient's
 // left / superior. The files run front-to-back (coronal) and top-to-bottom
 // (axial), so those two are reversed.
 const PLANES = [
@@ -52,6 +52,7 @@ export function mountMriAtlas(host, { base = 'models/brain-mri/', credit = '' } 
       <div class="dock-row">
         <input type="range" class="mri-pos" min="0" max="0" value="0" aria-label="Slice">
         <output class="mri-pos-val"></output>
+        <button type="button" class="mri-sweep" aria-pressed="false" title="Play through the slices">Sweep</button>
       </div>
     </div>
     <p class="mri-credit"></p>`;
@@ -156,8 +157,34 @@ export function mountMriAtlas(host, { base = 'models/brain-mri/', credit = '' } 
     if (g) showTip(g.dataset.name, e.clientX, e.clientY); else hideTip();
   });
 
-  pos.addEventListener('input', () => { state.index[state.plane] = Number(pos.value); draw(); });
-  host.querySelectorAll('[data-plane]').forEach(b => b.addEventListener('click', () => setPlane(b.dataset.plane)));
+  // Sweep: one pass from here to the end in about 6 s (from the start if
+  // already at the end), like the Brain (3D) slice dock. Any manual change stops it.
+  const sweepBtn = host.querySelector('.mri-sweep');
+  let sweep = null;
+  function setSweep(on) {
+    if (sweep) cancelAnimationFrame(sweep.raf);
+    sweep = null;
+    sweepBtn.setAttribute('aria-pressed', String(on));
+    const d = cache[state.plane];
+    if (!on || !d || d instanceof Promise) { sweepBtn.setAttribute('aria-pressed', 'false'); return; }
+    const n = d.slices.length;
+    let v = state.index[state.plane] ?? Math.floor(n / 2);
+    if (v >= n - 1) v = 0;
+    const s0 = { v, t0: performance.now(), raf: 0 };
+    sweep = s0;
+    const step = now => {
+      if (sweep !== s0 || !alive) return;
+      const nv = Math.min(n - 1, Math.floor(s0.v + ((now - s0.t0) / 6000) * n));
+      if (nv !== state.index[state.plane]) { state.index[state.plane] = nv; draw(); }
+      if (nv >= n - 1) { setSweep(false); return; }
+      s0.raf = requestAnimationFrame(step);
+    };
+    state.index[state.plane] = v; draw();
+    s0.raf = requestAnimationFrame(step);
+  }
+  sweepBtn.addEventListener('click', () => setSweep(!sweep));
+  pos.addEventListener('input', () => { setSweep(false); state.index[state.plane] = Number(pos.value); draw(); });
+  host.querySelectorAll('[data-plane]').forEach(b => b.addEventListener('click', () => { setSweep(false); setPlane(b.dataset.plane); }));
   labelsBtn.addEventListener('click', () => {
     state.labels = !state.labels;
     labelsBtn.setAttribute('aria-pressed', String(state.labels));
@@ -169,5 +196,5 @@ export function mountMriAtlas(host, { base = 'models/brain-mri/', credit = '' } 
     if (alive) PLANES.forEach(p => load(p.id).catch(() => {}));
   });
 
-  return { destroy() { alive = false; host.innerHTML = ''; } };
+  return { destroy() { alive = false; setSweep(false); host.innerHTML = ''; } };
 }
