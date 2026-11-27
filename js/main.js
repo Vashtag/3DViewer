@@ -231,7 +231,6 @@ const MODELS = [
   },
   {
     id: 'brainstem', label: 'Brainstem', file: 'models/brainstem/brainstem.glb',
-    category: 'CNS',
     rotation: [0, 0, 0],
     brightness: 2.2,
     views: [
@@ -244,7 +243,6 @@ const MODELS = [
     // One mesh per atlas region, in the atlas colours. +X is the patient's
     // left, so the Left/Right buttons look from +X/-X respectively.
     id: 'brain', label: 'Sliceable Brain', file: 'models/brain/brain.glb',
-    category: 'CNS',
     slicer: true,         // shows the Cross-section panel
     noFly: true,          // orbit only (no Fly mode)
     sliceByDefault: true, // opens already sliced
