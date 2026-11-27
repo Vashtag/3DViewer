@@ -311,6 +311,21 @@
         <!-- Data source / licence for the open model (e.g. the brain atlas) -->
         <p id="model-credit" class="hidden"></p>
 
+        <!-- Visual pathway: lesion site + side, and the resulting visual fields -->
+        <div id="lesion-dock" class="hidden" role="group" aria-label="Lesion">
+          <div class="lesion-head">
+            <span class="lesion-title">Lesion</span>
+            <div class="dock-seg" id="lesion-side" role="group" aria-label="Side of the lesion">
+              <button type="button" data-side="L" aria-pressed="false">Left side</button>
+              <button type="button" data-side="R" aria-pressed="true">Right side</button>
+            </div>
+          </div>
+          <div id="lesion-list" role="group" aria-label="Lesion site"></div>
+          <div id="lesion-fields"></div>
+          <p id="lesion-defect"></p>
+          <p id="lesion-note"></p>
+        </div>
+
         <!-- Back to the whole model after isolating a structure -->
         <button type="button" id="isolate-restore" class="hidden">&#8634; Show whole brain</button>
 
