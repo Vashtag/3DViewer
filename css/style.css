@@ -2119,9 +2119,7 @@ body.diagram-open #model-credit { display: none !important; }
 .mri-views { position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
 /* All views: transverse | sagittal | coronal, widths in the images' proportions so heights match. */
 .mri-views.all { grid-template-columns: minmax(0, 320fr) minmax(0, 512fr) minmax(0, 320fr); gap: 10px; padding: 8px 10px 0; }
-.mri-view { margin: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-width: 0; min-height: 0; }
-.mri-view-pos { width: 90%; justify-self: center; margin: 4px 0 2px; accent-color: var(--plane); cursor: pointer; }
-.mri-views:not(.all) .mri-view-pos { display: none; }
+.mri-view { margin: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; min-height: 0; }
 .mri-view[hidden] { display: none; }
 .mri-view figcaption { color: var(--plane); font-size: 0.78rem; font-weight: 600; text-align: center; padding: 2px 0 4px; font-variant-numeric: tabular-nums; }
 .mri-view figcaption .mri-view-n { color: var(--text-muted); font-weight: 400; }

@@ -27,7 +27,7 @@ These open over the viewer in place of a 3D model.
 
 | Model | What it is |
 |---|---|
-| **Brain (MRI)** | 342 slices of a T1 head MRI in all three planes, with 89 hand-outlined structures. **Labels** turns the outlines on and off, and hovering or tapping a region names it. **Sweep** plays through the slices. **All views** shows the three planes side by side with linked crosshairs. Click a structure to see it in all three, or drag each view's own slider. |
+| **Brain (MRI)** | 342 slices of a T1 head MRI in all three planes, with 89 hand-outlined structures. **Labels** turns the outlines on and off, and hovering or tapping a region names it. **Sweep** plays through the slices. **All views** shows the three planes side by side with linked crosshairs. Click a structure to see it in all three. |
 | **Visual Pathway** | A to-scale, top-down diagram from the eyes to the visual cortex. Click a numbered lesion site (optic nerve, chiasm, tract, Meyer's loop, parietal radiation, cortex) to see what each eye loses, drawn on a picture of a scene. |
 | **Eye Movements** | Both eyes with their six muscles, and the brainstem pathways that move them (FEF, PPRF, VI and III nuclei, MLF, riMLF). Pick a gaze, run the H test, tilt the head or look near. Then cut CN III, IV or VI, the MLF, or the VI nucleus, and watch which muscles fail. |
 
